@@ -25,15 +25,15 @@
     <button type="submit">Logout</button>
 </form>
 
-<!-- Admin‐only link -->
-<div sec:authorize="hasRole('attendance_client_admin')">
+<!-- Admin‐only link (admins or superadmins) -->
+<div sec:authorize="hasAnyRole('attendance_client_admin','attendance_client_superadmin')">
     <a th:href="@{/admin/dashboard}">
         <button type="button">Go to Admin Dashboard</button>
     </a>
 </div>
 
-<!-- Only admins see the Cool Animals list -->
-<section sec:authorize="hasRole('attendance_client_admin')">
+<!-- Only admins or superadmins see the Cool Animals list -->
+<section sec:authorize="hasAnyRole('attendance_client_admin','attendance_client_superadmin')">
     <h2>Cool Animals</h2>
     <table>
         <thead>
@@ -50,7 +50,7 @@
 </section>
 
 <!-- Fallback for non-admins -->
-<section sec:authorize="!hasRole('attendance_client_admin')">
+<section sec:authorize="!hasAnyRole('attendance_client_admin','attendance_client_superadmin')">
     <p><em>You don’t have permission to view the Cool Animals list.</em></p>
 </section>
 </body>

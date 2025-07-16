@@ -1,3 +1,4 @@
+// src/main/java/com/example/attendance/SecurityConfig.java
 package com.example.attendance;
 
 import java.util.HashSet;
@@ -10,6 +11,7 @@ import org.keycloak.representations.AccessToken;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -24,6 +26,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.logout.LogoutSuccessHandler;
 
 @Configuration
+@EnableMethodSecurity   // enable @PreAuthorize on controller methods
 public class SecurityConfig {
 
     @Bean
@@ -33,7 +36,11 @@ public class SecurityConfig {
         http
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/css/**", "/js/**", "/images/**").permitAll()
-                        .requestMatchers("/admin/**").hasAuthority("ROLE_attendance_client_admin")
+                        .requestMatchers("/admin/**")
+                        .hasAnyAuthority(
+                                "ROLE_attendance_client_admin",
+                                "ROLE_attendance_client_superadmin"
+                        )
                         .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth -> oauth

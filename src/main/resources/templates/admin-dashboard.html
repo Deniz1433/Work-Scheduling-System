@@ -1,6 +1,7 @@
 <!-- src/main/resources/templates/admin-dashboard.html -->
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/thymeleaf-extras-springsecurity6">
 <head>
     <meta charset="UTF-8"/>
     <title>Admin Dashboard</title>
@@ -27,16 +28,23 @@
                 th:separator="','">role</span>
         </td>
         <td>
-            <form th:action="@{'/admin/users/' + ${userDto.id} + '/roles'}" method="post">
-                <select name="selectedRoles" multiple>
-                    <option th:each="role : ${roles}"
-                            th:value="${role.name}"
-                            th:text="${role.name}"
-                            th:selected="${userDto.clientRoles.contains(role.name)}">
-                    </option>
-                </select>
-                <button type="submit">Save</button>
-            </form>
+            <!-- only superadmins see the selector & Save button -->
+            <div sec:authorize="hasRole('attendance_client_superadmin')">
+                <form th:action="@{'/admin/users/' + ${userDto.id} + '/roles'}" method="post">
+                    <select name="selectedRoles" multiple>
+                        <option th:each="role : ${roles}"
+                                th:value="${role.name}"
+                                th:text="${role.name}"
+                                th:selected="${userDto.clientRoles.contains(role.name)}">
+                        </option>
+                    </select>
+                    <button type="submit">Save</button>
+                </form>
+            </div>
+            <!-- regular admins see this notice instead -->
+            <div sec:authorize="!hasRole('attendance_client_superadmin')">
+                <em>Only superadmins may change roles</em>
+            </div>
         </td>
     </tr>
     </tbody>
