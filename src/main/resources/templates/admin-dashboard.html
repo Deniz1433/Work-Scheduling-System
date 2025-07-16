@@ -1,0 +1,47 @@
+<!-- src/main/resources/templates/admin-dashboard.html -->
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Admin Dashboard</title>
+</head>
+<body>
+<h1>Admin Dashboard: Manage attendance-client Roles</h1>
+
+<table>
+    <thead>
+    <tr>
+        <th>Username</th>
+        <th>Email</th>
+        <th>Client Roles (attendance-client)</th>
+        <th>Modify</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr th:each="userDto : ${adminUsers}">
+        <td th:text="${userDto.username}">username</td>
+        <td th:text="${userDto.email}">email</td>
+        <td>
+          <span th:each="r : ${userDto.clientRoles}"
+                th:text="${r}"
+                th:separator="','">role</span>
+        </td>
+        <td>
+            <form th:action="@{'/admin/users/' + ${userDto.id} + '/roles'}" method="post">
+                <select name="selectedRoles" multiple>
+                    <option th:each="role : ${roles}"
+                            th:value="${role.name}"
+                            th:text="${role.name}"
+                            th:selected="${userDto.clientRoles.contains(role.name)}">
+                    </option>
+                </select>
+                <button type="submit">Save</button>
+            </form>
+        </td>
+    </tr>
+    </tbody>
+</table>
+
+<a th:href="@{/}">← Back to Home</a>
+</body>
+</html>
