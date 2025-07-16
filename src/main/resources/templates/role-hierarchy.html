@@ -1,0 +1,183 @@
+<!-- src/main/resources/templates/role-hierarchy.html -->
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Interactive Role Hierarchy</title>
+
+    <!-- Only Cytoscape core -->
+    <script src="https://unpkg.com/cytoscape@3.24.0/dist/cytoscape.min.js"></script>
+
+    <style>
+        body { display:flex; height:100vh; margin:0; font-family:sans-serif; }
+        #sidebar { width:240px; padding:1rem; box-sizing:border-box; border-right:1px solid #ccc; overflow:auto; }
+        .mode-btn, #saveBtn {
+            display:block; margin-bottom:0.5rem; padding:0.5rem; width:100%;
+            border:none; border-radius:4px; cursor:pointer; font-weight:bold;
+        }
+        .mode-btn { background:#ddd; color:#000 }
+        .mode-btn.active { background:#48c; color:#fff }
+        #saveBtn { background:#4caf50; color:white }
+        #saveBtn:hover { background:#3e8e41 }
+        #cy, #cy canvas { flex:1; width:100%; height:100%; display:block }
+        .role-item {
+            cursor:pointer; padding:4px; border:1px solid #999;
+            margin:4px 0; background:#fafafa; user-select:none;
+        }
+        .role-item:hover { background:#eef }
+        .selected {
+            overlay-padding: 6px;
+            overlay-color: yellow;
+            overlay-opacity: 0.3;
+        }
+    </style>
+</head>
+<body>
+
+<div id="sidebar">
+    <button id="moveBtn" class="mode-btn">Move Mode</button>
+    <button id="arrowBtn" class="mode-btn">Arrow Mode</button>
+    <button id="saveBtn">Save Hierarchy</button>
+
+    <h2>Roles</h2>
+    <div th:each="r : ${roles}" class="role-item" th:text="${r}"></div>
+
+    <hr/>
+    <p><strong>Instructions:</strong></p>
+    <ul>
+        <li>Click a role to add it.</li>
+        <li><strong>Move Mode:</strong> drag &amp; drop nodes; click a node to remove it.</li>
+        <li><strong>Arrow Mode:</strong> click source → click target to draw.</li>
+        <li>Hit “Save Hierarchy” when done.</li>
+    </ul>
+</div>
+
+<div id="cy"></div>
+
+<script th:inline="javascript">
+    /*<![CDATA[*/
+    console.clear();
+    console.log("ROLE-SCRIPT: init");
+
+    // 1) Load existing hierarchy
+    const childrenMap = /*[[${childrenMap}]]*/ {};
+    const elements = [];
+    Object.entries(childrenMap).forEach(([p,kids]) => {
+        elements.push({ data:{ id:p, label:p } });
+        kids.forEach(c => {
+            elements.push({ data:{ id:c, label:c } });
+            elements.push({ data:{ id:p+'→'+c, source:p, target:c } });
+        });
+    });
+
+    // 2) Init Cytoscape
+    const cy = cytoscape({
+        container: document.getElementById('cy'),
+        elements,
+        style: [
+            {
+                selector:'node',
+                style:{
+                    'shape':'round-rectangle',
+                    'width':'label',
+                    'height':'label',
+                    'padding':'8px',
+                    'label':'data(label)',
+                    'text-valign':'center',
+                    'background-color':'#66c',
+                    'color':'#fff',
+                    'font-size':'12px'
+                }
+            },
+            {
+                selector:'edge',
+                style:{
+                    'curve-style':'bezier',
+                    'target-arrow-shape':'triangle',
+                    'line-color':'#888',
+                    'target-arrow-color':'#888'
+                }
+            },
+            {
+                selector:'.selected',
+                style:{
+                    'overlay-color':'yellow',
+                    'overlay-opacity':0.3,
+                    'overlay-padding':'6px'
+                }
+            }
+        ],
+        layout:{ name:'grid' }
+    });
+
+    // 3) Role-click → add nodes
+    document.querySelectorAll('.role-item').forEach(el => {
+        el.addEventListener('click', () => {
+            const role = el.textContent.trim();
+            if (cy.$id(role).length) return;
+            const x = cy.width()/2 + (Math.random()-0.5)*100;
+            const y = cy.height()/2 + (Math.random()-0.5)*100;
+            cy.add({ group:'nodes', data:{ id:role, label:role }, position:{ x,y } });
+        });
+    });
+
+    // 4) Handlers for Move vs Arrow
+    let deleteHandler = evt => {
+        const node = evt.target;
+        console.log('Deleting node', node.id());
+        cy.remove(node);
+    };
+
+    let srcNode = null;
+    let arrowHandler = evt => {
+        const tgt = evt.target;
+        if (!srcNode) {
+            srcNode = tgt;
+            tgt.addClass('selected');
+            console.log('Arrow source:', srcNode.id());
+        } else if (tgt.id()!==srcNode.id()) {
+            const eId = srcNode.id()+'→'+tgt.id();
+            cy.add({ data:{ id:eId, source:srcNode.id(), target:tgt.id() } });
+            console.log('Arrow:', srcNode.id(),'→',tgt.id());
+            srcNode.removeClass('selected');
+            srcNode = null;
+        }
+    };
+
+    function enableMoveMode(){
+        cy.autoungrabify(false);
+        cy.off('tap','node', arrowHandler);
+        cy.on('tap','node', deleteHandler);
+        moveBtn.classList.add('active');
+        arrowBtn.classList.remove('active');
+        // clear any selection
+        cy.nodes('.selected').removeClass('selected');
+        srcNode = null;
+    }
+
+    function enableArrowMode(){
+        cy.autoungrabify(true);
+        cy.off('tap','node', deleteHandler);
+        cy.on('tap','node', arrowHandler);
+        arrowBtn.classList.add('active');
+        moveBtn.classList.remove('active');
+    }
+
+    // 5) Wire mode buttons
+    const moveBtn  = document.getElementById('moveBtn');
+    const arrowBtn = document.getElementById('arrowBtn');
+    moveBtn.onclick  = enableMoveMode;
+    arrowBtn.onclick = enableArrowMode;
+    enableMoveMode();  // start in Move Mode
+
+    // 6) Save placeholder
+    document.getElementById('saveBtn').addEventListener('click', () => {
+        console.log('Save payload:', cy.json().elements);
+        alert('Save not implemented—see console.');
+    });
+
+    console.log("ROLE-SCRIPT: ready");
+    /*]]>*/
+</script>
+</body>
+</html>
