@@ -6,8 +6,10 @@ import com.example.attendance.repository.RoleHierarchyRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.LinkedHashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Set;
 
 @Service
 public class RoleHierarchyService {
@@ -32,6 +34,23 @@ public class RoleHierarchyService {
     @Transactional
     public void removeRelation(String parent, String child) {
         repo.deleteByParentRoleAndChildRole(parent, child);
+    }
+
+    /**
+     * Replace *all* relations with the provided list.
+     * First clears the table in batch, then inserts the new ones.
+     */
+    @Transactional
+    public void saveRelations(List<RoleRelationDto> relations) {
+        // 1) clear existing rows in a single SQL statement
+        repo.deleteAllInBatch();
+
+        // 2) insert each new (parent, child) pair
+        for (RoleRelationDto dto : relations) {
+            if (!dto.getParent().equals(dto.getChild())) {
+                repo.save(new RoleHierarchy(dto.getParent(), dto.getChild()));
+            }
+        }
     }
 
     /** Direct children of a role */
@@ -73,5 +92,29 @@ public class RoleHierarchyService {
                     });
         }
         return found;
+    }
+
+    /**
+     * DTO used by the save endpoint to represent a (parent, child) link.
+     */
+    public static class RoleRelationDto {
+        private String parent;
+        private String child;
+
+        public String getParent() {
+            return parent;
+        }
+
+        public void setParent(String parent) {
+            this.parent = parent;
+        }
+
+        public String getChild() {
+            return child;
+        }
+
+        public void setChild(String child) {
+            this.child = child;
+        }
     }
 }

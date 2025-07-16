@@ -5,31 +5,23 @@
     <meta charset="UTF-8"/>
     <title>Interactive Role Hierarchy</title>
 
-    <!-- Only Cytoscape core -->
+    <meta name="_csrf"       th:content="${_csrf.token}"/>
+    <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
+
     <script src="https://unpkg.com/cytoscape@3.24.0/dist/cytoscape.min.js"></script>
 
     <style>
         body { display:flex; height:100vh; margin:0; font-family:sans-serif; }
         #sidebar { width:240px; padding:1rem; box-sizing:border-box; border-right:1px solid #ccc; overflow:auto; }
-        .mode-btn, #saveBtn {
-            display:block; margin-bottom:0.5rem; padding:0.5rem; width:100%;
-            border:none; border-radius:4px; cursor:pointer; font-weight:bold;
-        }
+        .mode-btn, #saveBtn { display:block; margin-bottom:.5rem; padding:.5rem; width:100%; border:none; border-radius:4px; cursor:pointer; font-weight:bold }
         .mode-btn { background:#ddd; color:#000 }
         .mode-btn.active { background:#48c; color:#fff }
-        #saveBtn { background:#4caf50; color:white }
+        #saveBtn { background:#4caf50; color:#fff }
         #saveBtn:hover { background:#3e8e41 }
         #cy, #cy canvas { flex:1; width:100%; height:100%; display:block }
-        .role-item {
-            cursor:pointer; padding:4px; border:1px solid #999;
-            margin:4px 0; background:#fafafa; user-select:none;
-        }
+        .role-item { cursor:pointer; padding:4px; border:1px solid #999; margin:4px 0; background:#fafafa; user-select:none }
         .role-item:hover { background:#eef }
-        .selected {
-            overlay-padding: 6px;
-            overlay-color: yellow;
-            overlay-opacity: 0.3;
-        }
+        .selected { overlay-color:yellow; overlay-opacity:0.3; overlay-padding:6px }
     </style>
 </head>
 <body>
@@ -46,9 +38,9 @@
     <p><strong>Instructions:</strong></p>
     <ul>
         <li>Click a role to add it.</li>
-        <li><strong>Move Mode:</strong> drag &amp; drop nodes; click a node to remove it.</li>
-        <li><strong>Arrow Mode:</strong> click source → click target to draw.</li>
-        <li>Hit “Save Hierarchy” when done.</li>
+        <li><strong>Move Mode:</strong> drag & drop; click node to delete.</li>
+        <li><strong>Arrow Mode:</strong> click source, then click target to connect.</li>
+        <li>When done, hit “Save Hierarchy” to persist positions & links.</li>
     </ul>
 </div>
 
@@ -57,105 +49,85 @@
 <script th:inline="javascript">
     /*<![CDATA[*/
     console.clear();
-    console.log("ROLE-SCRIPT: init");
 
-    // 1) Load existing hierarchy
-    const childrenMap = /*[[${childrenMap}]]*/ {};
+    // load maps from server
+    const childrenMap  = /*[[${childrenMap}]]*/ {};
+    const positionsMap = /*[[${positionsMap}]]*/ {};
+
+    // build elements with saved positions
     const elements = [];
     Object.entries(childrenMap).forEach(([p,kids]) => {
-        elements.push({ data:{ id:p, label:p } });
+        const posP = positionsMap[p];
+        elements.push({
+            data:{ id:p, label:p },
+            position: posP ? { x: posP.x, y: posP.y } : undefined
+        });
         kids.forEach(c => {
-            elements.push({ data:{ id:c, label:c } });
+            const posC = positionsMap[c];
+            elements.push({
+                data:{ id:c, label:c },
+                position: posC ? { x: posC.x, y: posC.y } : undefined
+            });
             elements.push({ data:{ id:p+'→'+c, source:p, target:c } });
         });
     });
 
-    // 2) Init Cytoscape
+    // init Cytoscape
     const cy = cytoscape({
         container: document.getElementById('cy'),
         elements,
-        style: [
-            {
-                selector:'node',
-                style:{
-                    'shape':'round-rectangle',
-                    'width':'label',
-                    'height':'label',
-                    'padding':'8px',
-                    'label':'data(label)',
-                    'text-valign':'center',
-                    'background-color':'#66c',
-                    'color':'#fff',
-                    'font-size':'12px'
-                }
-            },
-            {
-                selector:'edge',
-                style:{
-                    'curve-style':'bezier',
-                    'target-arrow-shape':'triangle',
-                    'line-color':'#888',
-                    'target-arrow-color':'#888'
-                }
-            },
-            {
-                selector:'.selected',
-                style:{
-                    'overlay-color':'yellow',
-                    'overlay-opacity':0.3,
-                    'overlay-padding':'6px'
-                }
-            }
+        style:[
+            { selector:'node', style:{
+                    shape:'round-rectangle', width:'label', height:'label', padding:'8px',
+                    label:'data(label)', 'text-valign':'center',
+                    'background-color':'#66c','color':'#fff','font-size':'12px'
+                }},
+            { selector:'edge', style:{
+                    'curve-style':'bezier','target-arrow-shape':'triangle',
+                    'line-color':'#888','target-arrow-color':'#888'
+                }},
+            { selector:'.selected', style:{
+                    'overlay-color':'yellow','overlay-opacity':0.3,'overlay-padding':'6px'
+                }}
         ],
-        layout:{ name:'grid' }
+        layout:{ name:'preset' }  // use given positions
     });
 
-    // 3) Role-click → add nodes
+    // click-to-add roles (centered)
     document.querySelectorAll('.role-item').forEach(el => {
         el.addEventListener('click', () => {
             const role = el.textContent.trim();
             if (cy.$id(role).length) return;
-            const x = cy.width()/2 + (Math.random()-0.5)*100;
-            const y = cy.height()/2 + (Math.random()-0.5)*100;
+            const x = cy.width()/2, y = cy.height()/2;
             cy.add({ group:'nodes', data:{ id:role, label:role }, position:{ x,y } });
         });
     });
 
-    // 4) Handlers for Move vs Arrow
-    let deleteHandler = evt => {
-        const node = evt.target;
-        console.log('Deleting node', node.id());
-        cy.remove(node);
-    };
-
-    let srcNode = null;
+    // move vs arrow
+    let deleteHandler = evt => cy.remove(evt.target);
+    let src = null;
     let arrowHandler = evt => {
         const tgt = evt.target;
-        if (!srcNode) {
-            srcNode = tgt;
-            tgt.addClass('selected');
-            console.log('Arrow source:', srcNode.id());
-        } else if (tgt.id()!==srcNode.id()) {
-            const eId = srcNode.id()+'→'+tgt.id();
-            cy.add({ data:{ id:eId, source:srcNode.id(), target:tgt.id() } });
-            console.log('Arrow:', srcNode.id(),'→',tgt.id());
-            srcNode.removeClass('selected');
-            srcNode = null;
+        if (!src) { src = tgt; tgt.addClass('selected'); }
+        else if (tgt.id()!==src.id()) {
+            cy.add({ data:{
+                    id: src.id()+'→'+tgt.id(), source: src.id(), target: tgt.id()
+                }});
+            src.removeClass('selected');
+            src = null;
         }
     };
 
-    function enableMoveMode(){
+    function enableMove(){
         cy.autoungrabify(false);
         cy.off('tap','node', arrowHandler);
         cy.on('tap','node', deleteHandler);
         moveBtn.classList.add('active');
         arrowBtn.classList.remove('active');
-        // clear any selection
+        src = null;
         cy.nodes('.selected').removeClass('selected');
-        srcNode = null;
     }
-
-    function enableArrowMode(){
+    function enableArrow(){
         cy.autoungrabify(true);
         cy.off('tap','node', deleteHandler);
         cy.on('tap','node', arrowHandler);
@@ -163,21 +135,49 @@
         moveBtn.classList.remove('active');
     }
 
-    // 5) Wire mode buttons
     const moveBtn  = document.getElementById('moveBtn');
     const arrowBtn = document.getElementById('arrowBtn');
-    moveBtn.onclick  = enableMoveMode;
-    arrowBtn.onclick = enableArrowMode;
-    enableMoveMode();  // start in Move Mode
+    moveBtn.onclick  = enableMove;
+    arrowBtn.onclick = enableArrow;
+    enableMove();
 
-    // 6) Save placeholder
+    // save positions & relations
     document.getElementById('saveBtn').addEventListener('click', () => {
-        console.log('Save payload:', cy.json().elements);
-        alert('Save not implemented—see console.');
+        const token  = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+        const header = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+
+        const seen = new Set();
+        const rels = cy.edges().map(e => ({
+            parent: e.data('source'), child: e.data('target')
+        })).filter(p => {
+            const k = p.parent+'→'+p.child;
+            return seen.has(k) ? false : seen.add(k);
+        });
+
+        const poss = cy.nodes().map(n => ({
+            role: n.id(),
+            x: n.position('x'),
+            y: n.position('y')
+        }));
+
+        fetch('/admin/hierarchy/save', {
+            method:'POST',
+            headers:{
+                'Content-Type':'application/json',
+                [header]: token
+            },
+            body: JSON.stringify({ relations: rels, positions: poss })
+        })
+            .then(r => r.text().then(txt => {
+                if (r.ok) alert('Saved!');
+                else      alert('Save failed: '+txt);
+            }))
+            .catch(e => { console.error(e); alert('Save error—console'); });
     });
 
     console.log("ROLE-SCRIPT: ready");
     /*]]>*/
 </script>
+
 </body>
 </html>

@@ -1,4 +1,6 @@
 databaseChangeLog:
+
+  # — existing cool_animals table and inserts —
   - changeSet:
       id: 1
       author: deniz
@@ -49,3 +51,55 @@ databaseChangeLog:
               - column:
                   name: species
                   value: "Glaucus atlanticus"
+
+  # — new table for role hierarchy —
+  - changeSet:
+      id: 2
+      author: deniz
+      changes:
+        - createTable:
+            tableName: role_hierarchy
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+              - column:
+                  name: parent_role
+                  type: VARCHAR(100)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: child_role
+                  type: VARCHAR(100)
+                  constraints:
+                    nullable: false
+        - addUniqueConstraint:
+            tableName: role_hierarchy
+            columnNames: parent_role,child_role
+            constraintName: uq_role_hierarchy
+
+  - changeSet:
+      id: 3
+      author: deniz
+      changes:
+        - createTable:
+            tableName: role_node_position
+            columns:
+              - column:
+                  name: role
+                  type: VARCHAR(100)
+                  constraints:
+                    primaryKey: true
+              - column:
+                  name: pos_x
+                  type: DOUBLE
+                  constraints:
+                    nullable: false
+              - column:
+                  name: pos_y
+                  type: DOUBLE
+                  constraints:
+                    nullable: false

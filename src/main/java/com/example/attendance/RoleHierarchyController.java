@@ -2,9 +2,13 @@
 package com.example.attendance;
 
 import com.example.attendance.model.RoleHierarchy;
+import com.example.attendance.model.RoleNodePosition;
 import com.example.attendance.service.AdminService;
 import com.example.attendance.service.RoleHierarchyService;
+import com.example.attendance.service.RoleNodePositionService;
+import com.example.attendance.service.RoleHierarchyService.RoleRelationDto;
 import org.keycloak.representations.idm.RoleRepresentation;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -17,39 +21,34 @@ import java.util.stream.Collectors;
 @RequestMapping("/admin/hierarchy")
 @PreAuthorize("hasRole('attendance_client_superadmin')")
 public class RoleHierarchyController {
-
     private final RoleHierarchyService hierarchySvc;
+    private final RoleNodePositionService posSvc;
     private final AdminService adminSvc;
     private static final Set<String> BASE = Set.of("admin","user","superadmin");
 
-    public RoleHierarchyController(RoleHierarchyService hierarchySvc,
-                                   AdminService adminSvc) {
-        this.hierarchySvc = hierarchySvc;
-        this.adminSvc      = adminSvc;
+    public RoleHierarchyController(RoleHierarchyService h, RoleNodePositionService p, AdminService a) {
+        this.hierarchySvc = h;
+        this.posSvc       = p;
+        this.adminSvc     = a;
     }
 
     @GetMapping
     public String viewHierarchy(Model model) {
-        // all non-base client roles
-        List<String> roles = adminSvc.listClientRoles("attendance-client")
-                .stream()
+        // roles
+        List<String> roles = adminSvc.listClientRoles("attendance-client").stream()
                 .map(RoleRepresentation::getName)
                 .filter(r -> !BASE.contains(r))
                 .collect(Collectors.toList());
 
-        // all parent→child links
+        // relations
         List<RoleHierarchy> links = hierarchySvc.listAll();
-
-        // build children map
         Map<String,List<String>> childrenMap = new HashMap<>();
-        for (RoleHierarchy l : links) {
-            if (!childrenMap.containsKey(l.getParentRole())) {
-                childrenMap.put(l.getParentRole(), new ArrayList<>());
-            }
-            childrenMap.get(l.getParentRole()).add(l.getChildRole());
+        for (var l : links) {
+            childrenMap.computeIfAbsent(l.getParentRole(), k->new ArrayList<>())
+                    .add(l.getChildRole());
         }
 
-        // find roots: roles that never appear as a child
+        // roots
         Set<String> allChildren = links.stream()
                 .map(RoleHierarchy::getChildRole)
                 .collect(Collectors.toSet());
@@ -57,23 +56,50 @@ public class RoleHierarchyController {
                 .filter(r -> !allChildren.contains(r))
                 .collect(Collectors.toList());
 
+        // positions
+        Map<String,RoleNodePosition> posMap = posSvc.loadAll();
+
         model.addAttribute("roles", roles);
         model.addAttribute("roots", roots);
         model.addAttribute("childrenMap", childrenMap);
+        model.addAttribute("positionsMap", posMap);
+
         return "role-hierarchy";
     }
 
-    @PostMapping("/add")
-    public String addLink(@RequestParam String parent,
-                          @RequestParam String child) {
-        hierarchySvc.addRelation(parent, child);
-        return "redirect:/admin/hierarchy";
+    @PostMapping(path="/save", consumes="application/json")
+    @ResponseBody
+    public ResponseEntity<String> saveAll(@RequestBody SaveDto dto) {
+        try {
+            hierarchySvc.saveRelations(dto.getRelations());
+            // build entity list from dto.positions
+            List<RoleNodePosition> posList = dto.getPositions().stream()
+                    .map(p -> new RoleNodePosition(p.getRole(), p.getX(), p.getY()))
+                    .toList();
+            posSvc.saveAll(posList);
+            return ResponseEntity.ok("Saved relations & positions");
+        } catch (Exception ex) {
+            return ResponseEntity.status(500).body(ex.getMessage());
+        }
     }
 
-    @PostMapping("/remove")
-    public String removeLink(@RequestParam String parent,
-                             @RequestParam String child) {
-        hierarchySvc.removeRelation(parent, child);
-        return "redirect:/admin/hierarchy";
+    public static class SaveDto {
+        private List<RoleRelationDto> relations;
+        private List<PositionDto> positions;
+        public List<RoleRelationDto> getRelations() { return relations; }
+        public void setRelations(List<RoleRelationDto> r) { this.relations = r; }
+        public List<PositionDto> getPositions() { return positions; }
+        public void setPositions(List<PositionDto> p) { this.positions = p; }
+    }
+
+    public static class PositionDto {
+        private String role;
+        private double x, y;
+        public String getRole() { return role; }
+        public void setRole(String r) { this.role = r; }
+        public double getX() { return x; }
+        public void setX(double v) { this.x = v; }
+        public double getY() { return y; }
+        public void setY(double v) { this.y = v; }
     }
 }
