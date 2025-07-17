@@ -1,6 +1,6 @@
 databaseChangeLog:
 
-  # — existing cool_animals table and inserts —
+  # Cool animals table
   - changeSet:
       id: 1
       author: deniz
@@ -52,7 +52,7 @@ databaseChangeLog:
                   name: species
                   value: "Glaucus atlanticus"
 
-  # — new table for role hierarchy —
+  # Role hierarchy table
   - changeSet:
       id: 2
       author: deniz
@@ -81,6 +81,7 @@ databaseChangeLog:
             columnNames: parent_role,child_role
             constraintName: uq_role_hierarchy
 
+  # Role node positions
   - changeSet:
       id: 3
       author: deniz
