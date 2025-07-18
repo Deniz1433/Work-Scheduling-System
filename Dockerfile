@@ -5,12 +5,13 @@ COPY pom.xml .
 COPY src ./src
 RUN mvn clean package -DskipTests
 
-FROM eclipse-temurin:17-jdk-alpine
+# Alpine kullanma! Onun yerine debian/ubuntu tabanlı tam versiyon:
+FROM eclipse-temurin:17-jdk
 
-# install curl so our readiness probe can use it
-RUN apk add --no-cache curl
+RUN apt-get update && apt-get install -y curl
 
 WORKDIR /app
 COPY --from=builder /app/target/*.jar app.jar
+COPY themes /opt/keycloak/themes
 
 ENTRYPOINT ["java", "-jar", "app.jar"]

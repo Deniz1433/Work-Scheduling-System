@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   postgres:
-    image: postgres:15
+    image: postgres:17
     container_name: attendance-db
     environment:
       POSTGRES_DB: attendance-db
@@ -37,6 +37,7 @@ services:
     ports:
       - "127.0.0.1:8081:8080"
     volumes:
+      - ./themes:/opt/keycloak/themes:ro
       - ./attendance-realm-realm.json:/opt/keycloak/data/import/attendance-realm-realm.json:ro
     depends_on:
       - postgres
