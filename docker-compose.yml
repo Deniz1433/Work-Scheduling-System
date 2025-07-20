@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:17
@@ -20,19 +18,16 @@ services:
       - start-dev
       - --import-realm
     environment:
-      # internal hostname for Docker network
       KC_HOSTNAME: localhost
       KC_HOSTNAME_STRICT: "false"
       PROXY_ADDRESS_FORWARDING: "true"
       KEYCLOAK_FRONTEND_URL: http://localhost:8081
-      # admin + DB
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://postgres:5432/attendance-db
       KC_DB_USERNAME: admin
       KC_DB_PASSWORD: admin
-      # import your realm
       KEYCLOAK_IMPORT: /opt/keycloak/data/import/attendance-realm-realm.json
     ports:
       - "127.0.0.1:8081:8080"
@@ -48,51 +43,44 @@ services:
     depends_on:
       - postgres
       - keycloak
-    restart: on-failure
     ports:
       - "8080:8080"
     environment:
       SPRING_PROFILES_ACTIVE: default
 
-      # — Database —
+      # Database
       SPRING_DATASOURCE_URL:      jdbc:postgresql://postgres:5432/attendance-db
       SPRING_DATASOURCE_USERNAME: admin
       SPRING_DATASOURCE_PASSWORD: admin
 
-      # — OAuth2 / OIDC (manual endpoint wiring) —
-
-      # Provider endpoints (no issuer-uri)
+      # OAuth2 / OIDC (manual endpoints)
       SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_KEYCLOAK_AUTHORIZATION_URI: http://localhost:8081/realms/attendance-realm/protocol/openid-connect/auth
       SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_KEYCLOAK_TOKEN_URI:         http://keycloak:8080/realms/attendance-realm/protocol/openid-connect/token
       SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_KEYCLOAK_USER_INFO_URI:     http://keycloak:8080/realms/attendance-realm/protocol/openid-connect/userinfo
       SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_KEYCLOAK_JWK_SET_URI:       http://keycloak:8080/realms/attendance-realm/protocol/openid-connect/certs
 
       # Client registration
-      SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_KEYCLOAK_CLIENT_ID:                   attendance-client
-      SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_KEYCLOAK_CLIENT_SECRET:               PeueXSVXlHdbeJnY2zTv1Bpw8GHC1Nyk
-      SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_KEYCLOAK_REDIRECT_URI:                "{baseUrl}/login/oauth2/code/{registrationId}"
-      SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_KEYCLOAK_SCOPE:                       openid,profile,email
-      # pick up Keycloak’s preferred_username from the userinfo response
-      SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_KEYCLOAK_USER_NAME_ATTRIBUTE:         preferred_username
+      SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_KEYCLOAK_CLIENT_ID:           attendance-client
+      SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_KEYCLOAK_CLIENT_SECRET:       PeueXSVXlHdbeJnY2zTv1Bpw8GHC1Nyk
+      SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_KEYCLOAK_REDIRECT_URI:        "{baseUrl}/login/oauth2/code/{registrationId}"
+      SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_KEYCLOAK_SCOPE:               openid,profile,email
+      SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_KEYCLOAK_USER_NAME_ATTRIBUTE: preferred_username
+      SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_KEYCLOAK_PROVIDER:            keycloak
 
-      # Optional: if you had set a provider reference in your properties
-      SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_KEYCLOAK_PROVIDER:                    keycloak
-
-      # SQL logging, etc. (carry over your existing settings)
-      SPRING_JPA_SHOW_SQL:            "true"
-      SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL: "true"
-      LOGGING_LEVEL_ORG_HIBERNATE_SQL: DEBUG
-      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_SECURITY: DEBUG
+      # Logging
+      SPRING_JPA_SHOW_SQL:                               "true"
+      SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL:        "true"
+      LOGGING_LEVEL_ORG_HIBERNATE_SQL:                   DEBUG
+      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_SECURITY:        DEBUG
       LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_SECURITY_OAUTH2_CLIENT: DEBUG
       LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_SECURITY_OAUTH2_CORE:   DEBUG
-
     entrypoint:
       - sh
       - -c
       - |
         echo "⏳ Waiting for Keycloak…"
         until curl -sSf http://keycloak:8080/realms/attendance-realm/.well-known/openid-configuration >/dev/null 2>&1; do
-          sleep 3
+          sleep 2
         done
         echo "✅ Keycloak ready; starting app."
         exec java -jar /app/app.jar
