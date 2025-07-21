@@ -51,7 +51,7 @@ const EmployeeExcuseForm = () => {
     
     alert('Mazeret başvurunuz gönderildi!');
     
-    // Reset form
+    // Formu sıfırla
     setSelectedDates([]);
     setAttendanceStatus('');
     setDescription('');

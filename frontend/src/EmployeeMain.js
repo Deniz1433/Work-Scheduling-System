@@ -1,14 +1,30 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, Users, FileText } from 'lucide-react';
 import AttendanceRegistration from './EmployeeAttendanceRegistration';
 import TeamAttendance from './EmployeeTeamAttendance';
 import ExcuseForm from './EmployeeExcuseForm';
+import DepartmentInfo from './EmployeeDepartmentInfo';
 import logo from './assets/logo.png'
+import { LogOut } from 'lucide-react'; 
 
 const EmployeeMain = () => {
+  const [user, setUser] = useState(null);
+  
+
+  useEffect(() => {
+    fetch('/api/user')
+      .then(response => response.json())
+      .then(data => {
+        setUser(data); // Veriyi state'e kaydet
+      })
+      .catch(error => {
+        console.error('Hata:', error);
+      });
+  }, []);
   const [activeView, setActiveView] = useState('registration');
 
-  const navigationItems = [
+  // Tüm menü elemanları
+  const allNavigationItems = [
     {
       id: 'registration',
       label: 'Ofis Günü Kayıt',
@@ -26,18 +42,37 @@ const EmployeeMain = () => {
       label: 'Mazeret Belirt',
       icon: FileText,
       component: ExcuseForm
+    },
+    {
+      id: 'department',
+      label: 'Departman Bilgileri',
+      icon: FileText,
+      component: DepartmentInfo
     }
   ];
+
+  // KULLANICI ROLÜNE GÖRE BUTON FİLTRELEME ALANI
+  const navigationItems = allNavigationItems.filter(item => {
+    if (item.id === 'department') {// sadece manager rolü görüntüler
+      return user?.authorities?.includes('ROLE_attendance_client_manager');
+    }
+    if (item.id === 'team') { // sadece ekip üyeleri ve liderleri görüntüler
+      return user?.authorities?.includes('ROLE_attendance_client_staff') || user?.authorities?.includes('ROLE_attendance_client_team_leader');
+    }
+    return true;
+  });
 
   const renderActiveComponent = () => {
     const activeItem = navigationItems.find(item => item.id === activeView);
     if (activeItem) {
       const Component = activeItem.component;
-      return <Component />;
+      return <Component user={user} />;
     }
     return null;
   };
-
+  const handleLogout = () => {
+    window.location.href = '/logout';
+  };
   return (
     <div className="flex h-screen bg-gray-100">
       {/*Navigasyon Çubuğu*/}
@@ -73,14 +108,22 @@ const EmployeeMain = () => {
               <User className="w-5 h-5 text-white" />
             </div>
             <div className="mt-auto">
-              <div className="font-medium text-sm">Kullanıcı</div>
-              <div className="text-xs text-gray-400">user@company.com</div>
+              <div className="font-medium text-sm">{user?.preferredUsername || user?.name || 'Kullanıcı'}</div>
+              <div className="text-xs text-gray-400">{user?.email || 'example@example.com'}</div>
             </div>
           </div>
         </div>
 
         {/*Yaşar Bilgi Logosu*/}
         <img src={logo} alt="Logo" className="w-max mt-auto mx-auto" />
+        {/* Çıkış Yap Butonu */}
+        <button
+          onClick={handleLogout}
+          className="mt-6 w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-left bg-red-600 hover:bg-red-700 text-white font-medium"
+        >
+          <LogOut className="w-5 h-5" />
+          Çıkış Yap
+        </button>
       </div>
 
       {/*Ana ekran*/}
@@ -94,8 +137,9 @@ const EmployeeMain = () => {
               </h2>
               <p className="text-sm text-gray-600">
                 {activeView === 'registration' && 'Ofiste çalışacağınız günleri belirleyin'}
-                {activeView === 'team' && 'Ekip üyelerinin ofis günlerini görüntüleyin'}
                 {activeView === 'excuse' && 'Devamsızlık için mazeret başvurusu oluşturun'}
+                {activeView === 'team' && 'Ekip üyelerinin ofis günlerini görüntüleyin'}
+                {activeView === 'department' && 'Departman bilgilerini görüntüleyin'}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -110,7 +154,7 @@ const EmployeeMain = () => {
             </div>
           </div>
         </header>
-
+        
         {/* Dynamic Content */}
         <main className="flex-1 overflow-auto">
           {renderActiveComponent()}
