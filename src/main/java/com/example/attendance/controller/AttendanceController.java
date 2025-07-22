@@ -1,0 +1,37 @@
+package com.example.attendance.controller;
+
+import com.example.attendance.dto.AttendanceRequest;
+import com.example.attendance.service.AttendanceService;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.security.Principal;
+import java.time.LocalDate;
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/attendance")
+public class AttendanceController {
+    private final AttendanceService service;
+
+    public AttendanceController(AttendanceService service) {
+        this.service = service;
+    }
+
+    @PostMapping
+    public ResponseEntity<?> submit(
+            @RequestBody AttendanceRequest req,
+            Principal principal
+    ) {
+        service.record(principal.getName(), req.getDates());
+        return ResponseEntity.ok().build();
+    }
+
+    @GetMapping
+    public ResponseEntity<List<LocalDate>> list(
+            Principal principal
+    ) {
+        List<LocalDate> dates = service.fetch(principal.getName());
+        return ResponseEntity.ok(dates);
+    }
+}

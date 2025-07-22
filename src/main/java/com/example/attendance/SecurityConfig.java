@@ -30,25 +30,38 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
+                // disable CSRF for our stateless API endpoint
+                .csrf(csrf -> csrf
+                        .ignoringRequestMatchers("/api/attendance/**")
+                )
                 .authorizeHttpRequests(auth -> auth
-                        // allow React static files
-                        .requestMatchers("/static/**", "/favicon.ico").permitAll()
-                        // your custom CSS/JS/images (if any)
-                        .requestMatchers("/css/**", "/js/**", "/images/**").permitAll()
-                        // admin paths
+                        // allow React build artifacts
+                        .requestMatchers(
+                                "/static/**",
+                                "/favicon.ico",
+                                "/css/**",
+                                "/js/**",
+                                "/images/**"
+                        ).permitAll()
+
+                        // only admins on /admin/**
                         .requestMatchers("/admin/**")
                         .hasAnyAuthority(
                                 "ROLE_attendance_client_admin",
                                 "ROLE_attendance_client_superadmin"
                         )
-                        // everything else needs login
+
+                        // attendance API requires a logged-in user
+                        .requestMatchers("/api/attendance/**")
+                        .authenticated()
+
+                        // everything else also needs authentication
                         .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth -> oauth
-                        // always end up on "/" after successful login
                         .defaultSuccessUrl("/", true)
-                        .userInfoEndpoint(userInfo -> userInfo
-                                .oidcUserService(oidcUserServiceWithTokenVerifier())
+                        .userInfoEndpoint(userInfo ->
+                                userInfo.oidcUserService(oidcUserServiceWithTokenVerifier())
                         )
                 )
                 .logout(logout -> logout
@@ -68,8 +81,9 @@ public class SecurityConfig {
             Set<GrantedAuthority> mapped = new HashSet<>();
 
             try {
-                AccessToken kcToken =
-                        TokenVerifier.create(tokenString, AccessToken.class).getToken();
+                AccessToken kcToken = TokenVerifier
+                        .create(tokenString, AccessToken.class)
+                        .getToken();
 
                 // realm-level roles
                 if (kcToken.getRealmAccess() != null) {
@@ -78,22 +92,18 @@ public class SecurityConfig {
                     );
                 }
 
-                // client-specific roles ("attendance-client")
-                Map<String, AccessToken.Access> resources =
-                        kcToken.getResourceAccess();
-                if (resources != null &&
-                        resources.containsKey("attendance-client")) {
+                // client-specific roles
+                Map<String, AccessToken.Access> resources = kcToken.getResourceAccess();
+                if (resources != null && resources.containsKey("attendance-client")) {
                     resources.get("attendance-client").getRoles().forEach(r ->
                             mapped.add(new SimpleGrantedAuthority(
                                     "ROLE_attendance_client_" + r.replace('-', '_')
                             ))
                     );
                 }
-            } catch (VerificationException e) {
-                // ignore token parse errors
-            }
+            } catch (VerificationException ignored) { }
 
-            var userInfo = delegate.loadUser(userRequest);
+            OidcUser userInfo = delegate.loadUser(userRequest);
             return new DefaultOidcUser(
                     mapped,
                     userInfo.getIdToken(),
@@ -112,10 +122,7 @@ public class SecurityConfig {
             }
 
             String logoutUrl = UriComponentsBuilder
-                    .fromHttpUrl(
-                            "http://localhost:8081/realms/attendance-realm"
-                                    + "/protocol/openid-connect/logout"
-                    )
+                    .fromHttpUrl("http://localhost:8081/realms/attendance-realm/protocol/openid-connect/logout")
                     .queryParam("id_token_hint", idTokenHint)
                     .queryParam("post_logout_redirect_uri", redirectUri)
                     .toUriString();
