@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { User, Users, FileText } from 'lucide-react';
+import { User, Users, FileText, Calendar1, UserPlus, LogOut } from 'lucide-react';
 import AttendanceRegistration from './EmployeeAttendanceRegistration';
 import TeamAttendance from './EmployeeTeamAttendance';
 import ExcuseForm from './EmployeeExcuseForm';
 import DepartmentInfo from './EmployeeDepartmentInfo';
-import logo from './assets/logo.png'
-import { LogOut } from 'lucide-react'; 
+import AdminAddUser from './AdminAddUser';
+import logo from './assets/logo.png'  
 
 const EmployeeMain = () => {
   const [user, setUser] = useState(null);
@@ -34,7 +34,7 @@ const EmployeeMain = () => {
     {
       id: 'team',
       label: 'Ekip Takvimini Görüntüle',
-      icon: Users,
+      icon: Calendar1,
       component: TeamAttendance
     },
     {
@@ -46,8 +46,14 @@ const EmployeeMain = () => {
     {
       id: 'department',
       label: 'Departman Bilgileri',
-      icon: FileText,
+      icon: Users,
       component: DepartmentInfo
+    },
+    {
+      id: 'adminAddUser',
+      label: 'Kullanıcı Ekle - Çıkar',
+      icon: UserPlus,
+      component: AdminAddUser
     }
   ];
 
@@ -140,6 +146,7 @@ const EmployeeMain = () => {
                 {activeView === 'excuse' && 'Devamsızlık için mazeret başvurusu oluşturun'}
                 {activeView === 'team' && 'Ekip üyelerinin ofis günlerini görüntüleyin'}
                 {activeView === 'department' && 'Departman bilgilerini görüntüleyin'}
+                {activeView === 'adminAddUser' && 'Kullanıcı ekleyin - çıkarın'}
               </p>
             </div>
             <div className="flex items-center gap-2">
