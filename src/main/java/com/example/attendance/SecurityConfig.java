@@ -30,9 +30,9 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                // disable CSRF for our stateless API endpoint
+                // disable CSRF for our stateless API endpoints
                 .csrf(csrf -> csrf
-                        .ignoringRequestMatchers("/api/attendance/**")
+                        .ignoringRequestMatchers("/api/attendance/**", "/api/excuse/**")
                 )
                 .authorizeHttpRequests(auth -> auth
                         // allow React build artifacts
@@ -51,8 +51,8 @@ public class SecurityConfig {
                                 "ROLE_attendance_client_superadmin"
                         )
 
-                        // attendance API requires a logged-in user
-                        .requestMatchers("/api/attendance/**")
+                        // attendance & excuse APIs require a logged-in user
+                        .requestMatchers("/api/attendance/**", "/api/excuse/**")
                         .authenticated()
 
                         // everything else also needs authentication
