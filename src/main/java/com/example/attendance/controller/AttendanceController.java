@@ -1,6 +1,7 @@
 package com.example.attendance.controller;
 
 import com.example.attendance.dto.AttendanceRequest;
+import com.example.attendance.dto.TeamAttendanceDto;
 import com.example.attendance.service.AttendanceService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -33,5 +34,11 @@ public class AttendanceController {
     ) {
         List<LocalDate> dates = service.fetch(principal.getName());
         return ResponseEntity.ok(dates);
+    }
+
+    @GetMapping("/team")
+    public ResponseEntity<List<TeamAttendanceDto>> getTeamAttendance(Principal principal) {
+        List<TeamAttendanceDto> team = service.getTeamAttendance(principal.getName());
+        return ResponseEntity.ok(team);
     }
 }

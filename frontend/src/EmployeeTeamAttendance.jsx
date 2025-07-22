@@ -1,49 +1,28 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import user from "./EmployeeMain"
 
 const EmployeeTeamAttendance = ({ user }) => {
 
-  // Örnek data
-  const teamData = [
-    {
-      id: 1,
-      name: "AHMET EMIN",
-      surname: "KAHRAMAN",
-      department: "JAVA YAZILIM GELİŞTİRME DEPARTMANI",
-      attendance: [true, true, true, true, true], // Pzt, Salı, Çrş, Perş, Cuma
-      isApproved: false,
-      employeeExcuse: "Doktor raporu mevcut - Perşembe günü kontrole gideceğim"
-    },
-    {
-      id: 2,
-      name: "EMILETTIN YAVUZ",
-      surname: "ÜVE",
-      department: "JAVA YAZILIM GELİŞTİRME DEPARTMANI",
-      attendance: [true, true, false, false, true],
-      isApproved: true,
-      employeeExcuse: ""
-    },
-    {
-      id: 3,
-      name: "CENK",
-      surname: "KARAASLAN",
-      department: "JAVA YAZILIM GELİŞTİRME DEPARTMANI",
-      attendance: [false, true, true, true, false],
-      isApproved: false,
-      employeeExcuse: "Cuma günü özel işim var, pazartesi evden çalışacağım"
-    },
-    {
-      id: 4,
-      name: "ONUR",
-      surname: "ÇİMEN",
-      department: "JAVA YAZILIM GELİŞTİRME DEPARTMANI",
-      attendance: [true, false, false, false, true],
-      isApproved: true,
-      employeeExcuse: ""
-    }
-  ];
+  const [teamState, setTeamState] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const [teamState, setTeamState] = useState(teamData);
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // headers removed temporarily for development
+        const response = await fetch('/api/attendance/team');
+        const data = await response.json();
+        setTeamState(data);
+      } catch (err) {
+        setError('Veri alınamadı.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingMember, setEditingMember] = useState(null);
   const [tempAttendance, setTempAttendance] = useState([]);

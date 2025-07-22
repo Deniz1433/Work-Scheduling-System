@@ -89,3 +89,39 @@ databaseChangeLog:
                   defaultValueBoolean: false
                   constraints:
                     nullable: false
+
+# Populate attendance table with sample data
+  - changeSet:
+      id: 5
+      author: deniz
+      changes:
+        - insert:
+            tableName: attendance
+            columns:
+              - column:
+                  name: user_id
+                  value: "123e4567-e89b-12d3-a456-426614174000"
+              - column:
+                  name: attendance_date
+                  valueDate: "2025-07-21"
+              - column:
+                  name: created_at
+                  valueDate: "2025-07-21T09:00:00"
+              - column:
+                  name: is_verified
+                  valueBoolean: true
+        - insert:
+            tableName: attendance
+            columns:
+              - column:
+                  name: user_id
+                  value: "987e6543-e21b-45d3-a123-426614174999"
+              - column:
+                  name: attendance_date
+                  valueDate: "2025-07-21"
+              - column:
+                  name: created_at
+                  valueDate: "2025-07-21T09:05:00"
+              - column:
+                  name: is_verified
+                  valueBoolean: false

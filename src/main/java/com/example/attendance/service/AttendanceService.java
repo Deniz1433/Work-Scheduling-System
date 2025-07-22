@@ -2,6 +2,7 @@ package com.example.attendance.service;
 
 import com.example.attendance.model.Attendance;
 import com.example.attendance.repository.AttendanceRepository;
+import com.example.attendance.dto.TeamAttendanceDto;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;    // ← add this import
 
@@ -17,6 +18,28 @@ public class AttendanceService {
 
     public AttendanceService(AttendanceRepository repo) {
         this.repo = repo;
+    }
+
+    public List<TeamAttendanceDto> getTeamAttendance(String username) {
+        TeamAttendanceDto member1 = new TeamAttendanceDto();
+        member1.setId(1L);
+        member1.setName("Ali");
+        member1.setSurname("Yılmaz");
+        member1.setDepartment("Yazılım");
+        member1.setAttendance(List.of(true, true, false, true, false));
+        member1.setApproved(true);
+        member1.setEmployeeExcuse("Raporlu");
+
+        TeamAttendanceDto member2 = new TeamAttendanceDto();
+        member2.setId(2L);
+        member2.setName("Ayşe");
+        member2.setSurname("Demir");
+        member2.setDepartment("Tasarım");
+        member2.setAttendance(List.of(true, false, true, true, true));
+        member2.setApproved(false);
+        member2.setEmployeeExcuse(null);
+
+        return List.of(member1, member2);
     }
 
     /**
