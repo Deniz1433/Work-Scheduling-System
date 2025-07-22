@@ -32,10 +32,10 @@ public class SecurityConfig {
         http
                 // disable CSRF for our stateless API endpoints
                 .csrf(csrf -> csrf
-                        .ignoringRequestMatchers("/api/attendance/**", "/api/excuse/**")
+                        .ignoringRequestMatchers("/api/attendance/**", "/api/excuse/**", "/api/admin/**")
                 )
                 .authorizeHttpRequests(auth -> auth
-                        // allow React build artifacts
+                        // allow React static assets
                         .requestMatchers(
                                 "/static/**",
                                 "/favicon.ico",
@@ -44,19 +44,27 @@ public class SecurityConfig {
                                 "/images/**"
                         ).permitAll()
 
-                        // only admins on /admin/**
+                        // UI entrypoints under /admin/**
                         .requestMatchers("/admin/**")
                         .hasAnyAuthority(
                                 "ROLE_attendance_client_admin",
                                 "ROLE_attendance_client_superadmin"
                         )
 
-                        // attendance & excuse APIs require a logged-in user
+                        // our admin REST API
+                        .requestMatchers("/api/admin/**")
+                        .hasAnyAuthority(
+                                "ROLE_attendance_client_admin",
+                                "ROLE_attendance_client_superadmin"
+                        )
+
+                        // attendance & excuse APIs require any authenticated user
                         .requestMatchers("/api/attendance/**", "/api/excuse/**")
                         .authenticated()
 
                         // everything else also needs authentication
-                        .anyRequest().authenticated()
+                        .anyRequest()
+                        .authenticated()
                 )
                 .oauth2Login(oauth -> oauth
                         .defaultSuccessUrl("/", true)

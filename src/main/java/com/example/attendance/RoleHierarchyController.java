@@ -3,7 +3,7 @@ package com.example.attendance;
 
 import com.example.attendance.model.RoleHierarchy;
 import com.example.attendance.model.RoleNodePosition;
-import com.example.attendance.service.AdminService;
+import com.example.attendance.service.KeycloakAdminService;
 import com.example.attendance.service.RoleHierarchyService;
 import com.example.attendance.service.RoleNodePositionService;
 import com.example.attendance.service.RoleHierarchyService.RoleRelationDto;
@@ -23,10 +23,10 @@ import java.util.stream.Collectors;
 public class RoleHierarchyController {
     private final RoleHierarchyService hierarchySvc;
     private final RoleNodePositionService posSvc;
-    private final AdminService adminSvc;
+    private final KeycloakAdminService adminSvc;
     private static final Set<String> BASE = Set.of("admin","user","superadmin");
 
-    public RoleHierarchyController(RoleHierarchyService h, RoleNodePositionService p, AdminService a) {
+    public RoleHierarchyController(RoleHierarchyService h, RoleNodePositionService p, KeycloakAdminService a) {
         this.hierarchySvc = h;
         this.posSvc       = p;
         this.adminSvc     = a;
