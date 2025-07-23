@@ -3,8 +3,13 @@ package com.example.attendance.dto;
 import java.time.LocalDate;
 import java.util.List;
 
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
 public class AttendanceRequest {
-    private List<LocalDate> dates;
-    public List<LocalDate> getDates() { return dates; }
-    public void setDates(List<LocalDate> dates) { this.dates = dates; }
-}
+    private String userId;
+    private LocalDate weekStart;
+    private List<Integer> dates; // 5 elemanlı, günlerin durumunu tutan liste
+}   

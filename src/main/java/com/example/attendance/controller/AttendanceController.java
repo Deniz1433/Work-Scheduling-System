@@ -7,7 +7,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
-import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -24,15 +23,13 @@ public class AttendanceController {
             @RequestBody AttendanceRequest req,
             Principal principal
     ) {
-        service.record(principal.getName(), req.getDates());
+        service.record(principal.getName(),req.getWeekStart(),req.getDates());
         return ResponseEntity.ok().build();
     }
 
     @GetMapping
-    public ResponseEntity<List<LocalDate>> list(
-            Principal principal
-    ) {
-        List<LocalDate> dates = service.fetch(principal.getName());
+    public ResponseEntity<List<Integer>> getAttendanceData(Principal principal, String weekStart) {
+        List<Integer> dates = service.fetch(principal.getName(), weekStart);
         return ResponseEntity.ok(dates);
     }
 

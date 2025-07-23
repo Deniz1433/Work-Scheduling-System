@@ -47,28 +47,37 @@ public class AttendanceService {
      * by first deleting any existing rows in that range, then saving the new ones.
      */
     @Transactional    // ← ensure this method is transactional
-    public void record(String userId, List<LocalDate> dates) {
-        // 1) Determine this week's Monday and Friday
-        LocalDate reference = dates.isEmpty() ? LocalDate.now() : dates.get(0);
-        LocalDate monday = reference.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
-        LocalDate friday = monday.plusDays(4);
+    public void record(String userId, LocalDate weekStart, List<Integer> dates) {
+        
+        // 1) Attendance verisi var ise al
+        Attendance attendance = repo.findByUserIdAndWeekStart(userId, weekStart.toString());
 
-        // 2) Delete any of this user's existing rows in that week
-        repo.deleteByUserIdAndAttendanceDateBetween(userId, monday, friday);
-
-        // 3) Save only the newly selected dates
-        if (!dates.isEmpty()) {
-            List<Attendance> records = dates.stream()
-                    .map(d -> new Attendance(userId, d))
-                    .collect(Collectors.toList());
-            repo.saveAll(records);
+        // 2) Attendance kaydı yoksa kaydet
+        if(attendance == null) {
+            Attendance newAttendance = new Attendance(userId, weekStart.toString());
+            newAttendance.setMonday(dates.get(0));
+            newAttendance.setTuesday(dates.get(1));
+            newAttendance.setWednesday(dates.get(2));
+            newAttendance.setThursday(dates.get(3));
+            newAttendance.setFriday(dates.get(4));
+            newAttendance.setApproved(false);
+            repo.save(newAttendance);
+        }
+        // Attendance kaydı var ve henüz onaylanmadıysa kaydey
+        else if(attendance.isApproved() == false){
+            attendance.setMonday(dates.get(0));
+            attendance.setTuesday(dates.get(1));
+            attendance.setWednesday(dates.get(2));
+            attendance.setThursday(dates.get(3));
+            attendance.setFriday(dates.get(4));
         }
     }
 
-    public List<LocalDate> fetch(String userId) {
-        return repo.findByUserId(userId)
-                .stream()
-                .map(Attendance::getAttendanceDate)
-                .collect(Collectors.toList());
+    public List<Integer> fetch(String userId, String weekStart) {
+        Attendance attendance = repo.findByUserIdAndWeekStart(userId, weekStart);   
+        if(attendance == null) {
+            return List.of(0, 0, 0, 0, 0);
+        }
+        return attendance.getDates();
     }
 }

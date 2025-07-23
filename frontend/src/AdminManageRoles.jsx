@@ -1,6 +1,7 @@
 // src/AdminManageRoles.jsx
 
 import React, { useState, useEffect } from 'react';
+//devextreme tabloları eklenecek
 
 const AdminManageRoles = () => {
     const [users, setUsers] = useState([]);

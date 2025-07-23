@@ -7,21 +7,10 @@ import DepartmentInfo from './EmployeeDepartmentInfo';
 import AdminAddUser from './AdminAddUser';
 import AdminManageRoles from './AdminManageRoles';
 import logo from './assets/logo.png';
+import { useUser } from "./UserContext";
 
 const EmployeeMain = () => {
-  const [user, setUser] = useState(null);
-
-  useEffect(() => {
-    fetch('/api/user')
-        .then(response => response.json())
-        .then(data => {
-          setUser(data);
-        })
-        .catch(error => {
-          console.error('Hata:', error);
-        });
-  }, []);
-
+  const {user} = useUser();
   const [activeView, setActiveView] = useState('registration');
 
   // Tüm menü elemanları

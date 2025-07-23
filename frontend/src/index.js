@@ -4,11 +4,13 @@ import './index.css';
 import EmployeeMain from './EmployeeMain';
 import reportWebVitals from './reportWebVitals';
 import 'devextreme/dist/css/dx.light.css';
-
+import { UserProvider } from "./UserContext";
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
-    <EmployeeMain />
+    <UserProvider>
+      <EmployeeMain />
+    </UserProvider>
   </React.StrictMode>
 );
 

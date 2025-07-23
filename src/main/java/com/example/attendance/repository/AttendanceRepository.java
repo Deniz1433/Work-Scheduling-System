@@ -4,17 +4,14 @@ import com.example.attendance.model.Attendance;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
-import java.time.LocalDate;
-import java.util.List;
 
 @Repository
 public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
-    List<Attendance> findByUserId(String userId);
+    Attendance findByUserIdAndWeekStart(String userId, String weekStart);
 
     // Spring Data will derive this and perform the delete
-    void deleteByUserIdAndAttendanceDateBetween(
+    void deleteByUserIdAndWeekStart(
             String userId,
-            LocalDate start,
-            LocalDate end
+            String weekStart
     );
 }

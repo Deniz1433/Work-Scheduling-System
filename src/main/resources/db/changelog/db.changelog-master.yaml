@@ -95,36 +95,6 @@ databaseChangeLog:
       id: 5
       author: deniz
       changes:
-        - insert:
-            tableName: attendance
-            columns:
-              - column:
-                  name: user_id
-                  value: "123e4567-e89b-12d3-a456-426614174000"
-              - column:
-                  name: attendance_date
-                  valueDate: "2025-07-21"
-              - column:
-                  name: created_at
-                  valueDate: "2025-07-21T09:00:00"
-              - column:
-                  name: is_verified
-                  valueBoolean: true
-        - insert:
-            tableName: attendance
-            columns:
-              - column:
-                  name: user_id
-                  value: "987e6543-e21b-45d3-a123-426614174999"
-              - column:
-                  name: attendance_date
-                  valueDate: "2025-07-21"
-              - column:
-                  name: created_at
-                  valueDate: "2025-07-21T09:05:00"
-              - column:
-                  name: is_verified
-                  valueBoolean: false
         - createTable:
             tableName: excuse
             columns:
@@ -162,5 +132,105 @@ databaseChangeLog:
                   name: is_approved
                   type: BOOLEAN
                   defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+
+  - changeSet:
+      id: drop-attendance-excuse-tables
+      author: emir
+      changes:
+        - dropTable:
+            tableName: attendance
+            cascadeConstraints: true
+        - dropTable:
+            tableName: excuse
+            cascadeConstraints: true
+  - changeSet:
+      id: create-new-attendance-table
+      author: emir
+      changes:
+        - createTable:
+            tableName: attendance
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+              - column:
+                  name: user_id
+                  type: VARCHAR(36)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: week_start
+                  type: VARCHAR(20)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: monday
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: tuesday
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: wednesday
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: thursday
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: friday
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: is_approved
+                  type: BOOLEAN
+                  constraints:
+                    nullable: false
+  - changeSet:
+      id: create-new-excuse-table
+      author: emir
+      changes:
+        - createTable:
+            tableName: excuse
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+              - column:
+                  name: user_id
+                  type: VARCHAR(36)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: excuse_date
+                  type: DATE
+                  constraints:
+                    nullable: false
+              - column:
+                  name: excuse_type
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: description
+                  type: TEXT
+              - column:
+                  name: is_approved
+                  type: BOOLEAN
                   constraints:
                     nullable: false

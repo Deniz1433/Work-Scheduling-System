@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Search } from 'lucide-react';
+//devextreme tabloları eklenecek
+
 
 const DepartmentInfo = () => {
   const [nameSearch, setNameSearch] = useState('');
