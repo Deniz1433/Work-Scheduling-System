@@ -7,6 +7,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import com.example.attendance.controller.AdminUserController.UserRolesDto;
+import com.example.attendance.dto.AdminUserDto;
+
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -134,5 +137,17 @@ public class KeycloakAdminService {
                 .roles()
                 .get(roleName)
                 .remove();
+    }
+
+    public void addUser(AdminUserDto user) {
+        UserRepresentation userRep = new UserRepresentation();
+        userRep.setUsername(user.getUsername());
+        userRep.setEmail(user.getEmail());
+        userRep.setFirstName(user.getName());
+        userRep.setLastName(user.getSurname());
+        userRep.setEnabled(true);
+        keycloak.realm(realm)
+                .users()
+                .create(userRep);
     }
 }

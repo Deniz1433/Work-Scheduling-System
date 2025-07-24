@@ -15,7 +15,7 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/admin")
-public class AdminManageRolesController {
+public class AdminUserController {
 
     private static final Set<String> BASE_ROLES = Set.of("user", "admin", "superadmin");
 
@@ -24,8 +24,13 @@ public class AdminManageRolesController {
 
     public static class UserRolesDto {
         public String id;
+        public String name;
+        public String surname;
         public String username;
+        public String password;
         public String email;
+        //public String position;
+        //public String department;
         public String permissionRole;
         public List<String> departmentRoles;
     }
@@ -44,8 +49,12 @@ public class AdminManageRolesController {
                     .collect(Collectors.toList());
             UserRolesDto dto = new UserRolesDto();
             dto.id = u.getId();
+            dto.name = u.getFirstName();
+            dto.surname = u.getLastName();
             dto.username = u.getUsername();
             dto.email = u.getEmail();
+            //dto.position = u.getClientRoles();
+            //dto.department = u.getDepartment();
             dto.permissionRole = perm;
             dto.departmentRoles = deps;
             return dto;

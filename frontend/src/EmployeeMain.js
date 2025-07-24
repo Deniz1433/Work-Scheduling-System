@@ -4,10 +4,9 @@ import AttendanceRegistration from './EmployeeAttendanceRegistration';
 import TeamAttendance from './EmployeeTeamAttendance';
 import ExcuseForm from './EmployeeExcuseForm';
 import DepartmentInfo from './EmployeeDepartmentInfo';
-import AdminAddUser from './AdminAddUser';
-import AdminManageRoles from './AdminManageRoles';
 import logo from './assets/logo.png';
 import { useUser } from "./UserContext";
+import AdminManageUsers from './AdminManageUsers';
 
 const EmployeeMain = () => {
   const {user} = useUser();
@@ -40,16 +39,10 @@ const EmployeeMain = () => {
       component: DepartmentInfo
     },
     {
-      id: 'adminAddUser',
-      label: 'Kullanıcı Ekle - Çıkar',
-      icon: UserPlus,
-      component: AdminAddUser
-    },
-    {
-      id: 'manageRoles',
-      label: 'Rolleri Yönet',
+      id: 'manageUsers',
+      label: 'Kullanıcıları Yönet',
       icon: UserCog,
-      component: AdminManageRoles
+      component: AdminManageUsers
     }
   ];
 

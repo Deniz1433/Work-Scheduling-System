@@ -234,3 +234,28 @@ databaseChangeLog:
                   type: BOOLEAN
                   constraints:
                     nullable: false
+  - changeSet:
+      id: create-department-table
+      author: emir
+      changes:
+        - createTable:
+            tableName: department
+            ifNotExists: true
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: name
+                  type: TEXT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: min_days
+                  type: INT
+                  constraints:
+                    nullable: false

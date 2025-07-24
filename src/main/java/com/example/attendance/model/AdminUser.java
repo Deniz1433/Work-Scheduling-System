@@ -1,6 +1,5 @@
 package com.example.attendance.model;
 
-
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
@@ -27,7 +26,7 @@ public class AdminUser {
     private String email;
     @Column(name = "username", nullable = false, length = 15)
     private String username;
-    @Column(name = "password", nullable = false, length = 36)
+    @Column(name = "password", nullable = true, length = 36)
     private String password;
 
     @ManyToOne
