@@ -5,6 +5,7 @@ import TeamAttendance from './EmployeeTeamAttendance';
 import ExcuseForm from './EmployeeExcuseForm';
 import DepartmentInfo from './EmployeeDepartmentInfo';
 import AdminAddUser from './AdminAddUser';
+import HolidayRegistration from './HolidayRegistration';
 import AdminManageRoles from './AdminManageRoles';
 import logo from './assets/logo.png';
 import { useUser } from "./UserContext";
@@ -50,27 +51,46 @@ const EmployeeMain = () => {
       label: 'Rolleri Yönet',
       icon: UserCog,
       component: AdminManageRoles
+    },
+    {
+      id: 'holiday',
+      label: 'Tatil Ekle/Düzenle',
+      icon: User,
+      component: HolidayRegistration
     }
   ];
 
   // Kullanıcı rolüne göre buton filtreleme
   const navigationItems = allNavigationItems.filter(item => {
-    if (item.id === 'department') {
-      return user?.authorities?.includes('ROLE_attendance_client_manager');
+    const roles = user?.authorities ?? [];
+
+    if (item.id === 'registration' || item.id === 'excuse') {
+      return (
+          roles.includes('ROLE_attendance_client_staff') ||
+          roles.includes('ROLE_attendance_client_team_leader') ||
+          roles.includes('ROLE_attendance_client_manager')
+      );
     }
+
     if (item.id === 'team') {
       return (
-          user?.authorities?.includes('ROLE_attendance_client_staff') ||
-          user?.authorities?.includes('ROLE_attendance_client_team_leader')
+          roles.includes('ROLE_attendance_client_staff') ||
+          roles.includes('ROLE_attendance_client_team_leader')
       );
     }
-    if (item.id === 'adminAddUser' || item.id === 'manageRoles') {
+
+    if (item.id === 'department') {
+      return roles.includes('ROLE_attendance_client_manager');
+    }
+
+    if (item.id === 'adminAddUser' || item.id === 'manageRoles'|| item.id === 'holiday') {
       return (
-          user?.authorities?.includes('ROLE_attendance_client_admin') ||
-          user?.authorities?.includes('ROLE_attendance_client_superadmin')
+          roles.includes('ROLE_attendance_client_admin') ||
+          roles.includes('ROLE_attendance_client_superadmin')
       );
     }
-    return true;
+
+    return false; // default: görünmesin
   });
 
   const renderActiveComponent = () => {
