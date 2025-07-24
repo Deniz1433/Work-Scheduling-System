@@ -62,6 +62,12 @@ public class SecurityConfig {
                         .requestMatchers("/api/attendance/**", "/api/excuse/**")
                         .authenticated()
 
+                        .requestMatchers("/role-hierarchy.html")
+                        .hasAnyAuthority(
+                                "ROLE_attendance_client_admin",
+                                "ROLE_attendance_client_superadmin"
+                        )
+
                         // everything else also needs authentication
                         .anyRequest()
                         .authenticated()

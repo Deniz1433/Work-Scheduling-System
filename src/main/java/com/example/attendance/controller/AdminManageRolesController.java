@@ -68,6 +68,32 @@ public class AdminManageRolesController {
                 .collect(Collectors.toList());
     }
 
+    @PostMapping("/roles")
+    @PreAuthorize("hasRole('attendance_client_superadmin')")
+    public ResponseEntity<Void> createRole(@RequestBody Map<String,String> payload) {
+        String roleName = payload.get("roleName").trim();
+        if (roleName.isBlank()
+                || List.of("user","admin","superadmin").contains(roleName.toLowerCase())) {
+            return ResponseEntity.badRequest().build();
+        }
+        kcService.createClientRole(roleName);
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Delete a department role under attendance-client.
+     */
+    @DeleteMapping("/roles/{roleName}")
+    @PreAuthorize("hasRole('attendance_client_superadmin')")
+    public ResponseEntity<Void> deleteRole(@PathVariable String roleName) {
+        // prevent deleting base permission roles
+        if (List.of("user","admin","superadmin").contains(roleName.toLowerCase())) {
+            return ResponseEntity.badRequest().build();
+        }
+        kcService.deleteClientRole(roleName);
+        return ResponseEntity.noContent().build();
+    }
+
     @PutMapping("/users/{userId}/roles")
     @PreAuthorize("hasAnyRole('attendance_client_admin','attendance_client_superadmin')")
     public ResponseEntity<Void> updateUserRoles(
