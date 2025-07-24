@@ -23,6 +23,8 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.logout.LogoutSuccessHandler;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import org.springframework.transaction.annotation.Transactional;
+
 @Configuration
 @EnableMethodSecurity
 public class SecurityConfig {
@@ -32,9 +34,10 @@ public class SecurityConfig {
         http
                 // disable CSRF for our stateless API endpoints
                 .csrf(csrf -> csrf
-                        .ignoringRequestMatchers("/api/attendance/**", "/api/excuse/**", "/api/admin/**")
+                        .ignoringRequestMatchers("/api/attendance/**", "/api/excuse/**", "/api/admin/**", "/api/holidays/**")
                 )
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/api/holidays/**").permitAll()
                         // allow React static assets
                         .requestMatchers(
                                 "/static/**",
@@ -43,6 +46,13 @@ public class SecurityConfig {
                                 "/js/**",
                                 "/images/**"
                         ).permitAll()
+
+                        // GEÇİCİ: Tatil fetch endpointini herkese aç
+                        .requestMatchers("/api/holidays/fetch").permitAll()
+
+                        // GEÇİCİ: Tatil ekle/sil endpointlerini herkese aç
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/holidays").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.DELETE, "/api/holidays/*").permitAll()
 
                         // UI entrypoints under /admin/**
                         .requestMatchers("/admin/**")

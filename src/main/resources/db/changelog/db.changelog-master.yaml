@@ -234,3 +234,45 @@ databaseChangeLog:
                   type: BOOLEAN
                   constraints:
                     nullable: false
+
+  - changeSet:
+      id: create-holiday-table
+      author: gpt
+      changes:
+        - createTable:
+            tableName: holiday
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+              - column:
+                  name: name
+                  type: VARCHAR(100)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: date
+                  type: DATE
+                  constraints:
+                    nullable: false
+              - column:
+                  name: country_code
+                  type: VARCHAR(10)
+                  constraints:
+                    nullable: false
+
+  - changeSet:
+      id: add-end-date-to-holiday
+      author: gpt
+      changes:
+        - addColumn:
+            tableName: holiday
+            columns:
+              - column:
+                  name: end_date
+                  type: DATE
+                  constraints:
+                    nullable: true
