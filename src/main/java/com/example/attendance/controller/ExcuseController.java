@@ -1,94 +1,52 @@
+// src/main/java/com/example/attendance/controller/ExcuseController.java
 package com.example.attendance.controller;
 
-import com.example.attendance.dto.ExcusesRequest;
-import com.example.attendance.dto.ExcuseUpdateRequest;
-import com.example.attendance.model.Excuse;
+import com.example.attendance.dto.CreateExcuseDto;
+import com.example.attendance.dto.ExcuseDto;
 import com.example.attendance.service.ExcuseService;
-
-import org.springframework.http.ResponseEntity;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.web.bind.annotation.*;
 
-import java.security.Principal;
+import jakarta.validation.Valid;
 import java.util.List;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.oauth2.core.oidc.user.OidcUser;
-import org.springframework.security.oauth2.core.user.OAuth2User;
+import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/excuse")
+@RequestMapping("/api/excuses")
+@RequiredArgsConstructor
 public class ExcuseController {
-    private final ExcuseService service;
 
-    public ExcuseController(ExcuseService service) {
-        this.service = service;
+    private final ExcuseService excuseService;
+
+    @GetMapping
+    public List<ExcuseDto> list(@AuthenticationPrincipal OidcUser user) {
+        return excuseService.listForUser(user.getSubject());
     }
 
     @PostMapping
-    public ResponseEntity<?> submit(
-        @RequestBody ExcusesRequest req,
-        Authentication authentication
+    public ExcuseDto create(
+            @Valid @RequestBody CreateExcuseDto dto,
+            @AuthenticationPrincipal OidcUser user
     ) {
-        String userId = null;
-        Object principal = authentication.getPrincipal();
-
-        if (principal instanceof OidcUser) {
-            userId = ((OidcUser) principal).getSubject(); // OIDC için
-        } else if (principal instanceof OAuth2User) {
-            userId = ((OAuth2User) principal).getAttribute("sub"); // Sadece OAuth2 için
-        } else {
-            userId = authentication.getName(); // fallback
-        }
-        
-        service.submitExcuses(userId, req);
-        return ResponseEntity.ok().build();
+        return excuseService.create(user.getSubject(), dto);
     }
 
-    @GetMapping
-    public ResponseEntity<List<Excuse>> list(
-            Principal principal
+    @PutMapping("/{id}")
+    public ExcuseDto update(
+            @PathVariable UUID id,
+            @Valid @RequestBody CreateExcuseDto dto,
+            @AuthenticationPrincipal OidcUser user
     ) {
-        List<Excuse> excuses = service.listUserExcuses(principal.getName());
-        return ResponseEntity.ok(excuses);
+        return excuseService.update(user.getSubject(), id, dto);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> delete(
-            @PathVariable Long id,
-            Authentication authentication
+    public void delete(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal OidcUser user
     ) {
-        String userId = null;
-        Object principal = authentication.getPrincipal();
-
-        if (principal instanceof OidcUser) {
-            userId = ((OidcUser) principal).getSubject(); // OIDC için
-        } else if (principal instanceof OAuth2User) {
-            userId = ((OAuth2User) principal).getAttribute("sub"); // Sadece OAuth2 için
-        } else {
-            userId = authentication.getName(); // fallback
-        }
-
-        service.deleteExcuse(userId, id);
-        return ResponseEntity.noContent().build();
-    }
-
-    @PostMapping("/{id}")
-    public ResponseEntity<?> update(
-            @PathVariable Long id,
-            @RequestBody ExcuseUpdateRequest req,
-            Authentication authentication
-    ) {
-        String userId = null;
-        Object principal = authentication.getPrincipal();
-
-        if (principal instanceof OidcUser) {
-            userId = ((OidcUser) principal).getSubject();
-        } else if (principal instanceof OAuth2User) {
-            userId = ((OAuth2User) principal).getAttribute("sub");
-        } else {
-            userId = authentication.getName();
-        }
-
-        service.updateExcuse(userId, id, req);
-        return ResponseEntity.ok().build();
+        excuseService.delete(user.getSubject(), id);
     }
 }

@@ -74,16 +74,10 @@ services:
       LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_SECURITY:        DEBUG
       LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_SECURITY_OAUTH2_CLIENT: DEBUG
       LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_SECURITY_OAUTH2_CORE:   DEBUG
-    entrypoint:
-      - sh
-      - -c
-      - |
-        echo "⏳ Waiting for Keycloak…"
-        until curl -sSf http://keycloak:8080/realms/attendance-realm/.well-known/openid-configuration >/dev/null 2>&1; do
-          sleep 2
-        done
-        echo "✅ Keycloak ready; starting app."
-        exec java -jar /app/app.jar
+    entrypoint: ["java", "-jar", "/app/app.jar"]
+
+    volumes:
+      - ~/.m2:/root/.m2
 
 volumes:
   pgdata:

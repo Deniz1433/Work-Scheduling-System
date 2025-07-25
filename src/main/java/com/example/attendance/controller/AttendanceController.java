@@ -1,41 +1,44 @@
+// src/main/java/com/example/attendance/controller/AttendanceController.java
 package com.example.attendance.controller;
 
-import com.example.attendance.dto.AttendanceRequest;
-import com.example.attendance.dto.TeamAttendanceDto;
+import com.example.attendance.dto.AttendanceSubmissionDto;
 import com.example.attendance.service.AttendanceService;
-import org.springframework.http.ResponseEntity;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.web.bind.annotation.*;
 
-import java.security.Principal;
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/attendance")
+@RequiredArgsConstructor
 public class AttendanceController {
-    private final AttendanceService service;
 
-    public AttendanceController(AttendanceService service) {
-        this.service = service;
+    private final AttendanceService attendanceService;
+
+    @GetMapping
+    public List<Integer> getAttendanceWeek(
+            @RequestParam String weekStart,
+            @AuthenticationPrincipal OidcUser user
+    ) {
+        return attendanceService.getWeekAttendance(
+                user.getSubject(), // keycloak_id
+                LocalDate.parse(weekStart)
+        );
     }
 
     @PostMapping
-    public ResponseEntity<?> submit(
-            @RequestBody AttendanceRequest req,
-            Principal principal
+    public void submitAttendance(
+            @Valid @RequestBody AttendanceSubmissionDto dto,
+            @AuthenticationPrincipal OidcUser user
     ) {
-        service.record(principal.getName(),req.getWeekStart(),req.getDates());
-        return ResponseEntity.ok().build();
-    }
-
-    @GetMapping
-    public ResponseEntity<List<Integer>> getAttendanceData(Principal principal, String weekStart) {
-        List<Integer> dates = service.fetch(principal.getName(), weekStart);
-        return ResponseEntity.ok(dates);
-    }
-
-    @GetMapping("/team")
-    public ResponseEntity<List<TeamAttendanceDto>> getTeamAttendance(Principal principal) {
-        List<TeamAttendanceDto> team = service.getTeamAttendance(principal.getName());
-        return ResponseEntity.ok(team);
+        attendanceService.saveOrUpdate(
+                user.getSubject(),
+                LocalDate.parse(dto.getWeekStart()),
+                dto.getDates()
+        );
     }
 }

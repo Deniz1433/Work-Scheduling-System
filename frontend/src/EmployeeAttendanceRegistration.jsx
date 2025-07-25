@@ -22,14 +22,12 @@ const getIstanbulNow = () => {
     return new Date(`${m.year}-${m.month}-${m.day}T${m.hour}:${m.minute}:${m.second}`);
 };
 
-const EmployeeAttendanceRegistration = () => {  
-    const {user} = useUser();
-    // 5 elemanlı array: [monday, tuesday, wednesday, thursday, friday]
-    // Her eleman 0-5 arası durum kodunu tutar
+const EmployeeAttendanceRegistration = () => {
+    const { user } = useUser();
     const [weeklyStatus, setWeeklyStatus] = useState([0, 0, 0, 0, 0]);
+    const [debugLog, setDebugLog] = useState(''); // DEBUG state
     const minDay = 2;
 
-    // Next week's Monday→Friday
     const weekDays = (() => {
         const today = getIstanbulNow();
         const day = today.getDay();
@@ -43,8 +41,9 @@ const EmployeeAttendanceRegistration = () => {
             return d;
         });
     })();
-    
+
     const weekStart = weekDays[0].toISOString().split('T')[0];
+
     const statusStyles = {
         0: { bg: 'bg-gray-100', border: 'border-gray-200', text: 'text-gray-500', hover: 'hover:border-gray-300' },
         1: { bg: 'bg-green-500', border: 'border-green-500', text: 'text-white', hover: '' },
@@ -55,43 +54,36 @@ const EmployeeAttendanceRegistration = () => {
     };
 
     useEffect(() => {
+        if (!user) return;
         axios.get(`/api/attendance?weekStart=${weekStart}`)
             .then(res => {
-                // Backend'den 5 elemanlı integer array geliyor
                 if (res.data && res.data.length === 5) {
                     setWeeklyStatus(res.data);
                 }
             })
-            .catch(err => console.error('Fetch attendance failed', err));
-    }, [weekStart]);
+            .catch(err => {
+                console.error('Fetch attendance failed', err);
+                setDebugLog(`GET failed: ${err.message}`);
+            });
+    }, [user, weekStart]);
 
     const handleDayClick = (dayIndex) => {
-        // Resmi tatil (4) ve İzinli (3) günlere tıklanamaz
-        if (weeklyStatus[dayIndex] === 3 || weeklyStatus[dayIndex] === 4) {
-            return;
-        }
+        if (weeklyStatus[dayIndex] === 3 || weeklyStatus[dayIndex] === 4) return;
 
         setWeeklyStatus(prev => {
             const newStatus = [...prev];
-            // 0 -> 1 (Ofiste) -> 2 (Uzaktan) -> 0 döngüsü
-            if (newStatus[dayIndex] === 0) {
-                newStatus[dayIndex] = 1; // Ofiste
-            } else if (newStatus[dayIndex] === 1) {
-                newStatus[dayIndex] = 2; // Uzaktan
-            } else if (newStatus[dayIndex] === 2) {
-                newStatus[dayIndex] = 0; // Veri Yok
-            }
+            newStatus[dayIndex] = (newStatus[dayIndex] + 1) % 3;
             return newStatus;
         });
     };
 
-    // Ofiste olacak gün sayısını hesapla (status = 1)
     const officeDays = weeklyStatus.filter(status => status === 1).length;
 
     const handleSave = () => {
-        if(weeklyStatus.includes(0)){
-            return Swal.fire('Eksik bilgi','Lütfen günleri doldurunuz.','warning');
+        if (weeklyStatus.includes(0)) {
+            return Swal.fire('Eksik bilgi', 'Lütfen tüm günleri doldurunuz.', 'warning');
         }
+
         const warningText =
             officeDays < minDay
                 ? `Ofise en az ${minDay} gün gelmeniz gerekmektedir. Yine de kaydetmek istiyor musunuz?`
@@ -106,17 +98,21 @@ const EmployeeAttendanceRegistration = () => {
             cancelButtonText: 'Hayır',
         }).then(result => {
             if (result.isConfirmed) {
-                axios.post('/api/attendance', { 
-                    userId: user.id,
-                    weekStart: weekStart,
-                    dates: weeklyStatus // 5 elemanlı integer array gönder
+                axios.post('/api/attendance', {
+                    weekStart,
+                    dates: weeklyStatus
+                }, {
+                    withCredentials: true
                 })
-                .then(() => {
-                    Swal.fire('Başarılı', 'Seçiminiz kaydedildi.', 'success');
-                })
-                .catch(() => {
-                    Swal.fire('Hata', 'Kayıt sırasında bir sorun oluştu.', 'error');
-                });
+                    .then(() => {
+                        setDebugLog('POST successful');
+                        Swal.fire('Başarılı', 'Seçiminiz kaydedildi.', 'success');
+                    })
+                    .catch((err) => {
+                        const errorMsg = err.response?.data?.message || err.message || 'Unknown error';
+                        setDebugLog(`POST failed: ${errorMsg}`);
+                        Swal.fire('Hata', 'Kayıt sırasında bir sorun oluştu.', 'error');
+                    });
             }
         });
     };
@@ -125,7 +121,7 @@ const EmployeeAttendanceRegistration = () => {
         const date = weekDays[dayIndex];
         const status = weeklyStatus[dayIndex];
         const style = statusStyles[status];
-        const isClickable = status !== 3 && status !== 4; // İzinli ve Resmi Tatil hariç
+        const isClickable = status !== 3 && status !== 4;
 
         return (
             <div key={dayIndex} className="text-center">
@@ -135,59 +131,15 @@ const EmployeeAttendanceRegistration = () => {
                 </div>
                 <div
                     onClick={() => isClickable && handleDayClick(dayIndex)}
-                    className={`
-                        p-4 h-20 flex items-center justify-center rounded-lg border-2 transition
-                        ${style.bg} ${style.border} ${style.text}
-                        ${isClickable ? `cursor-pointer ${style.hover} hover:shadow-md` : 'cursor-not-allowed'}
-                    `}
+                    className={`p-4 h-20 flex items-center justify-center rounded-lg border-2 transition ${style.bg} ${style.border} ${style.text} ${isClickable ? `cursor-pointer ${style.hover} hover:shadow-md` : 'cursor-not-allowed'}`}
                 >
                     <div className="text-center">
-                        {status === 0 && (
-                            <>
-                                <div className="w-8 h-8 border-2 border-gray-300 rounded-full mx-auto mb-1"></div>
-                                <div className="text-xs">Seç</div>
-                            </>
-                        )}
-                        {status === 1 && (
-                            <>
-                                <div className="w-8 h-8 bg-white rounded-full mx-auto flex items-center justify-center mb-1">
-                                    <div className="w-4 h-4 bg-green-500 rounded-full"></div>
-                                </div>
-                                <div className="text-xs font-medium">Ofiste</div>
-                            </>
-                        )}
-                        {status === 2 && (
-                            <>
-                                <div className="w-8 h-8 bg-white rounded-full mx-auto flex items-center justify-center mb-1">
-                                    <div className="w-4 h-4 bg-blue-500 rounded-full"></div>
-                                </div>
-                                <div className="text-xs font-medium">Uzaktan</div>
-                            </>
-                        )}
-                        {status === 3 && (
-                            <>
-                                <div className="w-8 h-8 bg-white rounded-full mx-auto flex items-center justify-center mb-1">
-                                    <div className="w-4 h-4 bg-yellow-500 rounded-full"></div>
-                                </div>
-                                <div className="text-xs font-medium">İzinli</div>
-                            </>
-                        )}
-                        {status === 4 && (
-                            <>
-                                <div className="w-8 h-8 bg-white rounded-full mx-auto flex items-center justify-center mb-1">
-                                    <div className="w-4 h-4 bg-purple-500 rounded-full"></div>
-                                </div>
-                                <div className="text-xs font-medium">Mazeretli</div>
-                            </>
-                        )}
-                        {status === 5 && (
-                            <>
-                                <div className="w-8 h-8 bg-white rounded-full mx-auto flex items-center justify-center mb-1">
-                                    <div className="w-4 h-4 bg-orange-500 rounded-full"></div>
-                                </div>
-                                <div className="text-xs font-medium">Resmi Tatil</div>
-                            </>
-                        )}
+                        {status === 0 && <><div className="w-8 h-8 border-2 border-gray-300 rounded-full mx-auto mb-1"></div><div className="text-xs">Seç</div></>}
+                        {status === 1 && <><div className="w-8 h-8 bg-white rounded-full mx-auto flex items-center justify-center mb-1"><div className="w-4 h-4 bg-green-500 rounded-full"></div></div><div className="text-xs font-medium">Ofiste</div></>}
+                        {status === 2 && <><div className="w-8 h-8 bg-white rounded-full mx-auto flex items-center justify-center mb-1"><div className="w-4 h-4 bg-blue-500 rounded-full"></div></div><div className="text-xs font-medium">Uzaktan</div></>}
+                        {status === 3 && <><div className="w-8 h-8 bg-white rounded-full mx-auto flex items-center justify-center mb-1"><div className="w-4 h-4 bg-yellow-500 rounded-full"></div></div><div className="text-xs font-medium">İzinli</div></>}
+                        {status === 4 && <><div className="w-8 h-8 bg-white rounded-full mx-auto flex items-center justify-center mb-1"><div className="w-4 h-4 bg-purple-500 rounded-full"></div></div><div className="text-xs font-medium">Mazeretli</div></>}
+                        {status === 5 && <><div className="w-8 h-8 bg-white rounded-full mx-auto flex items-center justify-center mb-1"><div className="w-4 h-4 bg-orange-500 rounded-full"></div></div><div className="text-xs font-medium">Resmi Tatil</div></>}
                     </div>
                 </div>
             </div>
@@ -196,10 +148,9 @@ const EmployeeAttendanceRegistration = () => {
 
     return (
         <div className="flex-1 p-6 bg-white">
-            <h3 className="text-lg font-semibold mb-4">Bu Hafta - İş Günleri</h3>
-
+            <h3 className="text-lg font-semibold mb-4">Haftalık Katılım Seçimi</h3>
             <div className="grid grid-cols-5 gap-4 mb-6">
-                {['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma'].map((dayName, idx) => 
+                {['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma'].map((dayName, idx) =>
                     renderDayCard(dayName, idx)
                 )}
             </div>
@@ -219,8 +170,8 @@ const EmployeeAttendanceRegistration = () => {
                     <div>• Yeşil: Ofiste çalışma</div>
                     <div>• Mavi: Uzaktan çalışma</div>
                     <div>• Sarı: İzinli (değiştirilemez)</div>
-                    <div>• Mor: Resmi tatil (değiştirilemez)</div>
-                    <div>• Turuncu: Mazeretli</div>
+                    <div>• Mor: Mazeretli</div>
+                    <div>• Turuncu: Resmi Tatil</div>
                 </div>
             </div>
 
@@ -231,6 +182,16 @@ const EmployeeAttendanceRegistration = () => {
                 <Save className="w-4 h-4" />
                 Kaydet
             </button>
+
+            {/* === DEBUG START === */}
+            <div className="mt-6 p-4 border-2 border-red-300 rounded bg-red-50 text-sm text-red-800">
+                <strong>DEBUG:</strong><br />
+                <div>user: {JSON.stringify(user)}</div>
+                <div>weekStart: {weekStart}</div>
+                <div>weeklyStatus: {JSON.stringify(weeklyStatus)}</div>
+                <div>last POST result: {debugLog}</div>
+            </div>
+            {/* === DEBUG END === */}
         </div>
     );
 };

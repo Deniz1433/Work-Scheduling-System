@@ -1,297 +1,255 @@
-import React, { useState } from 'react';
+// src/frontend/src/AdminAddUser.jsx
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import { Search, OctagonMinus } from 'lucide-react';
 import Swal from 'sweetalert2';
 
-const AdminAddUser = () => {
+export default function AdminAddUser() {
+  const [users, setUsers] = useState([]);
+  const [roles, setRoles] = useState([]);
 
+  // Search filters
   const [nameSearch, setNameSearch] = useState('');
   const [surnameSearch, setSurnameSearch] = useState('');
   const [emailSearch, setEmailSearch] = useState('');
-  const [passwordSearch, setPasswordSearch] = useState('');
-  const [positionSearch, setPositionSearch] = useState('');
-  const [departmentSearch, setDepartmentSearch] = useState('');
-  
-  // Ekleme formu state'leri
+
+  // Role selector state
+  const [roleSearch, setRoleSearch] = useState('');
+  const [selectedRoles, setSelectedRoles] = useState([]);
+
+  // Add form state
   const [addName, setAddName] = useState('');
   const [addSurname, setAddSurname] = useState('');
   const [addEmail, setAddEmail] = useState('');
   const [addPassword, setAddPassword] = useState('');
-  const [addPosition, setAddPosition] = useState('');
   const [addDepartment, setAddDepartment] = useState('');
-  
-  // Sample data - replace with your actual data source
-  const [employeeData, setEmployeeData] = useState([
-    {
-      id: 1,
-      name: 'AHMET',
-      surname: 'GÜREL',
-      email: 'ahmet@email.com',
-      password: 'password1',
-      department: 'Java',
-      position: 'Çalışan'
-      },
-      {
-      id: 2,
-      name: 'AYŞEGÜL',
-      email: 'aysegul@email.com',
-      password: 'password2',
-      role:'Takım kaptanı',
-      department: 'Mobilite',
-      position: 'Takım kaptanı'
-      },
-      {
-      id: 3,
-      name: 'EMRE ÇAKIR',
-      surname: 'YANCI',
-      email: 'emre@email.com',
-      password: 'password3',
-      department: 'Java',
-      position:'Çalışan'
-      },
-      {
-      id: 4,
-      name: 'CEYHUN',
-      surname: 'ARABA',
-      email: 'ceyhun@email.com',
-      password: 'password4',
-      department: '',
-      position: 'Genel Müdür'
-      },
-      {
-      id: 5,
-      name: 'İnsan',
-      surname: 'Kaynak',
-      email: 'ik@email.com',
-      password: 'password5',
-      role:'İnsan Kaynakları',
-      department: '',
-      position: 'İnsan Kaynakları'
-      }
-  ]);
-  // Yeni kullanıcı ekleme
-  const handleAdd = (e) => {
-    e.preventDefault();
-    const maxId = employeeData.reduce((max, employee) => Math.max(max, employee.id), 0);
-    const newEmployee = {
-      id: maxId + 1,
-      name: addName,
-      surname: addSurname,
-      email: addEmail,
-      password: addPassword,
-      position: addPosition,
-      department: addDepartment,
-    };
-    setEmployeeData([...employeeData, newEmployee]);
+
+  // Fetch users when filters change
+  useEffect(() => {
+    axios
+        .get('/api/users', {
+          params: { name: nameSearch, surname: surnameSearch, email: emailSearch },
+          withCredentials: true,
+        })
+        .then(res => setUsers(res.data))
+        .catch(console.error);
+  }, [nameSearch, surnameSearch, emailSearch]);
+
+  // Fetch roles once
+  useEffect(() => {
+    axios
+        .get('/api/roles', { withCredentials: true })
+        .then(res => setRoles(res.data))
+        .catch(console.error);
+  }, []);
+
+  const reloadUsers = () => {
+    axios
+        .get('/api/users', { withCredentials: true })
+        .then(res => setUsers(res.data))
+        .catch(console.error);
   };
 
-  // Kullanıcıyı silme
-  const handleRemove = (employeeId) => {
-    setEmployeeData(employeeData.filter((employee) => employee.id !== employeeId));
-    console.log(employeeId + "removed.");
+  const toggleRole = role => {
+    setSelectedRoles(prev =>
+        prev.includes(role)
+            ? prev.filter(r => r !== role)
+            : [...prev, role]
+    );
   };
-  // Filter data based on search criteria
-  const filteredData = employeeData?.filter(employee => {
-    const nameMatch = !nameSearch || (employee.name?.toLowerCase().includes(nameSearch.toLowerCase()) || !employee.name);
-    const surnameMatch = !surnameSearch || (employee.surname && employee.surname.toLowerCase().includes(surnameSearch.toLowerCase()));
-    const emailMatch = !emailSearch || (employee.email?.toLowerCase().includes(emailSearch.toLowerCase()) || !employee.email);
-    const passwordMatch = !passwordSearch || (employee.password?.toLowerCase().includes(passwordSearch.toLowerCase()) || !employee.password);
-    const positionMatch = !positionSearch || (employee.position?.toLowerCase().includes(positionSearch.toLowerCase()) || !employee.position);
-    const departmentMatch = !departmentSearch || (employee.department?.toLowerCase().includes(departmentSearch.toLowerCase()) || !employee.department);
-    return nameMatch && surnameMatch && emailMatch && passwordMatch && positionMatch && departmentMatch;
-  });
+
+  const handleAdd = e => {
+    e.preventDefault();
+    axios
+        .post(
+            '/api/users',
+            {
+              name: addName,
+              surname: addSurname,
+              email: addEmail,
+              password: addPassword,
+              roles: selectedRoles,
+              department: addDepartment,
+            },
+            { withCredentials: true }
+        )
+        .then(() => {
+          setAddName('');
+          setAddSurname('');
+          setAddEmail('');
+          setAddPassword('');
+          setSelectedRoles([]);
+          setAddDepartment('');
+          reloadUsers();
+          Swal.fire('Başarılı', 'Kullanıcı eklendi', 'success');
+        })
+        .catch(() => Swal.fire('Hata', 'Ekleme başarısız', 'error'));
+  };
+
+  const handleRemove = id => {
+    Swal.fire({
+      title: 'Silinsin mi?',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Evet',
+      cancelButtonText: 'Hayır',
+    }).then(({ isConfirmed }) => {
+      if (!isConfirmed) return;
+      axios
+          .delete(`/api/users/${id}`, { withCredentials: true })
+          .then(() => {
+            reloadUsers();
+            Swal.fire('Silindi', 'Kullanıcı silindi', 'success');
+          })
+          .catch(() => Swal.fire('Hata', 'Silme başarısız', 'error'));
+    });
+  };
 
   return (
-    <div className="flex-1 p-6 bg-white">
-      <div className="mb-6">
-        <div className="flex item-center justify-between mb-6"></div>
-        {/* Sorgu Kısmı */}
-        <div className="flex items-center gap-4 mb-6 flex-wrap">
-          {/* İsim Sorgusu */}
+      <div className="p-6 bg-white">
+        <h3 className="text-lg font-semibold mb-4">Kullanıcı Yönetimi</h3>
+
+        {/* Search filters */}
+        <div className="flex flex-wrap gap-4 mb-6">
           <div className="flex items-center gap-2 bg-gray-50 p-2 rounded-lg">
             <Search className="w-4 h-4 text-gray-500" />
-            <span className="text-sm font-medium">İsim Sorgusu</span>
             <input
-              type="text"
-              value={nameSearch}
-              onChange={(e) => setNameSearch(e.target.value)}
-              className="border border-gray-300 px-3 py-1 text-sm w-32 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                type="text"
+                placeholder="İsim"
+                value={nameSearch}
+                onChange={e => setNameSearch(e.target.value)}
+                className="border px-2 py-1 text-sm"
             />
           </div>
-          {/* Soyisim Sorgusu */}
           <div className="flex items-center gap-2 bg-gray-50 p-2 rounded-lg">
             <Search className="w-4 h-4 text-gray-500" />
-            <span className="text-sm font-medium">Soyisim Sorgusu</span>
             <input
-              type="text"
-              value={surnameSearch}
-              onChange={(e) => setSurnameSearch(e.target.value)}
-              className="border border-gray-300 px-3 py-1 text-sm w-32 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                type="text"
+                placeholder="Soyisim"
+                value={surnameSearch}
+                onChange={e => setSurnameSearch(e.target.value)}
+                className="border px-2 py-1 text-sm"
             />
           </div>
-          {/* Email Sorgusu */}
           <div className="flex items-center gap-2 bg-gray-50 p-2 rounded-lg">
             <Search className="w-4 h-4 text-gray-500" />
-            <span className="text-sm font-medium">Email Sorgusu</span>
             <input
-              type="text"
-              value={emailSearch}
-              onChange={(e) => setEmailSearch(e.target.value)}
-              className="border border-gray-300 px-3 py-1 text-sm w-32 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                type="text"
+                placeholder="Email"
+                value={emailSearch}
+                onChange={e => setEmailSearch(e.target.value)}
+                className="border px-2 py-1 text-sm"
             />
-          </div>
-          {/* Parola Sorgusu */}
-          <div className="flex items-center gap-2 bg-gray-50 p-2 rounded-lg">
-            <Search className="w-4 h-4 text-gray-500" />
-            <span className="text-sm font-medium">Parola Sorgusu</span>
-            <input
-              type="password"
-              value={passwordSearch}
-              onChange={(e) => setPasswordSearch(e.target.value)}
-              className="border border-gray-300 px-3 py-1 text-sm w-32 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-          {/* Pozisyon Sorgusu */}
-          <div className="flex items-center gap-2 bg-gray-50 p-2 rounded-lg">
-            <span className="text-sm font-medium">Pozisyon Sorgusu</span>
-            <select
-              value={positionSearch}
-              onChange={(e) => setPositionSearch(e.target.value)}
-              className="border border-gray-300 px-3 py-1 text-sm w-40 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="">Tümü</option>
-              <option value="Çalışan">Çalışan</option>
-              <option value="İnsan Kaynakları">İnsan Kaynakları</option>
-              <option value="Admin">Admin</option>
-              <option value="Takım Kaptanı">Takım Kaptanı</option>
-              <option value="Genel Müdür">Genel Müdür</option>
-            </select>
-          </div>
-          {/* Departman Sorgusu */}
-          <div className="flex items-center gap-2 bg-gray-50 p-2 rounded-lg">
-            <span className="text-sm font-medium">Departman Sorgusu</span>
-            <select
-              value={departmentSearch}
-              onChange={(e) => setDepartmentSearch(e.target.value)}
-              className="border border-gray-300 px-3 py-1 text-sm w-40 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="">Tümü</option>
-              <option value="Java">Java</option>
-              <option value="Mobilite">Mobilite</option>
-            </select>
           </div>
         </div>
-        {/* Veri Tablosu */}
-        <div className="border border-gray-300 rounded-lg overflow-hidden">
-          {/* Header */}
-          <div className="bg-gray-100 border-b border-gray-300">
-            <div className="grid grid-cols-8 gap-0 text-center">
-              <div className="p-3 border-r border-gray-300 font-semibold text-sm bg-yellow-200">ID</div>
-              <div className="p-3 border-r border-gray-300 font-semibold text-sm bg-yellow-200">Ad</div>
-              <div className="p-3 border-r border-gray-300 font-semibold text-sm bg-yellow-200">Soyad</div>
-              <div className="p-3 border-r border-gray-300 font-semibold text-sm bg-yellow-200">E-posta</div>
-              <div className="p-3 border-r border-gray-300 font-semibold text-sm bg-yellow-200">Şifre</div>
-              <div className="p-3 border-r border-gray-300 font-semibold text-sm bg-yellow-200">Pozisyon</div>
-              <div className="p-3 border-r border-gray-300 font-semibold text-sm bg-yellow-200">Departman</div>
-              <div className="p-3 border-r border-gray-300 font-semibold text-sm bg-yellow-200 ">İşlemler</div>
-            </div>
-          </div>
-        {/* Ekleme Formu */}
-          <form onSubmit={handleAdd} className="flex flex-col gap-4 mb-6 bg-gray-50 p-4 rounded-lg">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">Yeni Kullanıcı Ekle</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                value={addName}
-                onChange={(e) => setAddName(e.target.value)}
-                placeholder="Ad"
-                className="border border-gray-300 px-3 py-1 text-sm w-32 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-              <input
-                type="text"
-                value={addSurname}
-                onChange={(e) => setAddSurname(e.target.value)}
-                placeholder="Soyad"
-                className="border border-gray-300 px-3 py-1 text-sm w-32 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-              <input
-                type="text"
-                value={addEmail}
-                onChange={(e) => setAddEmail(e.target.value)}
-                placeholder="Email"
-                className="border border-gray-300 px-3 py-1 text-sm w-32 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-              <input
-                type="password"
-                value={addPassword}
-                onChange={(e) => setAddPassword(e.target.value)}
-                placeholder="Şifre"
-                className="border border-gray-300 px-3 py-1 text-sm w-32 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-              <input
-                type="text"
-                value={addPosition}
-                onChange={(e) => setAddPosition(e.target.value)}
-                placeholder="Pozisyon"
-                className="border border-gray-300 px-3 py-1 text-sm w-32 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-              <input
-                type="text"
-                value={addDepartment}
-                onChange={(e) => setAddDepartment(e.target.value)}
-                placeholder="Departman"
-                className="border border-gray-300 px-3 py-1 text-sm w-32 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-              <button
-                type="submit"
-                className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"
-              >
-                Ekle
-              </button>
-            </div>
-          </form>
-          {/* VERİ SATIRLARI */}
-          <div className="bg-white">
-            {filteredData.map((employee, rowIndex) => (
-              <div key={employee.id} className={`grid grid-cols-8 gap-0 border-b border-gray-200 hover:bg-gray-50 ${rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
-                <div className="p-3 border-r border-gray-200 text-sm">
-                  {employee?.id }
-                </div>
-                <div className="p-3 border-r border-gray-200 text-sm">
-                  {employee?.name}
-                </div>
-                <div className="p-3 border-r border-gray-200 text-sm">
-                  {employee?.surname}
-                </div>
-                <div className="p-3 border-r border-gray-200 text-sm">
-                  {employee?.email}
-                </div>
-                <div className="p-3 border-r border-gray-200 text-sm">
-                  {employee?.password}
-                </div>
-                <div className="p-3 border-r border-gray-200 text-sm">
-                  {employee?.position}
-                </div>
-                <div className="p-3 border-r border-gray-200 text-sm">
-                  {employee?.department}
-                </div>
-                <div className="p-3 border-r border-gray-200 text-sm text-center">
-                <button
-                  className="px-3 py-1 text-xs bg-red-500 text-white rounded hover:bg-blue-600 transition-colors flex items-center"
-                  onClick={() => handleRemove(employee.id)}
-                >
-                  <OctagonMinus className="w-4 h-4 mr-1" />
-                  Kaldır
-                </button>
-              </div>
-              </div>
-            ))}
-          </div>
-        </div>    
-      </div>
-    </div>
-  );
-};
 
-export default AdminAddUser;
+        {/* Add user form */}
+        <form onSubmit={handleAdd} className="flex flex-wrap gap-4 mb-6 bg-gray-50 p-4 rounded-lg">
+          <input
+              type="text"
+              placeholder="Ad"
+              value={addName}
+              onChange={e => setAddName(e.target.value)}
+              className="border px-2 py-1 text-sm w-32"
+              required
+          />
+          <input
+              type="text"
+              placeholder="Soyad"
+              value={addSurname}
+              onChange={e => setAddSurname(e.target.value)}
+              className="border px-2 py-1 text-sm w-32"
+              required
+          />
+          <input
+              type="email"
+              placeholder="Email"
+              value={addEmail}
+              onChange={e => setAddEmail(e.target.value)}
+              className="border px-2 py-1 text-sm w-40"
+              required
+          />
+          <input
+              type="password"
+              placeholder="Şifre"
+              value={addPassword}
+              onChange={e => setAddPassword(e.target.value)}
+              className="border px-2 py-1 text-sm w-32"
+              required
+          />
+          {/* Roles multi-select dropdown */}
+          <div className="relative w-64">
+            <input
+                type="text"
+                placeholder="Roller ara..."
+                value={roleSearch}
+                onChange={e => setRoleSearch(e.target.value)}
+                className="border px-2 py-1 text-sm w-full"
+            />
+            <div className="absolute bg-white border mt-1 max-h-40 overflow-y-auto w-full z-10">
+              {roles
+                  .filter(r => r.toLowerCase().includes(roleSearch.toLowerCase()))
+                  .map(r => (
+                      <label key={r} className="flex items-center px-2 py-1 hover:bg-gray-100">
+                        <input
+                            type="checkbox"
+                            checked={selectedRoles.includes(r)}
+                            onChange={() => toggleRole(r)}
+                            className="mr-2"
+                        />
+                        <span className="text-sm">{r}</span>
+                      </label>
+                  ))}
+            </div>
+          </div>
+          <input
+              type="text"
+              placeholder="Departman"
+              value={addDepartment}
+              onChange={e => setAddDepartment(e.target.value)}
+              className="border px-2 py-1 text-sm w-32"
+          />
+          <button
+              type="submit"
+              className="bg-blue-600 text-white px-4 py-1 rounded-lg hover:bg-blue-700"
+          >
+            Ekle
+          </button>
+        </form>
+
+        {/* Users table */}
+        <div className="border rounded-lg overflow-hidden">
+          <div className="grid grid-cols-7 bg-gray-100 text-sm font-semibold text-center">
+            <div className="p-2 border-r">ID</div>
+            <div className="p-2 border-r">Ad</div>
+            <div className="p-2 border-r">Soyad</div>
+            <div className="p-2 border-r">E-posta</div>
+            <div className="p-2 border-r">Rol</div>
+            <div className="p-2 border-r">Departman</div>
+            <div className="p-2">İşlemler</div>
+          </div>
+          {users.map((u, i) => (
+              <div
+                  key={u.id} className={`grid grid-cols-7 text-center text-sm border-b ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                <div className="p-2 border-r">{u.id}</div>
+                <div className="p-2 border-r">{u.name}</div>
+                <div className="p-2 border-r">{u.surname}</div>
+                <div className="p-2 border-r">{u.email}</div>
+                <div className="p-2 border-r">{u.roles?.join(', ')}</div>
+                <div className="p-2 border-r">{u.department}</div>
+                <div className="p-2 flex justify-center">
+                  <button
+                      onClick={() => handleRemove(u.id)}
+                      className="text-red-600 hover:text-red-800 flex items-center"
+                      title="Kaldır"
+                  >
+                    <OctagonMinus className="w-4 h-4 mr-1" />
+                    Kaldır
+                  </button>
+                </div>
+              </div>
+          ))}
+        </div>
+      </div>
+  );
+}

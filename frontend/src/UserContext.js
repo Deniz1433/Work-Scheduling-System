@@ -8,15 +8,21 @@ export const UserProvider = ({ children }) => {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    fetch('/api/user')
-      .then(response => response.json())
-      .then(data => setUser(data))
-      .catch(error => console.error('Hata:', error));
+    fetch('/api/me')
+        .then(response => {
+          if (!response.ok) throw new Error('Not authenticated');
+          return response.json();
+        })
+        .then(data => setUser(data))
+        .catch(error => {
+          console.error('Kullanıcı bilgisi alınamadı:', error);
+          setUser(null);
+        });
   }, []);
 
   return (
-    <UserContext.Provider value={{ user, setUser }}>
-      {children}
-    </UserContext.Provider>
+      <UserContext.Provider value={{ user, setUser }}>
+        {children}
+      </UserContext.Provider>
   );
 };

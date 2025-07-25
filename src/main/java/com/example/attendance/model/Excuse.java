@@ -1,48 +1,64 @@
+// src/main/java/com/example/attendance/model/Excuse.java
 package com.example.attendance.model;
 
 import jakarta.persistence.*;
-import java.time.LocalDate;
-
-import lombok.AllArgsConstructor;
-import lombok.NoArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
-@AllArgsConstructor
-@NoArgsConstructor
+import org.hibernate.annotations.UuidGenerator;
+
+import java.util.Date;
+import java.util.UUID;
+
+@Entity
 @Getter
 @Setter
-@Entity
-@Table(name = "excuse")
+@Table(name = "excuses")
 public class Excuse {
+
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @UuidGenerator
+    private UUID id;
 
-    @Column(name="user_id", nullable=false, length=36)
-    private String userId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
 
-    @Column(name="excuse_date", nullable=false)
-    private LocalDate excuseDate;
+    @Column(name = "reason", nullable = false)
+    private String reason;
 
-    @Column(name="excuse_type", nullable=false)
-    private int excuseType;
-    /* Mazeret Türü
-     * 0->İzinli
-     * 1->(Yıllık izin olmadan) Mazeretli
-    */
-
-    @Column(name="description", columnDefinition="TEXT")
+    @Column(name = "description")
     private String description;
 
-    @Column(name="is_approved", nullable=false)
-    private Boolean isApproved = false;
+    @Column(name = "start_date", nullable = false)
+    private Date startDate;
 
+    @Column(name = "end_date", nullable = false)
+    private Date endDate;
 
-    public Excuse(String userId, LocalDate excuseDate, int excuseType, String description) {
-        this.userId = userId;
-        this.excuseDate = excuseDate;
-        this.excuseType = excuseType;
-        this.description = description;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "approved_by")
+    private User approvedBy;
+
+    @Column(name = "approved_at")
+    private Date approvedAt;
+
+    @Column(name = "status", nullable = false)
+    private String status;
+
+    @Column(name = "created_at", nullable = false)
+    private Date createdAt;
+
+    @Column(name = "updated_at")
+    private Date updatedAt;
+
+    @PrePersist
+    public void onCreate() {
+        this.createdAt = new Date();
+        if (this.status == null) this.status = "pending";
     }
 
+    @PreUpdate
+    public void onUpdate() {
+        this.updatedAt = new Date();
+    }
 }
