@@ -32,6 +32,13 @@ const HolidayRegistration = () => {
             });
     };
 
+    // Sadece bu senenin tatillerini filtrele
+    const currentYear = new Date().getFullYear();
+    const currentYearHolidays = holidays.filter(holiday => {
+        const holidayYear = new Date(holiday.date).getFullYear();
+        return holidayYear === currentYear;
+    });
+
     // Tüm tatil aralıklarını yyyy-mm-dd string olarak çıkar (UTC ile tam gün)
     const toUTCDate = (str) => {
         const [year, month, day] = str.split('-');
@@ -156,10 +163,10 @@ const HolidayRegistration = () => {
                         {success && <div className="mt-3 text-green-600 font-medium">{success}</div>}
                     </div>
                     <div className="bg-white rounded-xl shadow p-6">
-                        <h2 className="text-lg font-semibold mb-4 text-blue-700">Kayıtlı Tatiller</h2>
+                        <h2 className="text-lg font-semibold mb-4 text-blue-700">Kayıtlı Tatiller ({currentYear})</h2>
                         <ul className="divide-y divide-gray-200">
-                            {holidays.length === 0 && <li className="text-gray-500">Hiç tatil kaydı yok.</li>}
-                            {holidays.map((holiday) => (
+                            {currentYearHolidays.length === 0 && <li className="text-gray-500">Bu sene için tatil kaydı yok.</li>}
+                            {currentYearHolidays.map((holiday) => (
                                 <li key={holiday.id} className="flex items-center justify-between py-2 group">
                                     <span className="flex-1">{holiday.name} <span className="text-gray-500">- {holiday.date}{holiday.endDate && holiday.endDate !== holiday.date ? ` / ${holiday.endDate}` : ''}</span></span>
                                     <button

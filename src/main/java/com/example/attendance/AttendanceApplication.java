@@ -17,8 +17,10 @@ public class AttendanceApplication {
 	public CommandLineRunner fetchHolidaysOnStartup(HolidayService holidayService) {
 		return args -> {
 			try {
-				holidayService.fetchAndSaveHolidays(java.time.Year.now().getValue());
-				System.out.println("Türkiye tatilleri başarıyla çekildi ve kaydedildi.");
+				// 5 yıllık tatilleri çek (şu anki yıldan başlayarak)
+				int currentYear = java.time.Year.now().getValue();
+				holidayService.fetchAndSaveHolidaysForNextYears(currentYear, 5);
+				System.out.println("Türkiye tatilleri başarıyla çekildi ve kaydedildi: " + currentYear + " - " + (currentYear + 4));
 			} catch (Exception e) {
 				System.err.println("Tatiller çekilemedi: " + e.getMessage());
 			}
