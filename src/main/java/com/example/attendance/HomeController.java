@@ -8,8 +8,9 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 
-import java.util.List;
-
+/**
+ * HomeController, ana sayfa işlemleri için endpoint sağlar.
+ */
 @Controller
 public class HomeController {
 
@@ -20,17 +21,14 @@ public class HomeController {
         this.repo = repo;
     }
 
+    /**
+     * Ana sayfa ve kullanıcı listesini görüntüler.
+     */
     @GetMapping("/")
     public String home(Model model,
                        @AuthenticationPrincipal OidcUser user) {
 
         model.addAttribute("user", user);
-
-        // always fetch all animals
-        List<Animal> animals = repo.findAll();
-        log.debug("Fetched {} animals from DB", animals.size());
-
-        model.addAttribute("animals", animals);
         return "index";
     }
 }

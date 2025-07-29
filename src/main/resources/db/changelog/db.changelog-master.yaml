@@ -4,6 +4,10 @@ databaseChangeLog:
   - changeSet:
       id: 1
       author: deniz
+      preconditions:
+        - not:
+            - tableExists:
+                tableName: cool_animals
       changes:
         - createTable:
             tableName: cool_animals
@@ -33,6 +37,11 @@ databaseChangeLog:
               - column:
                   name: species
                   value: "Ambystoma mexicanum"
+            preconditions:
+              - not:
+                  - sqlCheck:
+                      expectedResult: 0
+                      sql: "SELECT COUNT(*) FROM cool_animals WHERE name = 'Axolotl' AND species = 'Ambystoma mexicanum'"
         - insert:
             tableName: cool_animals
             columns:
@@ -42,6 +51,11 @@ databaseChangeLog:
               - column:
                   name: species
                   value: "Vulpes zerda"
+            preconditions:
+              - not:
+                  - sqlCheck:
+                      expectedResult: 0
+                      sql: "SELECT COUNT(*) FROM cool_animals WHERE name = 'Fennec Fox' AND species = 'Vulpes zerda'"
         - insert:
             tableName: cool_animals
             columns:
@@ -51,11 +65,20 @@ databaseChangeLog:
               - column:
                   name: species
                   value: "Glaucus atlanticus"
+            preconditions:
+              - not:
+                  - sqlCheck:
+                      expectedResult: 0
+                      sql: "SELECT COUNT(*) FROM cool_animals WHERE name = 'Blue Dragon' AND species = 'Glaucus atlanticus'"
 
   # Role hierarchy table
   - changeSet:
       id: 2
       author: deniz
+      preconditions:
+        - not:
+            - tableExists:
+                tableName: role_hierarchy
       changes:
         - createTable:
             tableName: role_hierarchy
@@ -80,11 +103,20 @@ databaseChangeLog:
             tableName: role_hierarchy
             columnNames: parent_role,child_role
             constraintName: uq_role_hierarchy
+            preconditions:
+              - not:
+                  - uniqueConstraintExists:
+                      tableName: role_hierarchy
+                      constraintName: uq_role_hierarchy
 
   # Role node positions
   - changeSet:
       id: 3
       author: deniz
+      preconditions:
+        - not:
+            - tableExists:
+                tableName: role_node_position
       changes:
         - createTable:
             tableName: role_node_position

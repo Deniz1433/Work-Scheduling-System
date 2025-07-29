@@ -1,3 +1,6 @@
+/**
+ * RoleHierarchy, veritabanında rol ilişkisini temsil eder.
+ */
 // src/main/java/com/example/attendance/model/RoleHierarchy.java
 package com.example.attendance.model;
 
@@ -10,9 +13,11 @@ import jakarta.persistence.*;
 public class RoleHierarchy {
     @Id @GeneratedValue private Long id;
 
+    /** Ebeveyn rol adı */
     @Column(name="parent_role", nullable=false)
     private String parentRole;
 
+    /** Çocuk rol adı */
     @Column(name="child_role", nullable=false)
     private String childRole;
 

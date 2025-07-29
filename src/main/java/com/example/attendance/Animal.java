@@ -6,14 +6,20 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
+/**
+ * Animal, hayvan bilgisini temsil eden entity sınıfıdır.
+ */
 @Entity
 @Table(name = "cool_animals")
 public class Animal {
+    /** Hayvanın benzersiz ID'si */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /** Hayvanın adı */
     private String name;
+    /** Hayvanın türü */
     private String species;
 
     // getters & setters

@@ -1,6 +1,8 @@
 // src/main/java/com/example/attendance/RoleHierarchyController.java
 package com.example.attendance;
 
+import com.example.attendance.dto.RoleHierarchyDto;
+import com.example.attendance.dto.RoleNodePositionDto;
 import com.example.attendance.model.RoleHierarchy;
 import com.example.attendance.model.RoleNodePosition;
 import com.example.attendance.service.AdminService;
@@ -16,7 +18,11 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import static com.example.attendance.AppConstants.BASE;
 
+/**
+ * RoleHierarchyController, rol hiyerarşisi yönetimi için endpoint'ler sağlar.
+ */
 @Controller
 @RequestMapping("/admin/hierarchy")
 @PreAuthorize("hasRole('attendance_client_superadmin')")
@@ -24,7 +30,6 @@ public class RoleHierarchyController {
     private final RoleHierarchyService hierarchySvc;
     private final RoleNodePositionService posSvc;
     private final AdminService adminSvc;
-    private static final Set<String> BASE = Set.of("admin","user","superadmin");
 
     public RoleHierarchyController(RoleHierarchyService h, RoleNodePositionService p, AdminService a) {
         this.hierarchySvc = h;
@@ -32,41 +37,36 @@ public class RoleHierarchyController {
         this.adminSvc     = a;
     }
 
+    /**
+     * Rol hiyerarşisi sayfasını görüntüler.
+     */
     @GetMapping
     public String viewHierarchy(Model model) {
         // roles
-        List<String> roles = adminSvc.listClientRoles("attendance-client").stream()
-                .map(RoleRepresentation::getName)
-                .filter(r -> !BASE.contains(r))
-                .collect(Collectors.toList());
+        var allRoles = adminSvc.listClientRoles("attendance-client");
+        List<String> roles = hierarchySvc.getFilteredRoles(allRoles, BASE);
 
-        // relations
-        List<RoleHierarchy> links = hierarchySvc.listAll();
-        Map<String,List<String>> childrenMap = new HashMap<>();
-        for (var l : links) {
-            childrenMap.computeIfAbsent(l.getParentRole(), k->new ArrayList<>())
-                    .add(l.getChildRole());
-        }
+        // relations (DTO)
+        List<RoleHierarchyDto> links = hierarchySvc.getAllRoleHierarchyDtos();
+        Map<String, List<String>> childrenMap = hierarchySvc.buildChildrenMap(hierarchySvc.listAll());
 
         // roots
-        Set<String> allChildren = links.stream()
-                .map(RoleHierarchy::getChildRole)
-                .collect(Collectors.toSet());
-        List<String> roots = roles.stream()
-                .filter(r -> !allChildren.contains(r))
-                .collect(Collectors.toList());
+        List<String> roots = hierarchySvc.getRootRoles(roles, hierarchySvc.listAll());
 
-        // positions
-        Map<String,RoleNodePosition> posMap = posSvc.loadAll();
+        // positions (DTO)
+        List<RoleNodePositionDto> posList = posSvc.getAllRoleNodePositionDtos();
 
         model.addAttribute("roles", roles);
         model.addAttribute("roots", roots);
         model.addAttribute("childrenMap", childrenMap);
-        model.addAttribute("positionsMap", posMap);
+        model.addAttribute("positions", posList);
 
         return "role-hierarchy";
     }
 
+    /**
+     * Tüm rol ilişkilerini ve pozisyonlarını kaydeder.
+     */
     @PostMapping(path="/save", consumes="application/json")
     @ResponseBody
     public ResponseEntity<String> saveAll(@RequestBody SaveDto dto) {
