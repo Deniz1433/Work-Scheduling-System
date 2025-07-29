@@ -72,6 +72,7 @@ public class UserService {
         u.setName(dto.getName());
         u.setSurname(dto.getSurname());
         u.setIsActive(true);
+        u.setPassword(dto.getPassword());
         User saved = repo.save(u);
 
         return toDto(saved);

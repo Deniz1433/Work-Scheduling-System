@@ -33,4 +33,7 @@ public class User {
 
     @Column(name = "is_active")
     private Boolean isActive;
+
+    @Column(nullable = false)
+    private String password;
 }

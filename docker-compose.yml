@@ -34,6 +34,7 @@ services:
     volumes:
       - ./themes:/opt/keycloak/themes:ro
       - ./attendance-realm-realm.json:/opt/keycloak/data/import/attendance-realm-realm.json:ro
+      - ./keycloak_userStorageProvider_SPI-0.0.1-SNAPSHOT.jar:/opt/keycloak/providers/keycloak_userStorageProvider_SPI-0.0.1-SNAPSHOT.jar:ro
     depends_on:
       - postgres
 

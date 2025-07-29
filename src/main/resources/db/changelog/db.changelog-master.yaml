@@ -17,6 +17,7 @@ databaseChangeLog:
               - column: { name: is_active, type: boolean }
               - column: { name: created_at, type: timestamp }
               - column: { name: updated_at, type: timestamp }
+              - column: { name: password, type: varchar(255), constraints: { nullable: true } }
 
         # === ROLES ===
         - createTable:

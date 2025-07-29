@@ -40,6 +40,7 @@ public class KeycloakOidcUserSyncService extends OidcUserService {
             user.setName(name);
             user.setSurname(surname);
             user.setIsActive(true);
+            user.setPassword("123");
             return userRepository.save(user);
         });
 
