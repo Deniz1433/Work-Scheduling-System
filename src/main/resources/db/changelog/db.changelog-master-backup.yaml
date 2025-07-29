@@ -1,8 +1,80 @@
 databaseChangeLog:
+
+  # Role hierarchy table
+  - changeSet:
+      id: create-role-hierarchy-table
+      author: deniz
+      validCheckSum: ANY
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            tableExists:
+              tableName: role_hierarchy
+      changes:
+        - createTable:
+            tableName: role_hierarchy
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+              - column:
+                  name: parentRole
+                  type: VARCHAR(100)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: childRole
+                  type: VARCHAR(100)
+                  constraints:
+                    nullable: false
+        - addUniqueConstraint:
+            tableName: role_hierarchy
+            columnNames: parentRole,childRole
+            constraintName: uq_role_hierarchy
+
+  # Role node positions
+  - changeSet:
+      id: create-role-node-position-table
+      author: deniz
+      validCheckSum: ANY
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            tableExists:
+              tableName: role_node_position
+      changes:
+        - createTable:
+            tableName: role_node_position
+            columns:
+              - column:
+                  name: role
+                  type: VARCHAR(100)
+                  constraints:
+                    primaryKey: true
+              - column:
+                  name: posX
+                  type: DOUBLE
+                  constraints:
+                    nullable: false
+              - column:
+                  name: posY
+                  type: DOUBLE
+                  constraints:
+                    nullable: false
+
   # Department table
   - changeSet:
       id: create-department-table
       author: emir
+      validCheckSum: ANY
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            tableExists:
+              tableName: department
       changes:
         - createTable:
             tableName: department
@@ -15,22 +87,22 @@ databaseChangeLog:
                     primaryKey: true
               - column:
                   name: name
-                  type: VARCHAR(100)
+                  type: VARCHAR(36)
                   constraints:
                     nullable: false
               - column:
-                  name: min_days
+                  name: minDays
                   type: INT
                   constraints:
                     nullable: false
               - column:
-                  name: child_department_id
+                  name: childDepartmentId
                   type: BIGINT
                   constraints:
                     nullable: true
         - addForeignKeyConstraint:
             baseTableName: department
-            baseColumnNames: child_department_id
+            baseColumnNames: childDepartmentId
             constraintName: fk_department_child_department
             referencedTableName: department
             referencedColumnNames: id
@@ -39,6 +111,12 @@ databaseChangeLog:
   - changeSet:
       id: create-permission-table
       author: emir
+      validCheckSum: ANY
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            tableExists:
+              tableName: permission
       changes:
         - createTable:
             tableName: permission
@@ -51,7 +129,7 @@ databaseChangeLog:
                     primaryKey: true
               - column:
                   name: name
-                  type: VARCHAR(100)
+                  type: VARCHAR(36)
                   constraints:
                     nullable: false
               - column:
@@ -64,6 +142,12 @@ databaseChangeLog:
   - changeSet:
       id: create-role-table
       author: emir
+      validCheckSum: ANY
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            tableExists:
+              tableName: role
       changes:
         - createTable: 
             tableName: role
@@ -76,7 +160,7 @@ databaseChangeLog:
                     primaryKey: true
               - column:
                   name: name
-                  type: VARCHAR(100)
+                  type: VARCHAR(36)
                   constraints:
                     nullable: false
               - column:
@@ -85,7 +169,7 @@ databaseChangeLog:
                   constraints:
                     nullable: true
               - column:
-                  name: is_active
+                  name: isActive
                   type: BOOLEAN
                   defaultValueBoolean: true
                   constraints:
@@ -95,6 +179,12 @@ databaseChangeLog:
   - changeSet:
       id: create-role-permission-table
       author: emir
+      validCheckSum: ANY
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            tableExists:
+              tableName: role_permission
       changes:
         - createTable:
             tableName: role_permission
@@ -106,24 +196,24 @@ databaseChangeLog:
                   constraints:
                     primaryKey: true
               - column:
-                  name: role_id
+                  name: roleId
                   type: BIGINT
                   constraints:
                     nullable: false
               - column:
-                  name: permission_id
+                  name: permissionId
                   type: BIGINT
                   constraints:
                     nullable: false
         - addForeignKeyConstraint:
             baseTableName: role_permission
-            baseColumnNames: role_id
+            baseColumnNames: roleId
             constraintName: fk_role_permission_role
             referencedTableName: role
             referencedColumnNames: id
         - addForeignKeyConstraint:
             baseTableName: role_permission
-            baseColumnNames: permission_id
+            baseColumnNames: permissionId
             constraintName: fk_role_permission_permission
             referencedTableName: permission
             referencedColumnNames: id
@@ -133,6 +223,11 @@ databaseChangeLog:
       id: create-user-table
       author: emir
       validCheckSum: ANY
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            tableExists:
+              tableName: user
       changes:
         - createTable:
             tableName: user
@@ -144,49 +239,49 @@ databaseChangeLog:
                   constraints:
                     primaryKey: true
               - column:
-                  name: first_name
-                  type: VARCHAR(100)
+                  name: firstName
+                  type: VARCHAR(36)
                   constraints:
                     nullable: true
               - column:
-                  name: last_name
-                  type: VARCHAR(100)
+                  name: lastName
+                  type: VARCHAR(36)
                   constraints:  
                     nullable: true
               - column:
                   name: email
-                  type: VARCHAR(100)
+                  type: VARCHAR(36)
                   constraints:
                     nullable: true
               - column:
                   name: username
-                  type: VARCHAR(100)
+                  type: VARCHAR(36)
                   constraints:
                     nullable: false
               - column:
                   name: password
-                  type: VARCHAR(255)
+                  type: VARCHAR(36)
                   constraints:
                     nullable: true
               - column:
-                  name: role_id
+                  name: roleId
                   type: BIGINT
                   constraints:
                     nullable: false
               - column:
-                  name: department_id
+                  name: departmentId
                   type: BIGINT
                   constraints:
                     nullable: false
         - addForeignKeyConstraint:
             baseTableName: user
-            baseColumnNames: role_id
+            baseColumnNames: roleId
             constraintName: fk_user_role
             referencedTableName: role
             referencedColumnNames: id
         - addForeignKeyConstraint:
             baseTableName: user
-            baseColumnNames: department_id
+            baseColumnNames: departmentId
             constraintName: fk_user_department
             referencedTableName: department
             referencedColumnNames: id
@@ -195,6 +290,12 @@ databaseChangeLog:
   - changeSet:
       id: create-attendance-table
       author: emir
+      validCheckSum: ANY
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            tableExists:
+              tableName: attendance
       changes:
         - createTable:
             tableName: attendance
@@ -206,12 +307,12 @@ databaseChangeLog:
                   constraints:
                     primaryKey: true
               - column:
-                  name: user_id
-                  type: VARCHAR(100)
+                  name: userId
+                  type: VARCHAR(36)
                   constraints:
                     nullable: false
               - column:
-                  name: week_start
+                  name: weekStart
                   type: VARCHAR(20)
                   constraints:
                     nullable: false
@@ -241,7 +342,7 @@ databaseChangeLog:
                   constraints:
                     nullable: false
               - column:
-                  name: is_approved
+                  name: isApproved
                   type: BOOLEAN
                   defaultValueBoolean: false
                   constraints:
@@ -251,6 +352,12 @@ databaseChangeLog:
   - changeSet:
       id: create-excuse-table
       author: emir
+      validCheckSum: ANY
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            tableExists:
+              tableName: excuse
       changes:
         - createTable:
             tableName: excuse
@@ -262,111 +369,26 @@ databaseChangeLog:
                   constraints:
                     primaryKey: true
               - column:
-                  name: user_id
-                  type: VARCHAR(100)
+                  name: userId
+                  type: VARCHAR(36)
                   constraints:
                     nullable: false
               - column:
-                  name: excuse_date
+                  name: excuseDate
                   type: DATE
                   constraints:
                     nullable: false
               - column:
-                  name: excuse_type
+                  name: excuseType
                   type: INT
                   constraints:
                     nullable: false
               - column:
                   name: description
                   type: TEXT
-                  constraints:
-                    nullable: true
               - column:
-                  name: is_approved
+                  name: isApproved
                   type: BOOLEAN
                   defaultValueBoolean: false
                   constraints:
                     nullable: false
-
-  # Role hierarchy table
-  - changeSet:
-      id: create-role-hierarchy-table
-      author: emir
-      changes:
-        - createTable:
-            tableName: role_hierarchy
-            columns:
-              - column:
-                  name: id
-                  type: BIGINT
-                  autoIncrement: true
-                  constraints:
-                    primaryKey: true
-              - column:
-                  name: parent_role
-                  type: VARCHAR(100)
-                  constraints:
-                    nullable: false
-              - column:
-                  name: child_role
-                  type: VARCHAR(100)
-                  constraints:
-                    nullable: false
-        - addUniqueConstraint:
-            tableName: role_hierarchy
-            columnNames: parent_role,child_role
-            constraintName: uq_role_hierarchy
-
-  # Role node positions
-  - changeSet:
-      id: create-role-node-position-table
-      author: emir
-      changes:
-        - createTable:
-            tableName: role_node_position
-            columns:
-              - column:
-                  name: role
-                  type: VARCHAR(100)
-                  constraints:
-                    primaryKey: true
-              - column:
-                  name: pos_x
-                  type: DOUBLE
-                  constraints:
-                    nullable: false
-              - column:
-                  name: pos_y
-                  type: DOUBLE
-                  constraints:
-                    nullable: false
-
-  # Holiday table
-  - changeSet:
-      id: create-holiday-table
-      author: emir
-      changes:
-        - createTable:
-            tableName: holiday
-            columns:
-              - column:
-                  name: id
-                  type: BIGINT
-                  autoIncrement: true
-                  constraints:
-                    primaryKey: true
-              - column:
-                  name: name
-                  type: VARCHAR(100)
-                  constraints:
-                    nullable: false
-              - column:
-                  name: date
-                  type: DATE
-                  constraints:
-                    nullable: false
-              - column:
-                  name: end_date
-                  type: DATE
-                  constraints:  
-                    nullable: true

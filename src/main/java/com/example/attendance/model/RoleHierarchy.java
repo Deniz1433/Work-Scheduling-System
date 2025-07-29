@@ -5,7 +5,7 @@ import jakarta.persistence.*;
 
 @Entity
 @Table(name = "role_hierarchy", uniqueConstraints = {
-        @UniqueConstraint(name = "uq_role_hierarchy", columnNames = {"parent_role", "child_role"})
+        @UniqueConstraint(name = "uq_role_hierarchy", columnNames = {"parentRole", "childRole"})
 })
 public class RoleHierarchy {
     @Id @GeneratedValue private Long id;

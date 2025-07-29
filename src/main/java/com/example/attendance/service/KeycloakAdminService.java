@@ -6,9 +6,7 @@ import org.keycloak.representations.idm.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-
-import com.example.attendance.controller.AdminUserController.UserRolesDto;
-import com.example.attendance.dto.AdminUserDto;
+import com.example.attendance.dto.UserDto;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -139,12 +137,16 @@ public class KeycloakAdminService {
                 .remove();
     }
 
-    public void addUser(AdminUserDto user) {
+    public void addUser(UserDto user) {
         UserRepresentation userRep = new UserRepresentation();
         userRep.setUsername(user.getUsername());
         userRep.setEmail(user.getEmail());
-        userRep.setFirstName(user.getName());
-        userRep.setLastName(user.getSurname());
+        userRep.setFirstName(user.getFirstName());
+        userRep.setLastName(user.getLastName());
+        CredentialRepresentation cred = new CredentialRepresentation();
+        cred.setType(CredentialRepresentation.PASSWORD);
+        cred.setValue(user.getPassword());
+        userRep.setCredentials(Collections.singletonList(cred));
         userRep.setEnabled(true);
         keycloak.realm(realm)
                 .users()

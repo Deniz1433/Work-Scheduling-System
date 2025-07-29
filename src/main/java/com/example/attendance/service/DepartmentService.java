@@ -17,14 +17,16 @@ public class DepartmentService {
 
       public List<DepartmentDto> getAllDepartments() {
             return repo.findAll().stream()
-                        .map(d -> new DepartmentDto(d.getId(), d.getName(), d.getMinDays()))
+                        .map(d -> new DepartmentDto(d.getId(), d.getName(), d.getMinDays(), 
+                             d.getChildDepartment() != null ? d.getChildDepartment().getId() : null))
                         .collect(Collectors.toList());
       }
 
       public DepartmentDto getDepartmentById(Long id) {
             Department department = repo.findById(id)
                         .orElseThrow(() -> new RuntimeException("Department not found"));
-            return new DepartmentDto(department.getId(), department.getName(), department.getMinDays());
+            return new DepartmentDto(department.getId(), department.getName(), department.getMinDays(), 
+                                   department.getChildDepartment() != null ? department.getChildDepartment().getId() : null);
       }
 
       public DepartmentDto addDepartment(DepartmentDto departmentDto) {
@@ -32,7 +34,8 @@ public class DepartmentService {
             department.setName(departmentDto.getName());
             department.setMinDays(departmentDto.getMinDays());
             Department saved = repo.save(department);
-            return new DepartmentDto(saved.getId(), saved.getName(), saved.getMinDays());
+            return new DepartmentDto(saved.getId(), saved.getName(), saved.getMinDays(), 
+                                   saved.getChildDepartment() != null ? saved.getChildDepartment().getId() : null);
       }
 
       public DepartmentDto updateDepartment(Long id, DepartmentDto departmentDto) {
@@ -41,7 +44,8 @@ public class DepartmentService {
             department.setName(departmentDto.getName());
             department.setMinDays(departmentDto.getMinDays());
             Department saved = repo.save(department);
-            return new DepartmentDto(saved.getId(), saved.getName(), saved.getMinDays());
+            return new DepartmentDto(saved.getId(), saved.getName(), saved.getMinDays(), 
+                                   saved.getChildDepartment() != null ? saved.getChildDepartment().getId() : null);
       }
 
       public void deleteDepartment(Long id) {

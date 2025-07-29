@@ -11,19 +11,19 @@ public class RoleNodePosition {
     private String role;
 
     @Column(name = "pos_x", nullable = false)
-    private double x;
+    private double posX;
 
     @Column(name = "pos_y", nullable = false)
-    private double y;
+    private double posY;
 
     public RoleNodePosition() {}
-    public RoleNodePosition(String role, double x, double y) {
-        this.role = role; this.x = x; this.y = y;
+    public RoleNodePosition(String role, double posX, double posY) {
+        this.role = role; this.posX = posX; this.posY = posY;
     }
     public String getRole() { return role; }
     public void setRole(String role) { this.role = role; }
-    public double getX() { return x; }
-    public void setX(double x) { this.x = x; }
-    public double getY() { return y; }
-    public void setY(double y) { this.y = y; }
+    public double getPosX() { return posX; }
+    public void setPosX(double posX) { this.posX = posX; }
+    public double getPosY() { return posY; }
+    public void setPosY(double posY) { this.posY = posY; }
 }
