@@ -1,19 +1,15 @@
+// src/main/java/com/example/attendance/config/SecurityConfig.java
 package com.example.attendance.config;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-
 import org.keycloak.TokenVerifier;
 import org.keycloak.common.VerificationException;
 import org.keycloak.representations.AccessToken;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.retry.backoff.FixedBackOffPolicy;
-import org.springframework.retry.policy.SimpleRetryPolicy;
-import org.springframework.retry.support.RetryTemplate;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -27,9 +23,10 @@ import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.logout.LogoutSuccessHandler;
+import org.springframework.retry.backoff.FixedBackOffPolicy;
+import org.springframework.retry.policy.SimpleRetryPolicy;
+import org.springframework.retry.support.RetryTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
-import com.example.attendance.service.KeycloakOidcUserSyncService;
-
 
 import java.util.HashSet;
 import java.util.Map;
@@ -40,11 +37,6 @@ import java.util.Set;
 public class SecurityConfig {
 
     private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
-    private final KeycloakOidcUserSyncService syncService;
-
-    public SecurityConfig(KeycloakOidcUserSyncService syncService) {
-        this.syncService = syncService;
-    }
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -52,11 +44,8 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
-                                "/static/**",
-                                "/favicon.ico",
-                                "/css/**",
-                                "/js/**",
-                                "/images/**"
+                                "/static/**", "/favicon.ico",
+                                "/css/**", "/js/**", "/images/**"
                         ).permitAll()
                         .requestMatchers("/api/attendance/**").authenticated()
                         .anyRequest().authenticated()
@@ -64,8 +53,7 @@ public class SecurityConfig {
                 .oauth2Login(oauth -> oauth
                         .defaultSuccessUrl("/", true)
                         .userInfoEndpoint(userInfo ->
-                                // here we swap in your sync service so users get upserted on login
-                                userInfo.oidcUserService(syncService)
+                                userInfo.oidcUserService(oidcUserServiceWithTokenVerifier())
                         )
                 )
                 .logout(logout -> logout
@@ -80,44 +68,49 @@ public class SecurityConfig {
 
     private OAuth2UserService<OidcUserRequest, OidcUser> oidcUserServiceWithTokenVerifier() {
         OidcUserService delegate = new OidcUserService();
+        RetryTemplate retry = new RetryTemplate();
 
-        RetryTemplate retryTemplate = new RetryTemplate();
-        SimpleRetryPolicy retryPolicy = new SimpleRetryPolicy();
-        retryPolicy.setMaxAttempts(10);
-        FixedBackOffPolicy backOffPolicy = new FixedBackOffPolicy();
-        backOffPolicy.setBackOffPeriod(2000);
-        retryTemplate.setRetryPolicy(retryPolicy);
-        retryTemplate.setBackOffPolicy(backOffPolicy);
+        SimpleRetryPolicy policy = new SimpleRetryPolicy();
+        policy.setMaxAttempts(10);
+        FixedBackOffPolicy backoff = new FixedBackOffPolicy();
+        backoff.setBackOffPeriod(2000);
+
+        retry.setRetryPolicy(policy);
+        retry.setBackOffPolicy(backoff);
 
         return userRequest -> {
-            String tokenString = userRequest.getAccessToken().getTokenValue();
+            String tokenValue = userRequest.getAccessToken().getTokenValue();
             Set<GrantedAuthority> mapped = new HashSet<>();
 
             try {
-                AccessToken kcToken = retryTemplate.execute(context -> {
-                    log.debug("Attempting to verify Keycloak token (try #{})", context.getRetryCount() + 1);
-                    return TokenVerifier.create(tokenString, AccessToken.class).getToken();
+                AccessToken kcToken = retry.execute(ctx -> {
+                    log.debug("Verifying Keycloak token (try #{})", ctx.getRetryCount() + 1);
+                    return TokenVerifier.create(tokenValue, AccessToken.class).getToken();
                 });
 
                 Map<String, AccessToken.Access> resources = kcToken.getResourceAccess();
                 if (resources != null && resources.containsKey("attendance-client")) {
-                    resources.get("attendance-client").getRoles().forEach(r ->
-                            mapped.add(new SimpleGrantedAuthority("ROLE_attendance_client_" + r.replace('-', '_')))
-                    );
+                    resources.get("attendance-client")
+                            .getRoles()
+                            .forEach(r -> mapped.add(
+                                    new SimpleGrantedAuthority("ROLE_attendance_client_" + r.replace('-', '_'))
+                            ));
                 }
-
             } catch (VerificationException e) {
-                log.warn("Keycloak token verification failed after retries: {}", e.getMessage());
+                log.warn("Keycloak token verification failed: {}", e.getMessage());
             }
 
-            OidcUser userInfo = delegate.loadUser(userRequest);
-            log.debug("Logged in user: {}", userInfo.getEmail());
-            return new DefaultOidcUser(mapped, userInfo.getIdToken(), userInfo.getUserInfo());
+            OidcUser user = delegate.loadUser(userRequest);
+            log.debug("Logged in user: {}", user.getEmail());
+            return new DefaultOidcUser(mapped, user.getIdToken(), user.getUserInfo());
         };
     }
 
     private LogoutSuccessHandler keycloakLogoutSuccessHandler() {
-        return (HttpServletRequest request, HttpServletResponse response, Authentication auth) -> {
+        return (HttpServletRequest request,
+                HttpServletResponse response,
+                Authentication auth) -> {
+
             String redirectUri = "http://localhost:8080/";
             String idTokenHint = "";
 
