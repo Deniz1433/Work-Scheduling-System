@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Users, FileText, Calendar1, UserPlus, UserCog, LogOut } from 'lucide-react';
+import { User, Users, FileText, Calendar1, UserPlus, UserCog, LogOut, Settings, Building } from 'lucide-react';
 import AttendanceRegistration from './EmployeeAttendanceRegistration';
 import TeamAttendance from './EmployeeTeamAttendance';
 import ExcuseForm from './EmployeeExcuseForm';
@@ -7,6 +7,8 @@ import DepartmentInfo from './EmployeeDepartmentInfo';
 import AdminAddUser from './AdminAddUser';
 import HolidayRegistration from './HolidayRegistration';
 import AdminManageRoles from './AdminManageRoles';
+import RoleManagement from './RoleManagement';
+import DepartmentManagement from './DepartmentManagement';
 import logo from './assets/logo.png';
 import { useUser } from "./UserContext";
 
@@ -53,6 +55,18 @@ const EmployeeMain = () => {
       component: AdminManageRoles
     },
     {
+      id: 'roleManagement',
+      label: 'Rol Yönetimi',
+      icon: Settings,
+      component: RoleManagement
+    },
+    {
+      id: 'departmentManagement',
+      label: 'Departman Yönetimi',
+      icon: Building,
+      component: DepartmentManagement
+    },
+    {
       id: 'holiday',
       label: 'Tatil Ekle/Düzenle',
       icon: User,
@@ -83,7 +97,7 @@ const EmployeeMain = () => {
       return roles.includes('ROLE_attendance_client_manager');
     }
 
-    if (item.id === 'adminAddUser' || item.id === 'manageRoles'|| item.id === 'holiday') {
+    if (item.id === 'adminAddUser' || item.id === 'manageRoles' || item.id === 'roleManagement' || item.id === 'departmentManagement' || item.id === 'holiday') {
       return (
           roles.includes('ROLE_attendance_client_admin') ||
           roles.includes('ROLE_attendance_client_superadmin')
@@ -180,6 +194,9 @@ const EmployeeMain = () => {
                   {activeView === 'department' && 'Departman bilgilerini görüntüleyin'}
                   {activeView === 'adminAddUser' && 'Kullanıcı ekleyin - çıkarın'}
                   {activeView === 'manageRoles' && 'Kullanıcı rollerini yönetin'}
+                  {activeView === 'roleManagement' && 'Rol oluşturun ve düzenleyin'}
+                  {activeView === 'departmentManagement' && 'Departman oluşturun ve düzenleyin'}
+                  {activeView === 'holiday' && 'Tatil günlerini yönetin'}
                 </p>
               </div>
               <div className="flex items-center gap-2">
