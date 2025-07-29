@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { User, Users, FileText, Calendar1, UserPlus, UserCog, LogOut } from 'lucide-react';
 import AttendanceRegistration from './EmployeeAttendanceRegistration';
 import TeamAttendance from './EmployeeTeamAttendance';
-import ExcuseForm from './EmployeeExcuseForm';
 import DepartmentInfo from './EmployeeDepartmentInfo';
 import logo from './assets/logo.png';
 import { useUser } from "./UserContext";
@@ -25,12 +24,6 @@ const EmployeeMain = () => {
       label: 'Ekip Takvimini Görüntüle',
       icon: Calendar1,
       component: TeamAttendance
-    },
-    {
-      id: 'excuse',
-      label: 'Mazeret Belirt',
-      icon: FileText,
-      component: ExcuseForm
     },
     {
       id: 'department',

@@ -1,7 +1,6 @@
-// frontend/src/EmployeeAttendanceRegistration.jsx
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Save } from 'lucide-react';
+import { Save, Trash2, Edit3 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { useUser } from "./UserContext";
 
@@ -22,11 +21,19 @@ const getIstanbulNow = () => {
     return new Date(`${m.year}-${m.month}-${m.day}T${m.hour}:${m.minute}:${m.second}`);
 };
 
+const EXCUSE_TYPES = [
+    { val: 0, label: 'Yıllık İzin' },
+    { val: 1, label: 'Mazeretli İzin'}
+];
+
 const EmployeeAttendanceRegistration = () => {  
     const {user} = useUser();
     // 5 elemanlı array: [monday, tuesday, wednesday, thursday, friday]
     // Her eleman 0-5 arası durum kodunu tutar
     const [weeklyStatus, setWeeklyStatus] = useState([0, 0, 0, 0, 0]);
+    const [existingExcuses, setExistingExcuses] = useState([]);
+    // Yeni excuse'lar için açıklama sakla (dayIndex -> {excuseType, description})
+    const [pendingExcuseDescriptions, setPendingExcuseDescriptions] = useState({});
     const minDay = 2;
 
     // Next week's Monday→Friday
@@ -45,153 +52,472 @@ const EmployeeAttendanceRegistration = () => {
     })();
     
     const weekStart = weekDays[0].toISOString().split('T')[0];
+    const weekDaysStrings = weekDays.map(d => d.toISOString().split('T')[0]);
+
+    // Seçenekler - Resmi tatil (5) hariç, kullanıcı seçebilir
+    const statusOptions = [
+        { value: 0, label: 'Seçiniz', color: 'text-gray-500' },
+        { value: 1, label: 'Ofiste', color: 'text-green-600' },
+        { value: 2, label: 'Uzaktan', color: 'text-blue-600' },
+        { value: 3, label: 'İzinli', color: 'text-yellow-600' },
+        { value: 4, label: 'Mazeretli', color: 'text-purple-600' }
+    ];
+
     const statusStyles = {
-        0: { bg: 'bg-gray-100', border: 'border-gray-200', text: 'text-gray-500', hover: 'hover:border-gray-300' },
-        1: { bg: 'bg-green-500', border: 'border-green-500', text: 'text-white', hover: '' },
-        2: { bg: 'bg-blue-500', border: 'border-blue-500', text: 'text-white', hover: '' },
-        3: { bg: 'bg-yellow-500', border: 'border-yellow-500', text: 'text-white', hover: '' },
-        4: { bg: 'bg-purple-500', border: 'border-purple-500', text: 'text-white', hover: '' },
-        5: { bg: 'bg-orange-500', border: 'border-orange-500', text: 'text-white', hover: '' }
+        0: { bg: 'bg-gray-100', border: 'border-gray-200', text: 'text-gray-500' },
+        1: { bg: 'bg-green-100', border: 'border-green-300', text: 'text-green-700' },
+        2: { bg: 'bg-blue-100', border: 'border-blue-300', text: 'text-blue-700' },
+        3: { bg: 'bg-yellow-100', border: 'border-yellow-300', text: 'text-yellow-700' },
+        4: { bg: 'bg-purple-100', border: 'border-purple-300', text: 'text-purple-700' },
+        5: { bg: 'bg-orange-100', border: 'border-orange-300', text: 'text-orange-700' }
     };
 
     useEffect(() => {
-        axios.get(`/api/attendance?weekStart=${weekStart}`)
+        // Fetch attendance data
+        const fetchAttendance = axios.get(`/api/attendance?weekStart=${weekStart}`)
             .then(res => {
-                // Backend'den 5 elemanlı integer array geliyor
                 if (res.data && res.data.length === 5) {
                     setWeeklyStatus(res.data);
                 }
             })
             .catch(err => console.error('Fetch attendance failed', err));
+
+        // Fetch existing excuses
+        const fetchExcuses = axios.get('/api/excuse')
+            .then(res => {
+                setExistingExcuses(res.data);
+            })
+            .catch(console.error);
+
+        Promise.all([fetchAttendance, fetchExcuses]);
     }, [weekStart]);
 
-    const handleDayClick = (dayIndex) => {
-        // Resmi tatil (4) ve İzinli (3) günlere tıklanamaz
-        if (weeklyStatus[dayIndex] === 3 || weeklyStatus[dayIndex] === 4) {
-            return;
-        }
-
-        setWeeklyStatus(prev => {
-            const newStatus = [...prev];
-            // 0 -> 1 (Ofiste) -> 2 (Uzaktan) -> 0 döngüsü
-            if (newStatus[dayIndex] === 0) {
-                newStatus[dayIndex] = 1; // Ofiste
-            } else if (newStatus[dayIndex] === 1) {
-                newStatus[dayIndex] = 2; // Uzaktan
-            } else if (newStatus[dayIndex] === 2) {
-                newStatus[dayIndex] = 0; // Veri Yok
+    const handleStatusChange = async (dayIndex, newStatus) => {
+        const oldStatus = weeklyStatus[dayIndex];
+        const newStatusInt = parseInt(newStatus);
+        const excuseDate = weekDaysStrings[dayIndex];
+        
+        // aynı gün için zaten excuse var mı kontrol et
+        const existingExcuseForDay = existingExcuses.find(e => e.excuseDate === excuseDate);
+        
+        // İzinli (3) veya Mazeretli (4) seçildiğinde
+        if (newStatusInt === 3 || newStatusInt === 4) {
+            // Eğer bu gün için zaten excuse varsa izin verme
+            if (existingExcuseForDay) {
+                Swal.fire({
+                    title: 'Hata',
+                    text: 'Bu gün için zaten bir mazeret mevcut. Önce mevcut mazereti silmeniz gerekiyor.',
+                    icon: 'error',
+                    confirmButtonText: 'Tamam'
+                });
+                return; // Status değişikliği yapmadan çık
             }
-            return newStatus;
-        });
+
+            const excuseType = newStatusInt === 3 ? 0 : 1; // 3->0 (Yıllık), 4->1 (Mazeretli)
+            const excuseTypeLabel = EXCUSE_TYPES.find(t => t.val === excuseType)?.label;
+            
+            const result = await Swal.fire({
+                title: `${excuseTypeLabel} - Açıklama Gerekli`,
+                html: `
+                    <div class="text-left mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            Açıklama <span class="text-red-500">*</span>
+                        </label>
+                        <textarea 
+                            id="excuse-description" 
+                            rows="4" 
+                            class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none" 
+                            placeholder="Açıklama giriniz..."
+                        ></textarea>
+                    </div>
+                `,
+                showCancelButton: true,
+                confirmButtonText: 'Tamam',
+                cancelButtonText: 'İptal',
+                preConfirm: () => {
+                    const description = document.getElementById('excuse-description').value.trim();
+                    if (!description) {
+                        Swal.showValidationMessage('Açıklama zorunludur!');
+                        return false;
+                    }
+                    return description;
+                }
+            });
+
+            if (result.isConfirmed) {
+                // Sadece state'i güncelle, backend'e kaydetme
+                setWeeklyStatus(prev => {
+                    const newStatusArray = [...prev];
+                    newStatusArray[dayIndex] = newStatusInt;
+                    return newStatusArray;
+                });
+
+                // Pending excuse description'ı sakla
+                setPendingExcuseDescriptions(prev => ({
+                    ...prev,
+                    [dayIndex]: {
+                        excuseType: excuseType,
+                        description: result.value
+                    }
+                }));
+            } else {
+                // İptal edildi, status değişikliği yapma
+                return;
+            }
+        } else {
+            // Normal durum değişikliği (İzinli/Mazeretli değil)
+            
+            // Eğer önceki durum İzinli/Mazeretli idi, pending description'ı temizle
+            if (oldStatus === 3 || oldStatus === 4) {
+                setPendingExcuseDescriptions(prev => {
+                    const newPending = { ...prev };
+                    delete newPending[dayIndex];
+                    return newPending;
+                });
+            }
+
+            setWeeklyStatus(prev => {
+                const newStatusArray = [...prev];
+                newStatusArray[dayIndex] = newStatusInt;
+                return newStatusArray;
+            });
+        }
     };
 
     // Ofiste olacak gün sayısını hesapla (status = 1)
     const officeDays = weeklyStatus.filter(status => status === 1).length;
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if(weeklyStatus.includes(0)){
-            return Swal.fire('Eksik bilgi','Lütfen günleri doldurunuz.','warning');
+            return Swal.fire('Eksik bilgi','Lütfen tüm günleri doldurunuz.','warning');
         }
+        
         const warningText =
             officeDays < minDay
                 ? `Ofise en az ${minDay} gün gelmeniz gerekmektedir. Yine de kaydetmek istiyor musunuz?`
                 : 'Seçiminiz kaydedilecektir.';
 
-        Swal.fire({
+        const result = await Swal.fire({
             title: 'Emin misiniz?',
             text: warningText,
             icon: 'warning',
             showCancelButton: true,
             confirmButtonText: 'Evet',
             cancelButtonText: 'Hayır',
-        }).then(result => {
-            if (result.isConfirmed) {
-                axios.post('/api/attendance', { 
+        });
+
+        if (result.isConfirmed) {
+            try {
+                // Önce yeni excuse'ları oluştur
+                const excusePromises = [];
+                Object.keys(pendingExcuseDescriptions).forEach(dayIndex => {
+                    const excuseData = pendingExcuseDescriptions[dayIndex];
+                    const excuseDate = weekDaysStrings[dayIndex];
+                    
+                    excusePromises.push(
+                        axios.post('/api/excuse', {
+                            dates: [excuseDate],
+                            excuseType: excuseData.excuseType,
+                            description: excuseData.description
+                        })
+                    );
+                });
+
+                if (excusePromises.length > 0) {
+                    await Promise.all(excusePromises);
+                }
+
+                // Sonra attendance'ı kaydet
+                await axios.post('/api/attendance', { 
                     userId: user.id,
                     weekStart: weekStart,
-                    dates: weeklyStatus // 5 elemanlı integer array gönder
-                })
-                .then(() => {
-                    Swal.fire('Başarılı', 'Seçiminiz kaydedildi.', 'success');
-                })
-                .catch(() => {
-                    Swal.fire('Hata', 'Kayıt sırasında bir sorun oluştu.', 'error');
+                    dates: weeklyStatus
                 });
+
+                // Excuse listesini yenile
+                const excuseRes = await axios.get('/api/excuse');
+                setExistingExcuses(excuseRes.data);
+
+                // Pending descriptions'ı temizle
+                setPendingExcuseDescriptions({});
+
+                Swal.fire('Başarılı', 'Seçiminiz kaydedildi.', 'success');
+            } catch (error) {
+                console.error('Kaydetme hatası:', error);
+                Swal.fire('Hata', 'Kayıt sırasında bir sorun oluştu.', 'error');
             }
+        }
+    };
+
+    const handleDeleteExcuse = async (excuse) => {
+        const formattedDate = new Date(excuse.excuseDate).toLocaleDateString('tr-TR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
         });
+        
+        const result = await Swal.fire({
+            title: 'Silinsin mi?',
+            text: `${formattedDate} tarihli mazeret silinecek ve attendance durumu güncellenecek.`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Evet',
+            cancelButtonText: 'İptal'
+        });
+
+        if (result.isConfirmed) {
+            try {
+                // Excuse'u sil
+                await axios.delete(`/api/excuse/${excuse.id}`);
+                
+                // Attendance durumunu güncelle
+                const excuseDate = excuse.excuseDate;
+                const dayIndex = weekDaysStrings.indexOf(excuseDate);
+                if (dayIndex !== -1) {
+                    setWeeklyStatus(prev => {
+                        const newStatusArray = [...prev];
+                        newStatusArray[dayIndex] = 0; // Veri yok durumuna çevir
+                        
+                        // State güncellemesi sonrası API çağrısı yap
+                        setTimeout(async () => {
+                            try {
+                                await axios.post('/api/attendance', { 
+                                    userId: user.id,
+                                    weekStart: weekStart,
+                                    dates: newStatusArray
+                                });
+                            } catch (error) {
+                                console.error('Attendance güncelleme hatası:', error);
+                            }
+                        }, 0);
+                        
+                        return newStatusArray;
+                    });
+                    
+                    // Pending description varsa temizle
+                    setPendingExcuseDescriptions(prev => {
+                        const newPending = { ...prev };
+                        delete newPending[dayIndex];
+                        return newPending;
+                    });
+                }
+                
+                // Excuse listesini yenile
+                const excuseRes = await axios.get('/api/excuse');
+                setExistingExcuses(excuseRes.data);
+                
+                Swal.fire('Silindi','Mazeret silindi ve attendance güncellendi','success');
+            } catch (error) {
+                console.error('Excuse silme hatası:', error);
+                Swal.fire('Hata','Silme başarısız','error');
+            }
+        }
+    };
+
+    const handleEditExcuse = async (excuse) => {
+        const openDialog = async () => {
+            const result = await Swal.fire({
+                title: 'Mazereti Güncelle',
+                html:
+                    `<div class="text-left">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Mazeret Türü</label>
+                        <select id="swal-type" class="w-full p-2 border border-gray-300 rounded-lg mb-4">
+                            <option value="">-- Tür seç --</option>` +
+                    EXCUSE_TYPES.map(o =>
+                        `<option value="${o.val}" ${o.val===excuse.excuseType?'selected':''}>${o.label}</option>`
+                    ).join('') +
+                    `</select>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Açıklama *</label>
+                    <textarea id="swal-desc" class="w-full p-3 border border-gray-300 rounded-lg resize-none" rows="4" placeholder="Açıklama...">${excuse.description}</textarea>
+                    </div>`,
+                focusConfirm: false,
+                showCancelButton: true,
+                confirmButtonText: 'Güncelle',
+                cancelButtonText: 'İptal',
+                preConfirm: () => {
+                    const t = document.getElementById('swal-type').value;
+                    const d = document.getElementById('swal-desc').value.trim();
+                    if (!t) {
+                        Swal.showValidationMessage('Tür seçmelisiniz');
+                        return false;
+                    }
+                    if (!d) {
+                        Swal.showValidationMessage('Açıklama zorunludur');
+                        return false;
+                    }
+                    return { excuseType: parseInt(t), description: d };
+                }
+            });
+
+            if (result.isConfirmed) {
+                try {
+                    // Excuse'u güncelle
+                    await axios.post(`/api/excuse/${excuse.id}`, {
+                        id: excuse.id,
+                        excuseType: result.value.excuseType,
+                        description: result.value.description
+                    });
+                    
+                    // Attendance durumunu güncelle
+                    const excuseDate = excuse.excuseDate;
+                    const dayIndex = weekDaysStrings.indexOf(excuseDate);
+                    
+                    if (dayIndex !== -1) {
+                        setWeeklyStatus(prev => {
+                            const newStatusArray = [...prev];
+                            // Yeni mazeret türüne göre attendance durumunu güncelle
+                            newStatusArray[dayIndex] = result.value.excuseType === 0 ? 3 : 4;
+                            
+                            // State güncellemesi sonrası API çağrısı yap
+                            setTimeout(async () => {
+                                try {
+                                    await axios.post('/api/attendance', { 
+                                        userId: user.id,
+                                        weekStart: weekStart,
+                                        dates: newStatusArray
+                                    });
+                                } catch (error) {
+                                    console.error('Attendance güncelleme hatası:', error);
+                                }
+                            }, 0);
+                            
+                            return newStatusArray;
+                        });
+                    }
+                    
+                    // Excuse listesini yenile
+                    const excuseRes = await axios.get('/api/excuse');
+                    setExistingExcuses(excuseRes.data);
+                    
+                    Swal.fire('Güncellendi','Mazeret güncellendi','success');
+                } catch (error) {
+                    console.error('Excuse güncelleme hatası:', error);
+                    Swal.fire('Hata','Güncelleme başarısız','error');
+                }
+            }
+        };
+
+        if (excuse.isApproved) {
+            const result = await Swal.fire({
+                title: 'Onay kaldırılacak',
+                text: 'Düzenlemek onayını kaldıracak. Devam edilsin mi?',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Evet',
+                cancelButtonText: 'İptal'
+            });
+            
+            if (result.isConfirmed) {
+                openDialog();
+            }
+        } else {
+            openDialog();
+        }
     };
 
     const renderDayCard = (dayName, dayIndex) => {
         const date = weekDays[dayIndex];
         const status = weeklyStatus[dayIndex];
         const style = statusStyles[status];
-        const isClickable = status !== 3 && status !== 4; // İzinli ve Resmi Tatil hariç
+        const isResmiTatil = status === 5; // Resmi tatil değiştirilemez
+        const excuseDate = weekDaysStrings[dayIndex];
+        const hasExistingExcuse = existingExcuses.find(e => e.excuseDate === excuseDate);
+        const hasPendingDescription = pendingExcuseDescriptions[dayIndex];
 
         return (
             <div key={dayIndex} className="text-center">
-                <div className="text-sm font-medium text-gray-600 mb-2">{dayName}</div>
+                <div className="text-sm font-medium text-gray-700 mb-2">{dayName}</div>
                 <div className="text-xs text-gray-500 mb-3">
                     {date.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' })}
                 </div>
-                <div
-                    onClick={() => isClickable && handleDayClick(dayIndex)}
-                    className={`
-                        p-4 h-20 flex items-center justify-center rounded-lg border-2 transition
-                        ${style.bg} ${style.border} ${style.text}
-                        ${isClickable ? `cursor-pointer ${style.hover} hover:shadow-md` : 'cursor-not-allowed'}
-                    `}
-                >
-                    <div className="text-center">
-                        {status === 0 && (
-                            <>
-                                <div className="w-8 h-8 border-2 border-gray-300 rounded-full mx-auto mb-1"></div>
-                                <div className="text-xs">Seç</div>
-                            </>
-                        )}
-                        {status === 1 && (
-                            <>
-                                <div className="w-8 h-8 bg-white rounded-full mx-auto flex items-center justify-center mb-1">
-                                    <div className="w-4 h-4 bg-green-500 rounded-full"></div>
+                
+                <div className={`p-4 rounded-lg border-2 ${style.bg} ${style.border} min-h-[120px] relative`}>
+                    {isResmiTatil ? (
+                        // Resmi tatil - değiştirilemez
+                        <div className="flex flex-col items-center justify-center h-full">
+                            <div className="w-8 h-8 bg-orange-500 rounded-full mx-auto flex items-center justify-center mb-2">
+                                <div className="w-4 h-4 bg-white rounded-full"></div>
+                            </div>
+                            <div className="text-sm font-medium text-orange-700">Resmi Tatil</div>
+                            <div className="text-xs text-orange-600 mt-1">(Değiştirilemez)</div>
+                        </div>
+                    ) : (
+                        // Normal günler - combobox
+                        <div className="flex flex-col items-center justify-center h-full">
+                            <select
+                                value={status}
+                                onChange={(e) => handleStatusChange(dayIndex, e.target.value)}
+                                className={`
+                                    w-full px-3 py-2 rounded-md border border-gray-300 
+                                    focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
+                                    text-sm font-medium bg-white
+                                    ${status === 0 ? 'text-gray-500' : statusOptions.find(opt => opt.value === status)?.color || 'text-gray-700'}
+                                `}
+                                disabled={hasExistingExcuse} // Zaten excuse varsa disable et
+                            >
+                                {statusOptions.map(option => (
+                                    <option 
+                                        key={option.value} 
+                                        value={option.value}
+                                        className={option.color}
+                                    >
+                                        {option.label}
+                                    </option>
+                                ))}
+                            </select>
+                            
+                            {/* Seçilen duruma göre görsel gösterge */}
+                            {status > 0 && (
+                                <div className="mt-2 flex items-center justify-center">
+                                    <div className={`w-3 h-3 rounded-full ${
+                                        status === 1 ? 'bg-green-500' :
+                                        status === 2 ? 'bg-blue-500' :
+                                        status === 3 ? 'bg-yellow-500' :
+                                        status === 4 ? 'bg-purple-500' : 'bg-gray-400'
+                                    }`}></div>
                                 </div>
-                                <div className="text-xs font-medium">Ofiste</div>
-                            </>
-                        )}
-                        {status === 2 && (
-                            <>
-                                <div className="w-8 h-8 bg-white rounded-full mx-auto flex items-center justify-center mb-1">
-                                    <div className="w-4 h-4 bg-blue-500 rounded-full"></div>
+                            )}
+
+                            {/* Existing excuse varsa gösterge */}
+                            {hasExistingExcuse && (
+                                <div className="absolute top-1 right-1">
+                                    <div className="w-2 h-2 bg-green-500 rounded-full" title="Kayıtlı mazeret var"></div>
                                 </div>
-                                <div className="text-xs font-medium">Uzaktan</div>
-                            </>
-                        )}
-                        {status === 3 && (
-                            <>
-                                <div className="w-8 h-8 bg-white rounded-full mx-auto flex items-center justify-center mb-1">
-                                    <div className="w-4 h-4 bg-yellow-500 rounded-full"></div>
+                            )}
+
+                            {/* Pending description varsa gösterge */}
+                            {hasPendingDescription && !hasExistingExcuse && (
+                                <div>
+                                    <div className="absolute top-1 right-1">
+                                        <div className="w-2 h-2 bg-orange-500 rounded-full" title="Kaydedilmeyi bekliyor"></div>
+                                    </div>
+                                    <div className="text-sm text-gray-600 mt-2 break-words overflow-hidden">
+                                        {hasPendingDescription.description}
+                                    </div>
                                 </div>
-                                <div className="text-xs font-medium">İzinli</div>
-                            </>
-                        )}
-                        {status === 4 && (
-                            <>
-                                <div className="w-8 h-8 bg-white rounded-full mx-auto flex items-center justify-center mb-1">
-                                    <div className="w-4 h-4 bg-purple-500 rounded-full"></div>
-                                </div>
-                                <div className="text-xs font-medium">Mazeretli</div>
-                            </>
-                        )}
-                        {status === 5 && (
-                            <>
-                                <div className="w-8 h-8 bg-white rounded-full mx-auto flex items-center justify-center mb-1">
-                                    <div className="w-4 h-4 bg-orange-500 rounded-full"></div>
-                                </div>
-                                <div className="text-xs font-medium">Resmi Tatil</div>
-                            </>
-                        )}
-                    </div>
+                                
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
         );
+    };
+
+    // Bu haftanın excuse'larını filtrele
+    const thisWeekExcuses = existingExcuses.filter(excuse => 
+        weekDaysStrings.includes(excuse.excuseDate)
+    ).sort((a, b) => new Date(a.excuseDate) - new Date(b.excuseDate));
+
+    const formatExcuseDate = (dateStr) => {
+        const date = new Date(dateStr);
+        const dayNames = ['Pazartesi','Salı','Çarşamba','Perşembe','Cuma'];
+        const dayName = dayNames[date.getDay() - 1];
+        const formattedDate = date.toLocaleDateString('tr-TR', {
+            day: '2-digit',
+            month: '2-digit'
+        });
+        return `${dayName} (${formattedDate})`;
     };
 
     return (
@@ -205,28 +531,115 @@ const EmployeeAttendanceRegistration = () => {
             </div>
 
             {officeDays < minDay && (
-                <div className="mb-4 p-4 rounded-lg bg-red-50">
-                    <p className="text-xs text-red-600">
-                        Ofise en az {minDay} gün gelmeniz gerekmektedir. Şu an {officeDays} gün seçili.
+                <div className="mb-4 p-4 rounded-lg bg-red-50 border border-red-200">
+                    <p className="text-sm text-red-700">
+                        ⚠️ Ofise en az {minDay} gün gelmeniz gerekmektedir. Şu an {officeDays} gün seçili.
                     </p>
                 </div>
             )}
 
-            <div className="mb-4 p-4 rounded-lg bg-blue-50">
-                <h4 className="text-sm font-medium text-blue-800 mb-2">Durum Açıklamaları:</h4>
-                <div className="grid grid-cols-2 gap-2 text-xs text-blue-700">
-                    <div>• Gri: Veri yok (tıklayarak seçin)</div>
-                    <div>• Yeşil: Ofiste çalışma</div>
-                    <div>• Mavi: Uzaktan çalışma</div>
-                    <div>• Sarı: İzinli (değiştirilemez)</div>
-                    <div>• Mor: Resmi tatil (değiştirilemez)</div>
-                    <div>• Turuncu: Mazeretli</div>
+            {/* Pending excuse'lar varsa uyarı göster */}
+            {Object.keys(pendingExcuseDescriptions).length > 0 && (
+                <div className="mb-4 p-4 rounded-lg bg-yellow-50 border border-yellow-200">
+                    <p className="text-sm text-yellow-700">
+                        ⏳ {Object.keys(pendingExcuseDescriptions).length} adet mazeret açıklaması kaydedilmeyi bekliyor. 
+                        Kaydetmek için "Kaydet" butonunu kullanın.
+                    </p>
+                </div>
+            )}
+
+            <div className="mb-6 p-4 rounded-lg bg-blue-50 border border-blue-200">
+                <h4 className="text-sm font-medium text-blue-800 mb-3">Durum Açıklamaları:</h4>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                        <span className="text-green-700">Ofiste çalışma</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                        <span className="text-blue-700">Uzaktan çalışma</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                        <span className="text-yellow-700">İzinli (Açıklama gerekli)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
+                        <span className="text-purple-700">Mazeretli (Açıklama gerekli)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
+                        <span className="text-orange-700">Resmi Tatil (Değiştirilemez)</span>
+                    </div>
+                </div>
+                <div className="mt-3 pt-3 border-t border-blue-200">
+                    <div className="text-xs text-blue-600">
+                        <strong>Göstergeler:</strong> 
+                        <span className="inline-flex items-center gap-1 ml-2">
+                            <div className="w-2 h-2 bg-green-500 rounded-full"></div> Kayıtlı mazeret
+                        </span>
+                        <span className="inline-flex items-center gap-1 ml-3">
+                            <div className="w-2 h-2 bg-orange-500 rounded-full"></div> Kaydedilmeyi bekliyor
+                        </span>
+                    </div>
                 </div>
             </div>
 
+            {/* Bu haftanın excuse'ları */}
+            {thisWeekExcuses.length > 0 && (
+                <div className="mb-6">
+                    <h4 className="text-lg font-semibold mb-3">Bu Haftanın Mazeretleri</h4>
+                    <div className="space-y-3">
+                        {thisWeekExcuses.map(excuse => (
+                            <div key={excuse.id} className="p-4 border rounded-lg bg-gray-50">
+                                <div className="flex justify-between items-start">
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-3 mb-2">
+                                            <span className="font-medium text-gray-900">
+                                                {formatExcuseDate(excuse.excuseDate)}
+                                            </span>
+                                            <span className="text-sm bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                                                {EXCUSE_TYPES.find(o=>o.val===excuse.excuseType)?.label}
+                                            </span>
+                                            {excuse.isApproved && (
+                                                <span className="text-sm bg-green-100 text-green-700 px-2 py-1 rounded">
+                                                    Onaylı
+                                                </span>
+                                            )}
+                                        </div>
+                                        {excuse.description && (
+                                            <p className="text-sm text-gray-600 mt-1 break-words overflow-hidden">
+                                                {excuse.description}
+                                            </p>
+                                        )}
+                                    </div>
+                                    <div className="flex gap-2 ml-4">
+                                        <button 
+                                            onClick={() => handleEditExcuse(excuse)} 
+                                            className="flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm px-2 py-1 rounded hover:bg-blue-50 transition"
+                                            title="Düzenle"
+                                        >
+                                            <Edit3 size={14}/> 
+                                        </button>
+                                        <button 
+                                            onClick={() => handleDeleteExcuse(excuse)} 
+                                            className="flex items-center gap-1 text-red-600 hover:text-red-800 text-sm px-2 py-1 rounded hover:bg-red-50 transition"
+                                            title="Sil"
+                                        >
+                                            <Trash2 size={14}/> 
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             <button
                 onClick={handleSave}
-                className="px-6 py-3 rounded-lg font-medium transition-all flex items-center gap-2 bg-blue-600 text-white hover:bg-blue-700"
+                className="px-6 py-3 rounded-lg font-medium transition-all flex items-center gap-2 bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400"
+                disabled={weeklyStatus.includes(0)}
             >
                 <Save className="w-4 h-4" />
                 Kaydet
