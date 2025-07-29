@@ -135,4 +135,49 @@ public class KeycloakAdminService {
                 .get(roleName)
                 .remove();
     }
+    public void createUserWithAttributes(
+            String username,
+            String email,
+            String password,
+            String firstName,
+            String lastName,
+            String department,
+            String position,
+            List<String> roles
+    ) {
+        // 1. Kullanıcı oluştur
+        UserRepresentation user = new UserRepresentation();
+        user.setUsername(username);
+        user.setEmail(email);
+        user.setFirstName(firstName);
+        user.setLastName(lastName);
+        user.setEnabled(true);
+
+        // 2. Attribute'ları ekle
+        Map<String, List<String>> attributes = new HashMap<>();
+        attributes.put("department", Collections.singletonList(department));
+        attributes.put("position", Collections.singletonList(position));
+        user.setAttributes(attributes);
+
+        // 3. Keycloak'a gönder
+        var usersResource = keycloak.realm(realm).users();
+        var response = usersResource.create(user);
+
+        if (response.getStatus() != 201) {
+            throw new RuntimeException("Failed to create user: " + response.getStatus());
+        }
+
+        // 4. Oluşan kullanıcının ID'sini al
+        String userId = response.getLocation().getPath().replaceAll(".*/([^/]+)$", "$1");
+
+        // 5. Parola ayarla
+        CredentialRepresentation credential = new CredentialRepresentation();
+        credential.setTemporary(false);
+        credential.setType(CredentialRepresentation.PASSWORD);
+        credential.setValue(password);
+        usersResource.get(userId).resetPassword(credential);
+
+        // 6. Roller ekle
+        updateUserClientRoles(userId, roles);
+    }
 }
