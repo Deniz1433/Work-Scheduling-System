@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
+import java.util.ArrayList;
 import java.util.List;
 
 @RestController
@@ -28,9 +29,9 @@ public class AttendanceController {
     }
 
     @GetMapping
-    public ResponseEntity<List<Integer>> getAttendanceData(Principal principal, String weekStart) {
-        List<Integer> dates = service.fetch(principal.getName(), weekStart);
-        return ResponseEntity.ok(dates);
+    public ResponseEntity<ArrayList<Object>> getAttendanceData(Principal principal, String weekStart) {
+        ArrayList<Object> attendanceResponse = service.fetch(principal.getName(), weekStart);
+        return ResponseEntity.ok(attendanceResponse);
     }
 
     @GetMapping("/team")

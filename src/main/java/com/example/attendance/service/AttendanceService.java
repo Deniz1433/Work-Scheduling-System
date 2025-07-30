@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;    // ← add this import
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -61,20 +62,22 @@ public class AttendanceService {
             repo.save(newAttendance);
         }
         // Attendance kaydı var ve henüz onaylanmadıysa kaydey
-        else if(attendance.isApproved() == false){
+        else{
             attendance.setMonday(dates.get(0));
             attendance.setTuesday(dates.get(1));
             attendance.setWednesday(dates.get(2));
             attendance.setThursday(dates.get(3));
             attendance.setFriday(dates.get(4));
+            attendance.setApproved(false);
         }
     }
 
-    public List<Integer> fetch(String userId, String weekStart) {
+    public ArrayList<Object> fetch(String userId, String weekStart) {
         Attendance attendance = repo.findByUserIdAndWeekStart(userId, weekStart);   
         if(attendance == null) {
-            return List.of(0, 0, 0, 0, 0);
+                return new ArrayList<>(List.of(List.of(0, 0, 0, 0, 0), false));
         }
-        return attendance.getDates();
+        return new ArrayList<>(List.of(attendance.getDates(), attendance.isApproved()));
+
     }
 }

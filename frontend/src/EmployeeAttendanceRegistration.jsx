@@ -34,6 +34,9 @@ const EmployeeAttendanceRegistration = () => {
     const [existingExcuses, setExistingExcuses] = useState([]);
     // Yeni excuse'lar için açıklama sakla (dayIndex -> {excuseType, description})
     const [pendingExcuseDescriptions, setPendingExcuseDescriptions] = useState({});
+    const [loading, setLoading] = useState(true);
+    const [isAttendanceApproved, setIsAttendanceApproved] = useState(false);
+    const [originalWeeklyStatus, setOriginalWeeklyStatus] = useState([0, 0, 0, 0, 0]);
     const minDay = 2;
 
     // Next week's Monday→Friday
@@ -76,8 +79,14 @@ const EmployeeAttendanceRegistration = () => {
         // Fetch attendance data
         const fetchAttendance = axios.get(`/api/attendance?weekStart=${weekStart}`)
             .then(res => {
-                if (res.data && res.data.length === 5) {
-                    setWeeklyStatus(res.data);
+                if (res.data && res.data.length === 2) {
+                    setWeeklyStatus(res.data[0]);
+                    setOriginalWeeklyStatus(res.data[0]);
+                }
+                console.log(res.data);
+                // Check if attendance is approved
+                if (res.data && res.data[1]) {
+                    setIsAttendanceApproved(true);
                 }
             })
             .catch(err => console.error('Fetch attendance failed', err));
@@ -89,7 +98,10 @@ const EmployeeAttendanceRegistration = () => {
             })
             .catch(console.error);
 
-        Promise.all([fetchAttendance, fetchExcuses]);
+        Promise.all([fetchAttendance, fetchExcuses])
+            .finally(() => {
+                setLoading(false);
+            });
     }, [weekStart]);
 
     const handleStatusChange = async (dayIndex, newStatus) => {
@@ -192,15 +204,23 @@ const EmployeeAttendanceRegistration = () => {
             return Swal.fire('Eksik bilgi','Lütfen tüm günleri doldurunuz.','warning');
         }
         
-        const warningText =
-            officeDays < minDay
-                ? `Ofise en az ${minDay} gün gelmeniz gerekmektedir. Yine de kaydetmek istiyor musunuz?`
-                : 'Seçiminiz kaydedilecektir.';
+        // Check if attendance was approved and has been modified
+        const hasChanges = JSON.stringify(weeklyStatus) !== JSON.stringify(originalWeeklyStatus);
+        const needsApprovalWarning = isAttendanceApproved && hasChanges;
+        
+        let warningText = '';
+        if (needsApprovalWarning) {
+            warningText = 'Onaylı attendance kaydınız değiştirildi. Kaydetmek onayınızı kaldıracaktır. Devam etmek istiyor musunuz?';
+        } else if (officeDays < minDay) {
+            warningText = `Ofise en az ${minDay} gün gelmeniz gerekmektedir. Yine de kaydetmek istiyor musunuz?`;
+        } else {
+            warningText = 'Seçiminiz kaydedilecektir.';
+        }
 
         const result = await Swal.fire({
             title: 'Emin misiniz?',
             text: warningText,
-            icon: 'warning',
+            icon: needsApprovalWarning ? 'warning' : 'warning',
             showCancelButton: true,
             confirmButtonText: 'Evet',
             cancelButtonText: 'Hayır',
@@ -227,11 +247,12 @@ const EmployeeAttendanceRegistration = () => {
                     await Promise.all(excusePromises);
                 }
 
-                // Sonra attendance'ı kaydet
+                // Sonra attendance'ı kaydet - isApproved false olacak
                 await axios.post('/api/attendance', { 
                     userId: user.id,
                     weekStart: weekStart,
-                    dates: weeklyStatus
+                    dates: weeklyStatus,
+                    isApproved: false
                 });
 
                 // Excuse listesini yenile
@@ -240,6 +261,10 @@ const EmployeeAttendanceRegistration = () => {
 
                 // Pending descriptions'ı temizle
                 setPendingExcuseDescriptions({});
+                
+                // Update approval status
+                setIsAttendanceApproved(false);
+                setOriginalWeeklyStatus([...weeklyStatus]);
 
                 Swal.fire('Başarılı', 'Seçiminiz kaydedildi.', 'success');
             } catch (error) {
@@ -306,6 +331,10 @@ const EmployeeAttendanceRegistration = () => {
                 const excuseRes = await axios.get('/api/excuse');
                 setExistingExcuses(excuseRes.data);
                 
+                // Update approval status
+                setIsAttendanceApproved(false);
+                setOriginalWeeklyStatus([...weeklyStatus]);
+
                 Swal.fire('Silindi','Mazeret silindi ve attendance güncellendi','success');
             } catch (error) {
                 console.error('Excuse silme hatası:', error);
@@ -520,9 +549,25 @@ const EmployeeAttendanceRegistration = () => {
         return `${dayName} (${formattedDate})`;
     };
 
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <div className="text-lg">Yükleniyor...</div>
+            </div>
+        );
+    }
+
     return (
         <div className="flex-1 p-6 bg-white">
-            <h3 className="text-lg font-semibold mb-4">Bu Hafta - İş Günleri</h3>
+            <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">Bu Hafta - İş Günleri</h3>
+                {isAttendanceApproved && (
+                    <div className="flex items-center gap-2 px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        Onaylı
+                    </div>
+                )}
+            </div>
 
             <div className="grid grid-cols-5 gap-4 mb-6">
                 {['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma'].map((dayName, idx) => 
@@ -530,10 +575,19 @@ const EmployeeAttendanceRegistration = () => {
                 )}
             </div>
 
-            {officeDays < minDay && (
+            {officeDays < minDay && !isAttendanceApproved && (
                 <div className="mb-4 p-4 rounded-lg bg-red-50 border border-red-200">
                     <p className="text-sm text-red-700">
                         ⚠️ Ofise en az {minDay} gün gelmeniz gerekmektedir. Şu an {officeDays} gün seçili.
+                    </p>
+                </div>
+            )}
+
+            {/* Onaylı attendance değiştirildiğinde uyarı göster */}
+            {isAttendanceApproved && JSON.stringify(weeklyStatus) !== JSON.stringify(originalWeeklyStatus) && (
+                <div className="mb-4 p-4 rounded-lg bg-orange-50 border border-orange-200">
+                    <p className="text-sm text-orange-700">
+                        ⚠️ Onaylı attendance kaydınız değiştirildi. Kaydetmek onayınızı kaldıracaktır.
                     </p>
                 </div>
             )}
