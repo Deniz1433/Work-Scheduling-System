@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { User, Users, FileText, Calendar1, UserPlus, UserCog, LogOut } from 'lucide-react';
+import { User, Users, FileText, Calendar1, UserPlus, UserCog, LogOut, Building } from 'lucide-react';
 import AttendanceRegistration from './EmployeeAttendanceRegistration';
 import TeamAttendance from './EmployeeTeamAttendance';
-import DepartmentInfo from './EmployeeDepartmentInfo';
 import logo from './assets/logo.png';
 import { useUser } from "./UserContext";
 import AdminManageUsers from './AdminManageUsers';
+import AdminDepartmentManagement from './AdminDepartmentManagement';
+import AdminRoleManagement from './AdminRoleManagement';
+import AdminHolidayRegistration from './AdminHolidayRegistration';
 
 const EmployeeMain = () => {
   const {user} = useUser();
@@ -26,41 +28,34 @@ const EmployeeMain = () => {
       component: TeamAttendance
     },
     {
-      id: 'department',
-      label: 'Departman Bilgileri',
-      icon: Users,
-      component: DepartmentInfo
-    },
-    {
       id: 'manageUsers',
       label: 'Kullanıcıları Yönet',
       icon: UserCog,
       component: AdminManageUsers
+    },
+    {
+      id: 'departmentManagement',
+      label: 'Departmanları Yönet',
+      icon: Building,
+      component: AdminDepartmentManagement
+    },
+    {
+      id: 'adminRoleManagement',
+      label: 'Rolleri Yönet',
+      icon: UserCog,
+      component: AdminRoleManagement
+    },
+    {
+      id: 'adminHolidayRegistration',
+      label: 'Tatilleri Yönet',
+      icon: Calendar1,
+      component: AdminHolidayRegistration
     }
   ];
 
-  // Kullanıcı rolüne göre buton filtreleme
-  const navigationItems = allNavigationItems.filter(item => {
-    if (item.id === 'department') {
-      return user?.authorities?.includes('ROLE_attendance_client_manager');
-    }
-    if (item.id === 'team') {
-      return (
-          user?.authorities?.includes('ROLE_attendance_client_staff') ||
-          user?.authorities?.includes('ROLE_attendance_client_team_leader')
-      );
-    }
-    if (item.id === 'adminAddUser' || item.id === 'manageRoles') {
-      return (
-          user?.authorities?.includes('ROLE_attendance_client_admin') ||
-          user?.authorities?.includes('ROLE_attendance_client_superadmin')
-      );
-    }
-    return true;
-  });
 
   const renderActiveComponent = () => {
-    const activeItem = navigationItems.find(item => item.id === activeView);
+    const activeItem = allNavigationItems.find(item => item.id === activeView);
     if (activeItem) {
       const Component = activeItem.component;
       return <Component user={user} />;
@@ -79,7 +74,7 @@ const EmployeeMain = () => {
           <h1 className="text-xl font-bold mb-8">Ofis Günü Kayıt Sistemi</h1>
 
           <nav className="space-y-2">
-            {navigationItems.map(item => {
+            {allNavigationItems.map(item => {
               const Icon = item.icon;
               return (
                   <button
@@ -137,7 +132,7 @@ const EmployeeMain = () => {
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-semibold text-gray-800">
-                  {navigationItems.find(item => item.id === activeView)?.label}
+                  {allNavigationItems.find(item => item.id === activeView)?.label}
                 </h2>
                 <p className="text-sm text-gray-600">
                   {activeView === 'registration' && 'Ofiste çalışacağınız günleri belirleyin'}

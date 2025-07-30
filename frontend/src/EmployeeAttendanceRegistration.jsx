@@ -276,7 +276,7 @@ const EmployeeAttendanceRegistration = () => {
                 if (dayIndex !== -1) {
                     setWeeklyStatus(prev => {
                         const newStatusArray = [...prev];
-                        newStatusArray[dayIndex] = 0; // Veri yok durumuna çevir
+                        newStatusArray[dayIndex] = 1; // Veri yok durumuna çevir
                         
                         // State güncellemesi sonrası API çağrısı yap
                         setTimeout(async () => {

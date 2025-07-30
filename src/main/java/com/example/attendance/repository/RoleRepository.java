@@ -1,10 +1,10 @@
 package com.example.attendance.repository;
 
-import com.example.attendance.model.Department;
+import com.example.attendance.model.Role;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface DepartmentRepository extends JpaRepository<Department, Long> {
+public interface RoleRepository extends JpaRepository<Role, Long> {
     boolean existsByName(String name);
 } 

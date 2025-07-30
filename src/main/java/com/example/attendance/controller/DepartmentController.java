@@ -1,60 +1,54 @@
 package com.example.attendance.controller;
 
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import com.example.attendance.model.Department;
 import com.example.attendance.service.DepartmentService;
-import com.example.attendance.dto.DepartmentDto;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.DeleteMapping;
-
 @RestController
-@RequestMapping("/api/admin/department")
+@RequestMapping("/api/departments")
+@CrossOrigin(origins = "*")
 public class DepartmentController {
+    private final DepartmentService departmentService;
 
-      private final DepartmentService service;
+    public DepartmentController(DepartmentService departmentService) {
+        this.departmentService = departmentService;
+    }
 
-      public DepartmentController(DepartmentService service) {
-            this.service = service;
-      }
+    @GetMapping
+    public ResponseEntity<List<Department>> getAllDepartments() {
+        return ResponseEntity.ok(departmentService.getAllDepartments());
+    }
 
-      @PostMapping
-      public ResponseEntity<DepartmentDto> addDepartment(@RequestBody DepartmentDto departmentDto) {
-            DepartmentDto saved = service.addDepartment(departmentDto);
-            return ResponseEntity.ok(saved);
-      }
+    @PostMapping
+    public ResponseEntity<Department> createDepartment(@RequestBody Department department) {
+        try {
+            Department createdDepartment = departmentService.createDepartment(department);
+            return ResponseEntity.ok(createdDepartment);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
 
-      @PostMapping("/{id}")
-      public ResponseEntity<DepartmentDto> updateDepartment(
-            @PathVariable Long id,
-             @RequestBody DepartmentDto departmentDto
-      ) {
-            DepartmentDto updated = service.updateDepartment(id, departmentDto);
-            return ResponseEntity.ok(updated);
-      }
+    @PutMapping("/{id}")
+    public ResponseEntity<Department> updateDepartment(@PathVariable Long id, @RequestBody Department department) {
+        try {
+            Department updatedDepartment = departmentService.updateDepartment(id, department);
+            return ResponseEntity.ok(updatedDepartment);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
 
-      @DeleteMapping("/{id}")
-      public ResponseEntity<Void> deleteDepartment(@PathVariable Long id) {
-            service.deleteDepartment(id);
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteDepartment(@PathVariable Long id) {
+        try {
+            departmentService.deleteDepartment(id);
             return ResponseEntity.noContent().build();
-      }
-
-      @GetMapping
-      public ResponseEntity<List<DepartmentDto>> getAllDepartments() {
-            List<DepartmentDto> departments = service.getAllDepartments();
-            return ResponseEntity.ok(departments);
-      }
-
-      @GetMapping("/{id}")
-      public ResponseEntity<DepartmentDto> getDepartmentById(@PathVariable Long id) {
-            DepartmentDto department = service.getDepartmentById(id);
-            return ResponseEntity.ok(department);
-      }
-
-}
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+} 

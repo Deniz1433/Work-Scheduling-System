@@ -6,11 +6,8 @@ import com.example.attendance.dto.TeamAttendanceDto;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;    // ← add this import
 
-import java.time.DayOfWeek;
 import java.time.LocalDate;
-import java.time.temporal.TemporalAdjusters;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 public class AttendanceService {

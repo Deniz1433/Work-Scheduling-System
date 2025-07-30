@@ -32,7 +32,7 @@ public class SecurityConfig {
         http
                 // disable CSRF for our stateless API endpoints
                 .csrf(csrf -> csrf
-                        .ignoringRequestMatchers("/api/attendance/**", "/api/excuse/**", "/api/admin/**")
+                        .ignoringRequestMatchers("/api/attendance/**", "/api/excuse/**", "/api/admin/**", "/api/departments/**", "/api/roles/**", "/api/holidays/**" )
                 )
                 .authorizeHttpRequests(auth -> auth
                         // allow React static assets
@@ -57,6 +57,10 @@ public class SecurityConfig {
                                 "ROLE_attendance_client_admin",
                                 "ROLE_attendance_client_superadmin"
                         )
+
+                        // departments API - temporarily allow all users for testing
+                        .requestMatchers("/api/departments/**")
+                        .permitAll()
 
                         // attendance & excuse APIs require any authenticated user
                         .requestMatchers("/api/attendance/**", "/api/excuse/**")

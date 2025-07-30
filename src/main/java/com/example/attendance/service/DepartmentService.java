@@ -1,54 +1,52 @@
 package com.example.attendance.service;
 
-import org.springframework.stereotype.Service;
-import com.example.attendance.repository.DepartmentRepository;
-import com.example.attendance.dto.DepartmentDto;
 import com.example.attendance.model.Department;
+import com.example.attendance.repository.DepartmentRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 public class DepartmentService {
-      private final DepartmentRepository repo;
+    private final DepartmentRepository departmentRepository;
 
-      public DepartmentService(DepartmentRepository repo) {
-            this.repo = repo;
-      }
+    public DepartmentService(DepartmentRepository departmentRepository) {
+        this.departmentRepository = departmentRepository;
+    }
 
-      public List<DepartmentDto> getAllDepartments() {
-            return repo.findAll().stream()
-                        .map(d -> new DepartmentDto(d.getId(), d.getName(), d.getMinDays(), 
-                             d.getChildDepartment() != null ? d.getChildDepartment().getId() : null))
-                        .collect(Collectors.toList());
-      }
+    public List<Department> getAllDepartments() {
+        return departmentRepository.findAll();
+    }
 
-      public DepartmentDto getDepartmentById(Long id) {
-            Department department = repo.findById(id)
-                        .orElseThrow(() -> new RuntimeException("Department not found"));
-            return new DepartmentDto(department.getId(), department.getName(), department.getMinDays(), 
-                                   department.getChildDepartment() != null ? department.getChildDepartment().getId() : null);
-      }
+    @Transactional
+    public Department createDepartment(Department department) {
+        if (departmentRepository.existsByName(department.getName())) {
+            throw new RuntimeException("Bu departman adı zaten mevcut: " + department.getName());
+        }
+        return departmentRepository.save(department);
+    }
 
-      public DepartmentDto addDepartment(DepartmentDto departmentDto) {
-            Department department = new Department();
-            department.setName(departmentDto.getName());
-            department.setMinDays(departmentDto.getMinDays());
-            Department saved = repo.save(department);
-            return new DepartmentDto(saved.getId(), saved.getName(), saved.getMinDays(), 
-                                   saved.getChildDepartment() != null ? saved.getChildDepartment().getId() : null);
-      }
+    @Transactional
+    public Department updateDepartment(Long id, Department department) {
+        Department existingDepartment = departmentRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Departman bulunamadı: " + id));
+        
+        if (!existingDepartment.getName().equals(department.getName()) && 
+            departmentRepository.existsByName(department.getName())) {
+            throw new RuntimeException("Bu departman adı zaten mevcut: " + department.getName());
+        }
+        
+        existingDepartment.setName(department.getName());
+        existingDepartment.setMinDays(department.getMinDays());
+        return departmentRepository.save(existingDepartment);
+    }
 
-      public DepartmentDto updateDepartment(Long id, DepartmentDto departmentDto) {
-            Department department = repo.findById(id)
-                        .orElseThrow(() -> new RuntimeException("Department not found"));
-            department.setName(departmentDto.getName());
-            department.setMinDays(departmentDto.getMinDays());
-            Department saved = repo.save(department);
-            return new DepartmentDto(saved.getId(), saved.getName(), saved.getMinDays(), 
-                                   saved.getChildDepartment() != null ? saved.getChildDepartment().getId() : null);
-      }
-
-      public void deleteDepartment(Long id) {
-            repo.deleteById(id);
-      }
-}
+    @Transactional
+    public void deleteDepartment(Long id) {
+        if (!departmentRepository.existsById(id)) {
+            throw new RuntimeException("Departman bulunamadı: " + id);
+        }
+        departmentRepository.deleteById(id);
+    }
+} 
