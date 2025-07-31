@@ -331,9 +331,7 @@ const EmployeeAttendanceRegistration = () => {
                 const excuseRes = await axios.get('/api/excuse');
                 setExistingExcuses(excuseRes.data);
                 
-                // Update approval status
-                setIsAttendanceApproved(false);
-                setOriginalWeeklyStatus([...weeklyStatus]);
+                
 
                 Swal.fire('Silindi','Mazeret silindi ve attendance güncellendi','success');
             } catch (error) {
@@ -655,9 +653,14 @@ const EmployeeAttendanceRegistration = () => {
                                             <span className="text-sm bg-blue-100 text-blue-700 px-2 py-1 rounded">
                                                 {EXCUSE_TYPES.find(o=>o.val===excuse.excuseType)?.label}
                                             </span>
-                                            {excuse.isApproved && (
+                                            {excuse.approved || excuse.isApproved && (
                                                 <span className="text-sm bg-green-100 text-green-700 px-2 py-1 rounded">
                                                     Onaylı
+                                                </span>
+                                            )}
+                                            {excuse.approved === false || excuse.isApproved === false && (
+                                                <span className="text-sm bg-red-100 text-red-700 px-2 py-1 rounded">
+                                                    Onaylı Değil
                                                 </span>
                                             )}
                                         </div>
