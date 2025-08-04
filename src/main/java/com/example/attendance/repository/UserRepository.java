@@ -10,4 +10,8 @@ import java.util.UUID;
 public interface UserRepository extends JpaRepository<User, UUID> {
     Optional<User> findByKeycloakId(String keycloakId);
     List<User> findByFirstNameContainsAndLastNameContainsAndEmailContains(String firstName, String lastName, String email);
+
+    User findByUsername(String user);
+
+    List<User> findByDepartmentId(Long departmentId);
 }

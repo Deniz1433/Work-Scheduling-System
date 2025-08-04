@@ -50,14 +50,14 @@ public class AttendanceService {
         return departmentUsers.stream()
                 .map(user -> {
                     TeamAttendanceDto dto = new TeamAttendanceDto();
-                    dto.setId(Long.parseLong(user.getId()));
+                    dto.setId(Long.parseLong(String.valueOf(user.getId())));
                     dto.setName(user.getFirstName());
                     dto.setSurname(user.getLastName());
                     dto.setDepartment(user.getDepartment().getName());
                     dto.setDepartmentId(user.getDepartment().getId());
 
                     // Attendance verilerini al
-                    Attendance attendance = repo.findByUserIdAndWeekStart(user.getId(), nextWeekStart.toString());
+                    Attendance attendance = repo.findByUserIdAndWeekStart(String.valueOf(user.getId()), nextWeekStart.toString());
                     if (attendance != null) {
                        
                         List<Integer> attendanceIntegers = attendance.getDates().stream()
@@ -149,14 +149,14 @@ public class AttendanceService {
                 })
                 .map(user -> {
                     TeamAttendanceDto dto = new TeamAttendanceDto();
-                    dto.setId(Long.parseLong(user.getId()));
+                    dto.setId(Long.parseLong(String.valueOf(user.getId())));
                     dto.setName(user.getFirstName());
                     dto.setSurname(user.getLastName());
                     dto.setDepartment(user.getDepartment().getName());
                     dto.setDepartmentId(user.getDepartment().getId());
 
                     // Attendance verilerini al
-                    Attendance attendance = repo.findByUserIdAndWeekStart(user.getId(), nextWeekStart.toString());
+                    Attendance attendance = repo.findByUserIdAndWeekStart(String.valueOf(user.getId()), nextWeekStart.toString());
                     if (attendance != null) {
                         List<Integer> attendanceIntegers = attendance.getDates().stream()
                                 .map(day -> day) 
