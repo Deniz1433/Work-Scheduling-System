@@ -130,12 +130,12 @@ databaseChangeLog:
 
   # User table
   - changeSet:
-      id: create-user-table
+      id: create-users-table
       author: emir
       validCheckSum: ANY
       changes:
         - createTable:
-            tableName: user
+            tableName: users
             columns:
               - column:
                   name: id
@@ -179,13 +179,13 @@ databaseChangeLog:
                   constraints:
                     nullable: false
         - addForeignKeyConstraint:
-            baseTableName: user
+            baseTableName: users
             baseColumnNames: role_id
             constraintName: fk_user_role
             referencedTableName: role
             referencedColumnNames: id
         - addForeignKeyConstraint:
-            baseTableName: user
+            baseTableName: users
             baseColumnNames: department_id
             constraintName: fk_user_department
             referencedTableName: department
@@ -370,3 +370,26 @@ databaseChangeLog:
                   type: DATE
                   constraints:  
                     nullable: true
+  # Fix sequences for tables with mock data
+  - changeSet:
+      id: fix-sequences-after-mock-data
+      author: emir
+      changes:
+        - sql:
+            sql: SELECT setval('excuse_id_seq', (SELECT COALESCE(MAX(id), 0) + 1 FROM excuse), false);
+        - sql:
+            sql: SELECT setval('attendance_id_seq', (SELECT COALESCE(MAX(id), 0) + 1 FROM attendance), false);
+        - sql:
+            sql: SELECT setval('holiday_id_seq', (SELECT COALESCE(MAX(id), 0) + 1 FROM holiday), false);
+        - sql:
+            sql: SELECT setval('role_hierarchy_id_seq', (SELECT COALESCE(MAX(id), 0) + 1 FROM role_hierarchy), false);
+        - sql:
+            sql: SELECT setval('department_id_seq', (SELECT COALESCE(MAX(id), 0) + 1 FROM department), false);
+        - sql:
+            sql: SELECT setval('permission_id_seq', (SELECT COALESCE(MAX(id), 0) + 1 FROM permission), false);
+        - sql:
+            sql: SELECT setval('role_id_seq', (SELECT COALESCE(MAX(id), 0) + 1 FROM role), false);
+        - sql:
+            sql: SELECT setval('role_permission_id_seq', (SELECT COALESCE(MAX(id), 0) + 1 FROM role_permission), false);
+        - sql:
+            sql: SELECT setval('users_id_seq', (SELECT COALESCE(MAX(id), 0) + 1 FROM users), false);

@@ -31,7 +31,6 @@ public class AdminManageRolesController {
     }
 
     @GetMapping("/users")
-    @PreAuthorize("hasAnyRole('attendance_client_admin','attendance_client_superadmin')")
     public List<UserRolesDto> listAllUsers() {
         return kcService.getAllUsers().stream().map(u -> {
             List<String> roles = kcService.getUserClientRoles(u.getId());
@@ -53,7 +52,6 @@ public class AdminManageRolesController {
     }
 
     @GetMapping("/roles/permissions")
-    @PreAuthorize("hasAnyRole('attendance_client_admin','attendance_client_superadmin')")
     public List<String> listPermissionRoles() {
         return kcService.getPermissionRoles().stream()
                 .map(RoleRepresentation::getName)
@@ -61,7 +59,6 @@ public class AdminManageRolesController {
     }
 
     @GetMapping("/roles/departments")
-    @PreAuthorize("hasAnyRole('attendance_client_admin','attendance_client_superadmin')")
     public List<String> listDepartmentRoles() {
         return kcService.getDepartmentRoles().stream()
                 .map(RoleRepresentation::getName)
@@ -69,7 +66,6 @@ public class AdminManageRolesController {
     }
 
     @PutMapping("/users/{userId}/roles")
-    @PreAuthorize("hasAnyRole('attendance_client_admin','attendance_client_superadmin')")
     public ResponseEntity<Void> updateUserRoles(
             @PathVariable String userId,
             @RequestBody Map<String, Object> payload
