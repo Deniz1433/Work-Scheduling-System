@@ -10,8 +10,9 @@ import AdminRoleManagement from './AdminRoleManagement';
 import AdminHolidayRegistration from './AdminHolidayRegistration';
 
 const EmployeeMain = () => {
-  const {user} = useUser();
+  const {user, loading, error} = useUser();
   const [activeView, setActiveView] = useState('registration');
+  const [showError, setShowError] = useState(false);
 
   // Tüm menü elemanları
   const allNavigationItems = [
@@ -66,6 +67,25 @@ const EmployeeMain = () => {
   const handleLogout = () => {
     window.location.href = '/logout';
   };
+
+  // Hata durumunda popup göster
+  useEffect(() => {
+    if (error && !showError) {
+      setShowError(true);
+    }
+  }, [error, showError]);
+
+  // Loading durumunda loading göster
+  if (loading) {
+    return (
+      <div className="flex h-screen bg-gray-100 items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Kullanıcı bilgileri yükleniyor...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
       <div className="flex h-screen bg-gray-100">
@@ -161,6 +181,34 @@ const EmployeeMain = () => {
             {renderActiveComponent()}
           </main>
         </div>
+
+        {/* Hata Popup */}
+        {showError && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+              <div className="flex items-center mb-4">
+                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mr-4">
+                  <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-sm font-bold">✕</span>
+                  </div>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900">Hata</h3>
+              </div>
+              <p className="text-gray-600 mb-6">{error}</p>
+              <div className="flex justify-end">
+                <button
+                  onClick={() => {
+                    setShowError(false);
+                    window.location.reload();
+                  }}
+                  className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
+                >
+                  OK
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
   );
 };

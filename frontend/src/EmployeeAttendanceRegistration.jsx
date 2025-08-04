@@ -204,6 +204,11 @@ const EmployeeAttendanceRegistration = () => {
             return Swal.fire('Eksik bilgi','Lütfen tüm günleri doldurunuz.','warning');
         }
         
+        // Check if user is available
+        if (!user || !user.id) {
+            return Swal.fire('Hata', 'Kullanıcı bilgileri yüklenemedi. Lütfen sayfayı yenileyin.', 'error');
+        }
+        
         // Check if attendance was approved and has been modified
         const hasChanges = JSON.stringify(weeklyStatus) !== JSON.stringify(originalWeeklyStatus);
         const needsApprovalWarning = isAttendanceApproved && hasChanges;
@@ -249,10 +254,9 @@ const EmployeeAttendanceRegistration = () => {
 
                 // Sonra attendance'ı kaydet - isApproved false olacak
                 await axios.post('/api/attendance', { 
-                    userId: user.id,
+                    userId: user.id, // Long ID
                     weekStart: weekStart,
-                    dates: weeklyStatus,
-                    isApproved: false
+                    dates: weeklyStatus
                 });
 
                 // Excuse listesini yenile
@@ -307,7 +311,7 @@ const EmployeeAttendanceRegistration = () => {
                         setTimeout(async () => {
                             try {
                                 await axios.post('/api/attendance', { 
-                                    userId: user.id,
+                                    userId: user.id, // Long ID
                                     weekStart: weekStart,
                                     dates: newStatusArray
                                 });
@@ -399,7 +403,7 @@ const EmployeeAttendanceRegistration = () => {
                             setTimeout(async () => {
                                 try {
                                     await axios.post('/api/attendance', { 
-                                        userId: user.id,
+                                        userId: user.id, // Long ID
                                         weekStart: weekStart,
                                         dates: newStatusArray
                                     });

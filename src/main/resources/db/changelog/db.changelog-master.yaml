@@ -393,3 +393,85 @@ databaseChangeLog:
             sql: SELECT setval('role_permission_id_seq', (SELECT COALESCE(MAX(id), 0) + 1 FROM role_permission), false);
         - sql:
             sql: SELECT setval('users_id_seq', (SELECT COALESCE(MAX(id), 0) + 1 FROM users), false);
+
+  # User Roles table
+  - changeSet:
+      id: create-user-roles-table
+      author: gpt
+      changes:
+        - createTable:
+            tableName: user_roles
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+              - column:
+                  name: user_id
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: role_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: user_roles
+            baseColumnNames: role_id
+            constraintName: fk_user_roles_role_id
+            referencedTableName: role
+            referencedColumnNames: id
+        - addUniqueConstraint:
+            tableName: user_roles
+            columnNames: user_id,role_id
+            constraintName: uq_user_roles
+
+  # User Departments table
+  - changeSet:
+      id: create-user-departments-table
+      author: gpt
+      changes:
+        - createTable:
+            tableName: user_departments
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+              - column:
+                  name: user_id
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: department_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: user_departments
+            baseColumnNames: department_id
+            constraintName: fk_user_departments_department_id
+            referencedTableName: department
+            referencedColumnNames: id
+        - addUniqueConstraint:
+            tableName: user_departments
+            columnNames: user_id,department_id
+            constraintName: uq_user_departments

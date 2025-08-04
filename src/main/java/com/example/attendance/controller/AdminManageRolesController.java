@@ -1,6 +1,8 @@
-/*package com.example.attendance.controller;
+package com.example.attendance.controller;
 
+import com.example.attendance.dto.CreateUserDto;
 import com.example.attendance.service.KeycloakAdminService;
+import com.example.attendance.service.UserService;
 import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,6 +14,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import org.keycloak.representations.idm.CredentialRepresentation;
+import com.example.attendance.util.CreatedResponseUtil;
 
 @RestController
 @RequestMapping("/api/admin")
@@ -21,6 +25,9 @@ public class AdminManageRolesController {
 
     @Autowired
     private KeycloakAdminService kcService;
+    
+    @Autowired
+    private UserService userService;
 
     public static class UserRolesDto {
         public String id;
@@ -30,7 +37,7 @@ public class AdminManageRolesController {
         public List<String> departmentRoles;
     }
 
-    @GetMapping("/users")
+    @GetMapping("/users/roles")
     public List<UserRolesDto> listAllUsers() {
         return kcService.getAllUsers().stream().map(u -> {
             List<String> roles = kcService.getUserClientRoles(u.getId());
@@ -49,6 +56,39 @@ public class AdminManageRolesController {
             dto.departmentRoles = deps;
             return dto;
         }).collect(Collectors.toList());
+    }
+
+    @PostMapping("/users/create")
+    public ResponseEntity<String> createUser(@RequestBody CreateUserDto createUserDto) {
+        try {
+            // Keycloak'ta kullanıcı oluştur
+            UserRepresentation user = new UserRepresentation();
+            user.setUsername(createUserDto.getUsername());
+            user.setEmail(createUserDto.getEmail());
+            user.setFirstName(createUserDto.getFirstName());
+            user.setLastName(createUserDto.getLastName());
+            user.setEnabled(true);
+
+            jakarta.ws.rs.core.Response response = kcService.createUser(user);
+            String keycloakId = CreatedResponseUtil.getCreatedId(response);
+
+            // Şifre ayarla
+            CredentialRepresentation passwordRep = new CredentialRepresentation();
+            passwordRep.setType(CredentialRepresentation.PASSWORD);
+            passwordRep.setValue(createUserDto.getPassword());
+            passwordRep.setTemporary(false);
+            kcService.setUserPassword(keycloakId, passwordRep);
+
+            // Veritabanında kullanıcı oluştur
+            userService.createUser(createUserDto, keycloakId);
+
+            // Varsayılan "user" rolünü ata
+            kcService.assignRoleToUser(keycloakId, "user");
+
+            return ResponseEntity.ok("Kullanıcı başarıyla oluşturuldu");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Kullanıcı oluşturulamadı: " + e.getMessage());
+        }
     }
 
     @GetMapping("/roles/permissions")
@@ -113,4 +153,3 @@ public class AdminManageRolesController {
         return ResponseEntity.noContent().build();
     }
 }
-*/

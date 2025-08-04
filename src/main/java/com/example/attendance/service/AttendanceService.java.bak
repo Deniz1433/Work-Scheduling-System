@@ -31,7 +31,8 @@ public class AttendanceService {
     
     public List<TeamAttendanceDto> getTeamAttendance(String username) {
         // 1. Kullanıcıyı username'e göre bul
-        User currentUser = userRepo.findByUsername(username).orElse(null);
+        // DENEME İÇİN 
+        User currentUser = userRepo.findByUsername("user");
         if (currentUser == null) {
             return new ArrayList<>();
         }
@@ -49,14 +50,14 @@ public class AttendanceService {
         return departmentUsers.stream()
                 .map(user -> {
                     TeamAttendanceDto dto = new TeamAttendanceDto();
-                    dto.setId(user.getId()); // Long ID
+                    dto.setId(Long.parseLong(user.getId()));
                     dto.setName(user.getFirstName());
                     dto.setSurname(user.getLastName());
                     dto.setDepartment(user.getDepartment().getName());
                     dto.setDepartmentId(user.getDepartment().getId());
 
                     // Attendance verilerini al
-                    Attendance attendance = repo.findByUserIdAndWeekStart(user.getId().toString(), nextWeekStart.toString());
+                    Attendance attendance = repo.findByUserIdAndWeekStart(user.getId(), nextWeekStart.toString());
                     if (attendance != null) {
                        
                         List<Integer> attendanceIntegers = attendance.getDates().stream()
@@ -84,7 +85,7 @@ public class AttendanceService {
             String attendanceStatus
     ) {
         // 1. Kullanıcıyı username'e göre bul
-        User currentUser = userRepo.findByUsername(username).orElse(null);
+        User currentUser = userRepo.findByUsername("user");
         if (currentUser == null) {
             return new ArrayList<>();
         }
@@ -148,14 +149,14 @@ public class AttendanceService {
                 })
                 .map(user -> {
                     TeamAttendanceDto dto = new TeamAttendanceDto();
-                    dto.setId(user.getId()); // Long ID
+                    dto.setId(Long.parseLong(user.getId()));
                     dto.setName(user.getFirstName());
                     dto.setSurname(user.getLastName());
                     dto.setDepartment(user.getDepartment().getName());
                     dto.setDepartmentId(user.getDepartment().getId());
 
                     // Attendance verilerini al
-                    Attendance attendance = repo.findByUserIdAndWeekStart(user.getId().toString(), nextWeekStart.toString());
+                    Attendance attendance = repo.findByUserIdAndWeekStart(user.getId(), nextWeekStart.toString());
                     if (attendance != null) {
                         List<Integer> attendanceIntegers = attendance.getDates().stream()
                                 .map(day -> day) 
@@ -254,4 +255,4 @@ public class AttendanceService {
         excuse.setIsApproved(true);
         excuseRepo.save(excuse);
     }
-} 
+}

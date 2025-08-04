@@ -1,5 +1,6 @@
 package com.example.attendance.service;
 
+import lombok.RequiredArgsConstructor;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.resource.RoleScopeResource;
 import org.keycloak.representations.idm.*;
@@ -40,6 +41,25 @@ public class KeycloakAdminService {
                 .list();
     }
 
+    /** Create a new user in Keycloak. */
+    public jakarta.ws.rs.core.Response createUser(UserRepresentation user) {
+        return keycloak.realm(realm)
+                .users()
+                .create(user);
+    }
+
+    public void setUserPassword(String userId, CredentialRepresentation passwordRep) {
+        keycloak.realm(realm).users().get(userId).resetPassword(passwordRep);
+    }
+
+    public void assignRoleToUser(String userId, String roleName) {
+        // Client role'unu bul
+        RoleRepresentation role = keycloak.realm(realm).clients().get(CLIENT_ID).roles().get(roleName).toRepresentation();
+        
+        // Kullanıcıya rol ata
+        keycloak.realm(realm).users().get(userId).roles().clientLevel(CLIENT_ID).add(Arrays.asList(role));
+    }
+
     /** List all roles for a given client. */
     public List<RoleRepresentation> listClientRoles(String clientId) {
         String uuid = getClientUuid(clientId);
@@ -55,7 +75,7 @@ public class KeycloakAdminService {
         return listClientRoles(CLIENT_ID);
     }
 
-    /** The three “permission” roles: user, admin, superadmin. */
+    /** The three "permission" roles: user, admin, superadmin. */
     public List<RoleRepresentation> getPermissionRoles() {
         Set<String> perms = Set.of("user", "admin", "superadmin");
         return getAllClientRoles().stream()
@@ -63,7 +83,7 @@ public class KeycloakAdminService {
                 .collect(Collectors.toList());
     }
 
-    /** Everything else is a “department” role. */
+    /** Everything else is a "department" role. */
     public List<RoleRepresentation> getDepartmentRoles() {
         Set<String> perms = Set.of("user", "admin", "superadmin");
         return getAllClientRoles().stream()
@@ -71,7 +91,7 @@ public class KeycloakAdminService {
                 .collect(Collectors.toList());
     }
 
-    /** Get a user’s RoleRepresentation list for any client. */
+    /** Get a user's RoleRepresentation list for any client. */
     public List<RoleRepresentation> getUserClientRoles(String userId, String clientId) {
         String uuid = getClientUuid(clientId);
         RoleScopeResource scope = keycloak.realm(realm)
@@ -95,7 +115,7 @@ public class KeycloakAdminService {
                 .collect(Collectors.toList());
     }
 
-    /** Replace a user’s attendance-client roles in one call. */
+    /** Replace a user's attendance-client roles in one call. */
     public void updateUserClientRoles(String userId, List<String> newRoles) {
         String uuid = getClientUuid(CLIENT_ID);
         RoleScopeResource scope = keycloak.realm(realm)

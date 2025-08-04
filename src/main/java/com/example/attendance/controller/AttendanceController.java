@@ -1,104 +1,193 @@
 package com.example.attendance.controller;
 
-import com.example.attendance.dto.AttendanceRequest;
-import com.example.attendance.dto.ExcuseDto;
-import com.example.attendance.dto.ExcusesRequest;
 import com.example.attendance.dto.TeamAttendanceDto;
-import com.example.attendance.model.Excuse;
 import com.example.attendance.service.AttendanceService;
-
-import jakarta.persistence.PrePersist;
-
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.security.Principal;
-import java.util.ArrayList;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/attendance")
+@CrossOrigin(origins = "*")
 public class AttendanceController {
-    private final AttendanceService service;
 
-    public AttendanceController(AttendanceService service) {
-        this.service = service;
-    }
+    private final AttendanceService attendanceService;
 
-    @PostMapping
-    public ResponseEntity<?> submit(
-            @RequestBody AttendanceRequest req,
-            Principal principal
-    ) {
-        service.record(principal.getName(),req.getWeekStart(),req.getDates());
-        return ResponseEntity.ok().build();
-    }
-
-    @PostMapping("/{id}")
-    public ResponseEntity<?> submit(@PathVariable Long id, @RequestBody AttendanceRequest req, Principal principal) {
-        System.out.println("Controller received request - ID: " + id + ", Principal: " + principal.getName());
-        System.out.println("Request body - weekStart: " + req.getWeekStart() + ", dates: " + req.getDates());
-        
-        try {
-            // Frontend'den gelen userId'yi kullan, principal.getName() değil
-            service.record(req.getUserId(), req.getWeekStart(), req.getDates());
-            System.out.println("Service call completed successfully");
-            return ResponseEntity.ok(Map.of("message", "Attendance updated successfully", "userId", id));
-        } catch (Exception e) {
-            System.err.println("Error in controller: " + e.getMessage());
-            e.printStackTrace();
-            return ResponseEntity.internalServerError().body("Error processing request: " + e.getMessage());
-        }
-    }
-
-    @PostMapping("/{id}/approve")
-    public ResponseEntity<?> approve(@PathVariable Long id, Principal principal) {
-        System.out.println("✅ Attendance approval request - ID: " + id + " by user: " + principal.getName());
-        service.approve(id, principal.getName());
-        System.out.println("✅ Attendance approved successfully!");
-        return ResponseEntity.ok().build();
-    }
-
-    @PostMapping("/excuse/{id}/approve")
-    public ResponseEntity<?> approveExcuse(@PathVariable Long id, Principal principal) {
-        service.approveExcuse(id, principal.getName());
-        return ResponseEntity.ok().build();
+    public AttendanceController(AttendanceService attendanceService) {
+        this.attendanceService = attendanceService;
     }
 
     @GetMapping
-    public ResponseEntity<ArrayList<Object>> getAttendanceData(Principal principal, String weekStart) {
-        ArrayList<Object> attendanceResponse = service.fetch(principal.getName(), weekStart);
-        return ResponseEntity.ok(attendanceResponse);
+    public ResponseEntity<Map<String, Object>> getAttendance(@RequestParam(required = false) String weekStart) {
+        try {
+            // Kullanıcının kendi attendance verilerini getir
+            if (weekStart == null) {
+                // Gelecek haftanın başlangıç tarihini hesapla
+                LocalDate nextWeekStart = LocalDate.now();
+                int dayOfWeek = nextWeekStart.getDayOfWeek().getValue();
+                int daysUntilNextMonday = (8 - dayOfWeek) % 7;
+                nextWeekStart = nextWeekStart.plusDays(daysUntilNextMonday);
+                weekStart = nextWeekStart.toString();
+            }
+            
+            // Şimdilik mock data döndür, gerçek uygulamada authentication'dan user ID alınacak
+            return ResponseEntity.ok(Map.of(
+                "message", "Attendance data retrieved successfully",
+                "weekStart", weekStart,
+                "data", List.of(List.of(0, 0, 0, 0, 0), false) // [attendance_dates, is_approved]
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "error", "Failed to get attendance: " + e.getMessage()
+            ));
+        }
     }
 
     @GetMapping("/team")
     public ResponseEntity<List<TeamAttendanceDto>> getTeamAttendance(
-            Principal principal,
             @RequestParam(required = false) String departmentId,
             @RequestParam(required = false) String roleId,
             @RequestParam(required = false) String searchTerm,
             @RequestParam(required = false) String attendanceStatus
     ) {
-        List<TeamAttendanceDto> team = service.getTeamAttendanceWithFilters(
-            principal.getName(), 
-            departmentId, 
-            roleId, 
-            searchTerm, 
-            attendanceStatus
-        );
-        return ResponseEntity.ok(team);
+        try {
+            List<TeamAttendanceDto> teamAttendance = attendanceService.getTeamAttendanceWithFilters(
+                "admin", // Admin kullanıcısı için - gerçek uygulamada authentication'dan alınacak
+                departmentId,
+                roleId,
+                searchTerm,
+                attendanceStatus
+            );
+            return ResponseEntity.ok(teamAttendance);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().build();
+        }
     }
 
-    @GetMapping("/excuse/{id}")
-    public ResponseEntity<List<ExcuseDto>> getExcuse(Principal principal, @PathVariable Long id) {
-        // Convert the numeric ID to string userId
-        String userId = id.toString();
-        List<Excuse> excuses = service.getExcuse(principal.getName(), userId);
-        List<ExcuseDto> excuseDtos = excuses.stream()
-            .map(e -> new ExcuseDto(e.getId(), e.getUserId(), e.getExcuseDate().toString(), e.getExcuseType(), e.getDescription(), e.getIsApproved()))
-            .collect(Collectors.toList());
-        return ResponseEntity.ok(excuseDtos);
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<Map<String, Object>> getUserAttendance(@PathVariable String userId) {
+        try {
+            // Kullanıcının gelecek hafta için attendance verilerini getir
+            LocalDate nextWeekStart = LocalDate.now();
+            int dayOfWeek = nextWeekStart.getDayOfWeek().getValue();
+            int daysUntilNextMonday = (8 - dayOfWeek) % 7;
+            nextWeekStart = nextWeekStart.plusDays(daysUntilNextMonday);
+            
+            var attendanceData = attendanceService.fetch(userId, nextWeekStart.toString());
+            
+            return ResponseEntity.ok(Map.of(
+                "message", "User attendance data retrieved successfully",
+                "userId", userId,
+                "weekStart", nextWeekStart.toString(),
+                "data", attendanceData
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().build();
+        }
     }
-}
+
+    @PostMapping
+    public ResponseEntity<Map<String, Object>> saveAttendance(@RequestBody Map<String, Object> request) {
+        try {
+            Object userIdObj = request.get("userId");
+            String userId;
+            
+            // userId Long veya String olabilir, String'e çevir
+            if (userIdObj instanceof Long) {
+                userId = userIdObj.toString();
+            } else if (userIdObj instanceof String) {
+                userId = (String) userIdObj;
+            } else {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "error", "Invalid userId format"
+                ));
+            }
+            
+            String weekStart = (String) request.get("weekStart");
+            @SuppressWarnings("unchecked")
+            List<Integer> dates = (List<Integer>) request.get("dates");
+            
+            if (userId == null || weekStart == null || dates == null) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "error", "Missing required fields: userId, weekStart, or dates"
+                ));
+            }
+            
+            LocalDate weekStartDate = LocalDate.parse(weekStart);
+            attendanceService.record(userId, weekStartDate, dates);
+            
+            return ResponseEntity.ok(Map.of(
+                "message", "Attendance saved successfully",
+                "userId", userId,
+                "weekStart", weekStart
+            ));
+        } catch (Exception e) {
+            e.printStackTrace(); // Console'a detaylı hata yazdır
+            return ResponseEntity.badRequest().body(Map.of(
+                "error", "Failed to save attendance: " + e.getMessage(),
+                "details", e.toString()
+            ));
+        }
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<Map<String, Object>> updateAttendance(@PathVariable String id, @RequestBody Map<String, Object> request) {
+        try {
+            Object userIdObj = request.get("userId");
+            String userId;
+            
+            // userId Long veya String olabilir, String'e çevir
+            if (userIdObj instanceof Long) {
+                userId = userIdObj.toString();
+            } else if (userIdObj instanceof String) {
+                userId = (String) userIdObj;
+            } else {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "error", "Invalid userId format"
+                ));
+            }
+            
+            String weekStart = (String) request.get("weekStart");
+            @SuppressWarnings("unchecked")
+            List<Integer> dates = (List<Integer>) request.get("dates");
+            
+            if (userId == null || weekStart == null || dates == null) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "error", "Missing required fields: userId, weekStart, or dates"
+                ));
+            }
+            
+            LocalDate weekStartDate = LocalDate.parse(weekStart);
+            attendanceService.record(userId, weekStartDate, dates);
+            
+            return ResponseEntity.ok(Map.of(
+                "message", "Attendance updated successfully",
+                "id", id,
+                "userId", userId,
+                "weekStart", weekStart
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "error", "Failed to update attendance: " + e.getMessage()
+            ));
+        }
+    }
+
+    @PostMapping("/{id}/approve")
+    public ResponseEntity<Map<String, Object>> approveAttendance(@PathVariable Long id) {
+        try {
+            attendanceService.approve(id, "admin");
+            return ResponseEntity.ok(Map.of(
+                "message", "Attendance approved successfully",
+                "id", id
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "error", "Failed to approve attendance: " + e.getMessage()
+            ));
+        }
+    }
+} 

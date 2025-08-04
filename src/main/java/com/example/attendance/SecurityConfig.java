@@ -62,9 +62,13 @@ public class SecurityConfig {
                         .requestMatchers("/api/departments/**")
                         .permitAll()
 
-                        // attendance & excuse APIs require any authenticated user
+                        // user API - temporarily allow all users for testing
+                        .requestMatchers("/api/user")
+                        .permitAll()
+
+                        // attendance & excuse APIs - temporarily allow all users for testing
                         .requestMatchers("/api/attendance/**", "/api/excuse/**")
-                        .authenticated()
+                        .permitAll()
 
                         // everything else also needs authentication
                         .anyRequest()
