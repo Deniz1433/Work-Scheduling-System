@@ -1,35 +1,39 @@
 package com.example.attendance.controller;
 
 import com.example.attendance.dto.UserDto;
-import com.example.attendance.model.Permission;
 import com.example.attendance.service.UserService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.*;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
 
-import java.util.*;
+import java.util.List;
+import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/admin/{userId}")
+@RequestMapping("/api/admin/users")
+@RequiredArgsConstructor
 public class UserController {
 
-    @Autowired
-    private UserService userService;
+    private final UserService userService;
 
-    @GetMapping("/users")
-    public List<UserDto> listAllUsers(@PathVariable String userId) {
-        UserDto user = userService.getUserById(userId);
-        List<Permission> permissions = userService.getPermissions(user.getId());
-        boolean isAdmin = permissions.stream()
-                .anyMatch(p -> p.getId() == 1 || p.getId() == 2);
-        if(isAdmin) {
-            return userService.getAllUsers();
-        }
-        else {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not authorized to access this resource");
-        }
+    @GetMapping
+    public List<UserDto> getAllUsers() {
+        return userService.getAllUsers();
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<UserDto> getUser(@PathVariable UUID id) {
+        return ResponseEntity.ok(userService.getUserById(id));
+    }
 
+    @PostMapping
+    public ResponseEntity<UserDto> createUser(@RequestBody UserDto dto) {
+        return ResponseEntity.ok(userService.createUser(dto));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteUser(@PathVariable UUID id) {
+        userService.deleteUser(id);
+        return ResponseEntity.noContent().build();
+    }
 }

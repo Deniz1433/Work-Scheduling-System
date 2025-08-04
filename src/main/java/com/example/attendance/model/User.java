@@ -1,40 +1,44 @@
 package com.example.attendance.model;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
+import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.Getter;
-import lombok.Setter;
 
-@Getter
-@Setter
+import java.util.UUID;
 
-@AllArgsConstructor
-@NoArgsConstructor
 @Entity
-@Table(name = "user")
+@Table(name = "users")
+@Data
+@NoArgsConstructor
 public class User {
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private String id;
+    private UUID id;
 
-    @Column(name = "first_name", nullable = true, length = 30)
-    private String firstName;
-    @Column(name = "last_name", nullable = true, length = 30)
-    private String lastName;
-    @Column(name = "email", nullable = true, length = 36)
-    private String email;
-    @Column(name = "username", nullable = false, length = 15)
+    @Column(name = "keycloak_id", nullable = false, unique = true)
+    private String keycloakId;
+
+    @Column(nullable = false, unique = true)
     private String username;
-    @Column(name = "password", nullable = true, length = 36)
-    private String password;
 
+    @Column(nullable = false, unique = true)
+    private String email;
+
+    @Column(nullable = false)
+    private String firstName;
+
+    @Column(nullable = false)
+    private String lastName;
+
+    @Column(name = "is_active")
+    private Boolean isActive;
+
+    @Column(nullable = true)
+    private String password;
     @ManyToOne
-    @JoinColumn(name = "role_id", nullable = false)
+    @JoinColumn(name = "role_id")
     private Role role;
 
     @ManyToOne
-    @JoinColumn(name = "department_id", nullable = false)
+    @JoinColumn(name = "department_id")
     private Department department;
-
 }

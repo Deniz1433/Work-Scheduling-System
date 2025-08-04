@@ -14,27 +14,36 @@ const AdminManageUsers = () => {
     lastName: '',
     email: '',
     username: '',
-    password: ''
+    password: '',
+    roleId: '',
+    departmentId: ''
   });
 
-  const [nameFilter, setNameFilter] = useState('');
-  const [filterSurname, setFilterSurname] = useState('');
-  const [filterEmail, setFilterEmail] = useState('');
-  const [filterDept, setFilterDept] = useState('');
-  const [filterRole, setFilterRole] = useState('');
+  const [filters, setFilters] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    department: '',
+    role: ''
+  });
 
   useEffect(() => {
     fetch('/api/admin/users')
         .then(res => res.json())
-        .then(data => setUsers(data));
-
-    fetch('/api/roles')
-        .then(res => res.json())
-        .then(data => setRoles(data));
-
-    fetch('/api/departments')
-        .then(res => res.json())
-        .then(data => setDepartments(data));
+        .then(data => {
+          if (Array.isArray(data)) {
+            setUsers(data);
+          } else {
+            console.error("Beklenmeyen veri formatı:", data);
+            setUsers([]); // Hatalı veri gelirse boş dizi ata
+          }
+        })
+        .catch(err => {
+          console.error("Kullanıcılar çekilirken hata oluştu:", err);
+          setUsers([]);
+        });
+    fetch('/api/roles').then(res => res.json()).then(setRoles);
+    fetch('/api/departments').then(res => res.json()).then(setDepartments);
   }, []);
 
   const handleInputChange = (e) => {
@@ -53,37 +62,34 @@ const AdminManageUsers = () => {
         })
         .then(msg => {
           Swal.fire('Başarılı', msg, 'success');
-          setNewUser({ firstName: '', lastName: '', email: '', username: '', password: '' });
+          setNewUser({ firstName: '', lastName: '', email: '', username: '', password: '', roleId: '', departmentId: '' });
+          fetch('/api/admin/users').then(res => res.json()).then(setUsers);
         })
         .catch(err => Swal.fire('Hata', err.message, 'error'));
   };
 
-  const handleRoleChange = (userId, newRole) => {
-    setSelectedRole(newRole);
+  const handleRoleChange = (userId, newRoleId) => {
     fetch(`/api/admin/users/${userId}/role`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ role: newRole })
+      body: JSON.stringify({ roleId: newRoleId })
     }).then(() => setEditRoleUserId(null));
   };
 
-  const handleDepartmentChange = (userId, newDept) => {
-    setSelectedDepartment(newDept);
+  const handleDepartmentChange = (userId, newDeptId) => {
     fetch(`/api/admin/users/${userId}/department`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ department: newDept })
+      body: JSON.stringify({ departmentId: newDeptId })
     }).then(() => setEditDeptUserId(null));
   };
 
   const filteredUsers = users.filter(user => {
-    const nameMatch = nameFilter === '' || user.firstName.toLowerCase().includes(nameFilter.toLowerCase());
-    const surnameMatch = filterSurname === '' || user.lastName.toLowerCase().includes(filterSurname.toLowerCase());
-    const emailMatch = filterEmail === '' || user.email.toLowerCase().includes(filterEmail.toLowerCase());
-    const deptMatch = filterDept === '' || user.department === filterDept;
-    const roleMatch = filterRole === '' || user.role === filterRole;
-
-    return nameMatch && surnameMatch && emailMatch && deptMatch && roleMatch;
+    return (!filters.firstName || user.firstName.toLowerCase().includes(filters.firstName.toLowerCase())) &&
+        (!filters.lastName || user.lastName.toLowerCase().includes(filters.lastName.toLowerCase())) &&
+        (!filters.email || user.email.toLowerCase().includes(filters.email.toLowerCase())) &&
+        (!filters.department || user.department === filters.department) &&
+        (!filters.role || user.role === filters.role);
   });
 
   return (
@@ -98,55 +104,33 @@ const AdminManageUsers = () => {
             <input type="text" name="username" placeholder="Kullanıcı Adı" value={newUser.username} onChange={handleInputChange} className="border p-2 rounded" />
             <input type="email" name="email" placeholder="Email" value={newUser.email} onChange={handleInputChange} className="border p-2 rounded" />
             <input type="password" name="password" placeholder="Şifre" value={newUser.password} onChange={handleInputChange} className="border p-2 rounded" />
+            <select name="roleId" value={newUser.roleId || ''} onChange={handleInputChange} className="border p-2 rounded">
+              <option value="">Rol Seç</option>
+              {roles.map(role => <option key={role.id} value={role.id}>{role.name}</option>)}
+            </select>
+            <select name="departmentId" value={newUser.departmentId || ''} onChange={handleInputChange} className="border p-2 rounded">
+              <option value="">Departman Seç</option>
+              {departments.map(dept => <option key={dept.id} value={dept.id}>{dept.name}</option>)}
+            </select>
           </div>
           <button onClick={handleAddUser} className="mt-4 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
             Kullanıcı Ekle
           </button>
         </div>
+
         <div className="grid grid-cols-5 gap-4 mb-6">
-          <input
-              type="text"
-              placeholder="Ad"
-              className="border p-2 rounded"
-              value={nameFilter}
-              onChange={(e) => setNameFilter(e.target.value)}
-          />
-          <input
-              type="text"
-              placeholder="Soyad"
-              className="border p-2 rounded"
-              value={filterSurname}
-              onChange={(e) => setFilterSurname(e.target.value)}
-          />
-          <input
-              type="text"
-              placeholder="Email"
-              className="border p-2 rounded"
-              value={filterEmail}
-              onChange={(e) => setFilterEmail(e.target.value)}
-          />
-          <select
-              className="border p-2 rounded"
-              value={filterDept}
-              onChange={(e) => setFilterDept(e.target.value)}
-          >
-            <option value="">Tüm Departmanlar</option>
-            {departments.map((d) => (
-                <option key={d.id} value={d.name}>{d.name}</option>
-            ))}
-          </select>
-          <select
-              className="border p-2 rounded"
-              value={filterRole}
-              onChange={(e) => setFilterRole(e.target.value)}
-          >
+          <input type="text" placeholder="Ad" className="border p-2 rounded" value={filters.firstName} onChange={e => setFilters({ ...filters, FirstName: e.target.value })} />
+          <input type="text" placeholder="Soyad" className="border p-2 rounded" value={filters.lastName} onChange={e => setFilters({ ...filters, LastName: e.target.value })} />
+          <input type="text" placeholder="Email" className="border p-2 rounded" value={filters.email} onChange={e => setFilters({ ...filters, email: e.target.value })} />
+          <select className="border p-2 rounded" value={filters.role} onChange={e => setFilters({ ...filters, role: e.target.value })}>
             <option value="">Tüm Roller</option>
-            {roles.map((r) => (
-                <option key={r.id} value={r.name}>{r.name}</option>
-            ))}
+            {roles.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
+          </select>
+          <select className="border p-2 rounded" value={filters.department} onChange={e => setFilters({ ...filters, department: e.target.value })}>
+            <option value="">Tüm Departmanlar</option>
+            {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
           </select>
         </div>
-
 
         <table className="w-full table-auto border border-gray-300">
           <thead>
@@ -154,45 +138,39 @@ const AdminManageUsers = () => {
             <th className="p-2 border">Ad</th>
             <th className="p-2 border">Soyad</th>
             <th className="p-2 border">Email</th>
-            <th className="p-2 border">Pozisyon</th>
+            <th className="p-2 border">Rol</th>
             <th className="p-2 border">Departman</th>
             <th className="p-2 border">İşlemler</th>
           </tr>
           </thead>
           <tbody>
-          {filteredUsers.map((user) => (
+          {filteredUsers.map(user => (
               <tr key={user.id}>
                 <td className="p-2 border">{user.firstName}</td>
                 <td className="p-2 border">{user.lastName}</td>
                 <td className="p-2 border">{user.email}</td>
-                <td className="p-2 border">{user.position}</td>
-                <td className="p-2 border">{user.department}</td>
                 <td className="p-2 border">
-                  <div className="flex gap-2 flex-wrap">
-                    {editRoleUserId === user.id ? (
-                        <select className="border px-2 py-1" value={selectedRole} onChange={(e) => handleRoleChange(user.id, e.target.value)}>
-                          <option value="">Rol Seç</option>
-                          {roles.map((r) => (
-                              <option key={r} value={r}>{r}</option>
-                          ))}
-                        </select>
-                    ) : (
-                        <button onClick={() => { setEditRoleUserId(user.id); setSelectedRole(user.role || ''); }} className="bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600">Rol Ata</button>
-                    )}
-
-                    {editDeptUserId === user.id ? (
-                        <select className="border px-2 py-1" value={selectedDepartment} onChange={(e) => handleDepartmentChange(user.id, e.target.value)}>
-                          <option value="">Departman Seç</option>
-                          {departments.map((d) => (
-                              <option key={d.id} value={d.name}>{d.name}</option>
-                          ))}
-                        </select>
-                    ) : (
-                        <button onClick={() => { setEditDeptUserId(user.id); setSelectedDepartment(user.department || ''); }} className="bg-purple-500 text-white px-2 py-1 rounded hover:bg-purple-600">Departman Ata</button>
-                    )}
-
-                    <button onClick={() => window.location.href = `/attendance/edit/${user.id}`} className="bg-orange-500 text-white px-2 py-1 rounded hover:bg-orange-600">Attendance</button>
-                  </div>
+                  {editRoleUserId === user.id ? (
+                      <select className="border px-2 py-1" value={selectedRole} onChange={e => handleRoleChange(user.id, e.target.value)}>
+                        <option value="">Rol Seç</option>
+                        {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                      </select>
+                  ) : (
+                      <button onClick={() => { setEditRoleUserId(user.id); setSelectedRole(user.roleId || ''); }} className="bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600">Rol Ata</button>
+                  )}
+                </td>
+                <td className="p-2 border">
+                  {editDeptUserId === user.id ? (
+                      <select className="border px-2 py-1" value={selectedDepartment} onChange={e => handleDepartmentChange(user.id, e.target.value)}>
+                        <option value="">Departman Seç</option>
+                        {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                      </select>
+                  ) : (
+                      <button onClick={() => { setEditDeptUserId(user.id); setSelectedDepartment(user.departmentId || ''); }} className="bg-purple-500 text-white px-2 py-1 rounded hover:bg-purple-600">Departman Ata</button>
+                  )}
+                </td>
+                <td className="p-2 border">
+                  <button onClick={() => window.location.href = `/attendance/edit/${user.id}`} className="bg-orange-500 text-white px-2 py-1 rounded hover:bg-orange-600">Attendance</button>
                 </td>
               </tr>
           ))}
