@@ -7,7 +7,7 @@ import jakarta.persistence.*;
 @Table(name = "role_hierarchy", uniqueConstraints = {
         @UniqueConstraint(name = "uq_role_hierarchy", columnNames = {"parentRole", "childRole"})
 })
-public class RoleHierarchy {
+public class DepartmentHierarchy {
     @Id @GeneratedValue private Long id;
 
     @Column(name="parent_role", nullable=false)
@@ -17,8 +17,8 @@ public class RoleHierarchy {
     private String childRole;
 
     // constructors, getters/setters
-    public RoleHierarchy() {}
-    public RoleHierarchy(String parentRole, String childRole) {
+    public DepartmentHierarchy() {}
+    public DepartmentHierarchy(String parentRole, String childRole) {
         this.parentRole = parentRole;
         this.childRole = childRole;
     }

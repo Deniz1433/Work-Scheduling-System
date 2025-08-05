@@ -1,8 +1,8 @@
 // src/main/java/com/example/attendance/service/RoleHierarchyService.java
 package com.example.attendance.service;
 
-import com.example.attendance.model.RoleHierarchy;
-import com.example.attendance.repository.RoleHierarchyRepository;
+import com.example.attendance.model.DepartmentHierarchy;
+import com.example.attendance.repository.DepartmentHierarchyRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -12,14 +12,14 @@ import java.util.List;
 import java.util.Set;
 
 @Service
-public class RoleHierarchyService {
-    private final RoleHierarchyRepository repo;
+public class DepartmentHierarchyService {
+    private final DepartmentHierarchyRepository repo;
 
-    public RoleHierarchyService(RoleHierarchyRepository repo) {
+    public DepartmentHierarchyService(DepartmentHierarchyRepository repo) {
         this.repo = repo;
     }
 
-    public List<RoleHierarchy> listAll() {
+    public List<DepartmentHierarchy> listAll() {
         return repo.findAll();
     }
 
@@ -28,7 +28,7 @@ public class RoleHierarchyService {
         if (parent.equals(child)) {
             throw new IllegalArgumentException("Cannot link role to itself");
         }
-        repo.save(new RoleHierarchy(parent, child));
+        repo.save(new DepartmentHierarchy(parent, child));
     }
 
     @Transactional
@@ -48,7 +48,7 @@ public class RoleHierarchyService {
         // 2) insert each new (parent, child) pair
         for (RoleRelationDto dto : relations) {
             if (!dto.getParent().equals(dto.getChild())) {
-                repo.save(new RoleHierarchy(dto.getParent(), dto.getChild()));
+                repo.save(new DepartmentHierarchy(dto.getParent(), dto.getChild()));
             }
         }
     }
@@ -57,7 +57,7 @@ public class RoleHierarchyService {
     public List<String> findDirectChildren(String parent) {
         return repo.findByParentRole(parent)
                 .stream()
-                .map(RoleHierarchy::getChildRole)
+                .map(DepartmentHierarchy::getChildRole)
                 .toList();
     }
 
@@ -86,7 +86,7 @@ public class RoleHierarchyService {
             String cur = stack.pop();
             repo.findByChildRole(cur)
                     .stream()
-                    .map(RoleHierarchy::getParentRole)
+                    .map(DepartmentHierarchy::getParentRole)
                     .forEach(parent -> {
                         if (found.add(parent)) stack.push(parent);
                     });

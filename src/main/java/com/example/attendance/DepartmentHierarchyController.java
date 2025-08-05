@@ -1,12 +1,12 @@
 // src/main/java/com/example/attendance/RoleHierarchyController.java
 package com.example.attendance;
 
-import com.example.attendance.model.RoleHierarchy;
-import com.example.attendance.model.RoleNodePosition;
+import com.example.attendance.model.DepartmentHierarchy;
+import com.example.attendance.model.DepartmentNodePosition;
 import com.example.attendance.service.KeycloakAdminService;
-import com.example.attendance.service.RoleHierarchyService;
-import com.example.attendance.service.RoleNodePositionService;
-import com.example.attendance.service.RoleHierarchyService.RoleRelationDto;
+import com.example.attendance.service.DepartmentHierarchyService;
+import com.example.attendance.service.DepartmentNodePositionService;
+import com.example.attendance.service.DepartmentHierarchyService.RoleRelationDto;
 import org.keycloak.representations.idm.RoleRepresentation;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -20,13 +20,13 @@ import java.util.stream.Collectors;
 @Controller
 @RequestMapping("/admin/hierarchy")
 @PreAuthorize("hasRole('attendance_client_superadmin')")
-public class RoleHierarchyController {
-    private final RoleHierarchyService hierarchySvc;
-    private final RoleNodePositionService posSvc;
+public class DepartmentHierarchyController {
+    private final DepartmentHierarchyService hierarchySvc;
+    private final DepartmentNodePositionService posSvc;
     private final KeycloakAdminService adminSvc;
     private static final Set<String> BASE = Set.of("admin","user","superadmin");
 
-    public RoleHierarchyController(RoleHierarchyService h, RoleNodePositionService p, KeycloakAdminService a) {
+    public DepartmentHierarchyController(DepartmentHierarchyService h, DepartmentNodePositionService p, KeycloakAdminService a) {
         this.hierarchySvc = h;
         this.posSvc       = p;
         this.adminSvc     = a;
@@ -41,7 +41,7 @@ public class RoleHierarchyController {
                 .collect(Collectors.toList());
 
         // relations
-        List<RoleHierarchy> links = hierarchySvc.listAll();
+        List<DepartmentHierarchy> links = hierarchySvc.listAll();
         Map<String,List<String>> childrenMap = new HashMap<>();
         for (var l : links) {
             childrenMap.computeIfAbsent(l.getParentRole(), k->new ArrayList<>())
@@ -50,14 +50,14 @@ public class RoleHierarchyController {
 
         // roots
         Set<String> allChildren = links.stream()
-                .map(RoleHierarchy::getChildRole)
+                .map(DepartmentHierarchy::getChildRole)
                 .collect(Collectors.toSet());
         List<String> roots = roles.stream()
                 .filter(r -> !allChildren.contains(r))
                 .collect(Collectors.toList());
 
         // positions
-        Map<String,RoleNodePosition> posMap = posSvc.loadAll();
+        Map<String, DepartmentNodePosition> posMap = posSvc.loadAll();
 
         model.addAttribute("roles", roles);
         model.addAttribute("roots", roots);
@@ -75,8 +75,8 @@ public class RoleHierarchyController {
         try {
             hierarchySvc.saveRelations(dto.getRelations());
             // build entity list from dto.positions
-            List<RoleNodePosition> posList = dto.getPositions().stream()
-                    .map(p -> new RoleNodePosition(p.getRole(), p.getX(), p.getY()))
+            List<DepartmentNodePosition> posList = dto.getPositions().stream()
+                    .map(p -> new DepartmentNodePosition(p.getRole(), p.getX(), p.getY()))
                     .toList();
             posSvc.saveAll(posList);
             return ResponseEntity.ok("Saved relations & positions");
@@ -88,12 +88,12 @@ public class RoleHierarchyController {
     @GetMapping("/load")
     @ResponseBody
     public Map<String, Object> loadHierarchy() {
-        List<RoleHierarchy> links = hierarchySvc.listAll();
+        List<DepartmentHierarchy> links = hierarchySvc.listAll();
         List<Map<String, String>> rels = links.stream()
                 .map(r -> Map.of("parent", r.getParentRole(), "child", r.getChildRole()))
                 .toList();
 
-        Map<String, RoleNodePosition> positions = posSvc.loadAll();
+        Map<String, DepartmentNodePosition> positions = posSvc.loadAll();
 
         return Map.of(
                 "relations", rels,

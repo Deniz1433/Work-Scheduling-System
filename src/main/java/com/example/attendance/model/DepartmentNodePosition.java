@@ -5,7 +5,7 @@ import jakarta.persistence.*;
 
 @Entity
 @Table(name = "role_node_position")
-public class RoleNodePosition {
+public class DepartmentNodePosition {
     @Id
     @Column(name = "role", length = 100)
     private String role;
@@ -16,8 +16,8 @@ public class RoleNodePosition {
     @Column(name = "pos_y", nullable = false)
     private double posY;
 
-    public RoleNodePosition() {}
-    public RoleNodePosition(String role, double posX, double posY) {
+    public DepartmentNodePosition() {}
+    public DepartmentNodePosition(String role, double posX, double posY) {
         this.role = role; this.posX = posX; this.posY = posY;
     }
     public String getRole() { return role; }
