@@ -1,0 +1,80 @@
+body, .admin-hierarchy {
+    display: flex;
+    height: 100vh;
+    width: 100vw; /* ensure full width */
+    margin: 0;
+    font-family: sans-serif;
+}
+
+#sidebar {
+    flex: 0 0 240px; /* fixed sidebar width */
+    padding: 1rem;
+    box-sizing: border-box;
+    border-right: 1px solid #ccc;
+    overflow: auto;
+}
+
+.mode-btn, #saveBtn, #backBtn {
+    display: block;
+    margin-bottom: 0.5rem;
+    padding: 0.5rem;
+    width: 100%;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.mode-btn {
+    background: #ddd;
+    color: #000;
+}
+
+.mode-btn.active {
+    background: #48c;
+    color: #fff;
+}
+
+#saveBtn {
+    background: #4caf50;
+    color: #fff;
+}
+
+#saveBtn:hover {
+    background: #3e8e41;
+}
+
+#backBtn {
+    background: #888;
+    color: #fff;
+}
+
+#backBtn:hover {
+    background: #666;
+}
+
+#cy {
+    flex: 1;        /* take all remaining space */
+    min-width: 0;   /* prevent overflow */
+    height: 100%;
+    display: block;
+}
+
+.role-item {
+    cursor: pointer;
+    padding: 4px;
+    border: 1px solid #999;
+    margin: 4px 0;
+    background: #fafafa;
+    user-select: none;
+}
+
+.role-item:hover {
+    background: #eef;
+}
+
+.selected {
+    overlay-color: yellow;
+    overlay-opacity: 0.3;
+    overlay-padding: 6px;
+}

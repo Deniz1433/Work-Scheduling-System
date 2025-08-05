@@ -21,6 +21,7 @@ import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.logout.LogoutSuccessHandler;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.web.util.UriComponentsBuilder;
 
 @Configuration
@@ -30,12 +31,18 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                // disable CSRF for our stateless API endpoints
                 .csrf(csrf -> csrf
-                        .ignoringRequestMatchers("/api/attendance/**", "/api/excuse/**", "/api/admin/**", "/api/departments/**", "/api/roles/**", "/api/holidays/**" )
+                        .ignoringRequestMatchers(
+                                "/admin/**", // ✅ Disable CSRF for all admin UI endpoints
+                                "/api/attendance/**",
+                                "/api/excuse/**",
+                                "/api/admin/**",
+                                "/api/departments/**",
+                                "/api/roles/**",
+                                "/api/holidays/**"
+                        )
                 )
                 .authorizeHttpRequests(auth -> auth
-                        // allow React static assets
                         .requestMatchers(
                                 "/static/**",
                                 "/favicon.ico",
@@ -44,31 +51,21 @@ public class SecurityConfig {
                                 "/images/**"
                         ).permitAll()
 
-                        // UI entrypoints under /admin/**
-                        .requestMatchers("/admin/**")
-                        .hasAnyAuthority(
+                        .requestMatchers("/admin/**").hasAnyAuthority(
                                 "ROLE_attendance_client_admin",
                                 "ROLE_attendance_client_superadmin"
                         )
 
-                        // our admin REST API
-                        .requestMatchers("/api/admin/**")
-                        .hasAnyAuthority(
+                        .requestMatchers("/api/admin/**").hasAnyAuthority(
                                 "ROLE_attendance_client_admin",
                                 "ROLE_attendance_client_superadmin"
                         )
 
-                        // departments API - temporarily allow all users for testing
-                        .requestMatchers("/api/departments/**")
-                        .permitAll()
+                        .requestMatchers("/api/departments/**").permitAll()
 
-                        // attendance & excuse APIs require any authenticated user
-                        .requestMatchers("/api/attendance/**", "/api/excuse/**")
-                        .authenticated()
+                        .requestMatchers("/api/attendance/**", "/api/excuse/**").authenticated()
 
-                        // everything else also needs authentication
-                        .anyRequest()
-                        .authenticated()
+                        .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth -> oauth
                         .defaultSuccessUrl("/", true)
@@ -97,14 +94,12 @@ public class SecurityConfig {
                         .create(tokenString, AccessToken.class)
                         .getToken();
 
-                // realm-level roles
                 if (kcToken.getRealmAccess() != null) {
                     kcToken.getRealmAccess().getRoles().forEach(r ->
                             mapped.add(new SimpleGrantedAuthority("ROLE_realm_" + r))
                     );
                 }
 
-                // client-specific roles
                 Map<String, AccessToken.Access> resources = kcToken.getResourceAccess();
                 if (resources != null && resources.containsKey("attendance-client")) {
                     resources.get("attendance-client").getRoles().forEach(r ->
@@ -113,7 +108,7 @@ public class SecurityConfig {
                             ))
                     );
                 }
-            } catch (VerificationException ignored) { }
+            } catch (VerificationException ignored) {}
 
             OidcUser userInfo = delegate.loadUser(userRequest);
             return new DefaultOidcUser(

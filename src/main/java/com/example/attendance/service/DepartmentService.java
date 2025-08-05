@@ -31,12 +31,12 @@ public class DepartmentService {
     public Department updateDepartment(Long id, Department department) {
         Department existingDepartment = departmentRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Departman bulunamadı: " + id));
-        
-        if (!existingDepartment.getName().equals(department.getName()) && 
-            departmentRepository.existsByName(department.getName())) {
+
+        if (!existingDepartment.getName().equals(department.getName()) &&
+                departmentRepository.existsByName(department.getName())) {
             throw new RuntimeException("Bu departman adı zaten mevcut: " + department.getName());
         }
-        
+
         existingDepartment.setName(department.getName());
         existingDepartment.setMinDays(department.getMinDays());
         return departmentRepository.save(existingDepartment);
@@ -49,4 +49,4 @@ public class DepartmentService {
         }
         departmentRepository.deleteById(id);
     }
-} 
+}

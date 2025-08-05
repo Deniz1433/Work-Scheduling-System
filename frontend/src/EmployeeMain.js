@@ -8,6 +8,7 @@ import AdminManageUsers from './AdminManageUsers';
 import AdminDepartmentManagement from './AdminDepartmentManagement';
 import AdminRoleManagement from './AdminRoleManagement';
 import AdminHolidayRegistration from './AdminHolidayRegistration';
+import AdminDepartmentHierarchy from './AdminDepartmentHierarchy';
 
 const EmployeeMain = () => {
   const {user} = useUser();
@@ -50,6 +51,12 @@ const EmployeeMain = () => {
       label: 'Tatilleri Yönet',
       icon: Calendar1,
       component: AdminHolidayRegistration
+    },
+    {
+      id: 'departmentHierarchy',
+      label: 'Departman Hiyerarşisi',
+      icon: Building,
+      component: AdminDepartmentHierarchy
     }
   ];
 

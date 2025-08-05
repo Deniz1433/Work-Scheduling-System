@@ -67,6 +67,8 @@ public class RoleHierarchyController {
         return "role-hierarchy";
     }
 
+
+
     @PostMapping(path="/save", consumes="application/json")
     @ResponseBody
     public ResponseEntity<String> saveAll(@RequestBody SaveDto dto) {
@@ -82,6 +84,23 @@ public class RoleHierarchyController {
             return ResponseEntity.status(500).body(ex.getMessage());
         }
     }
+
+    @GetMapping("/load")
+    @ResponseBody
+    public Map<String, Object> loadHierarchy() {
+        List<RoleHierarchy> links = hierarchySvc.listAll();
+        List<Map<String, String>> rels = links.stream()
+                .map(r -> Map.of("parent", r.getParentRole(), "child", r.getChildRole()))
+                .toList();
+
+        Map<String, RoleNodePosition> positions = posSvc.loadAll();
+
+        return Map.of(
+                "relations", rels,
+                "positions", positions
+        );
+    }
+
 
     public static class SaveDto {
         private List<RoleRelationDto> relations;

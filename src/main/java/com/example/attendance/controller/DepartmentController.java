@@ -9,7 +9,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/departments")
-@CrossOrigin(origins = "*")
+@CrossOrigin(origins = "*") // adjust as needed for security
 public class DepartmentController {
     private final DepartmentService departmentService;
 
@@ -51,4 +51,4 @@ public class DepartmentController {
             return ResponseEntity.badRequest().build();
         }
     }
-} 
+}
