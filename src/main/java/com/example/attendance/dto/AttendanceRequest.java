@@ -1,6 +1,5 @@
 package com.example.attendance.dto;
 
-import java.time.LocalDate;
 import java.util.List;
 
 import lombok.Getter;
@@ -10,6 +9,6 @@ import lombok.Setter;
 @Setter
 public class AttendanceRequest {
     private String userId;
-    private LocalDate weekStart;
+    private String weekStart;
     private List<Integer> dates; // 5 elemanlı, günlerin durumunu tutan liste
 }   

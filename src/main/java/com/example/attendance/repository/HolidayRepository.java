@@ -10,6 +10,6 @@ import java.util.List;
 @Repository
 public interface HolidayRepository extends JpaRepository<Holiday, Long> {
     List<Holiday> findByCountryCode(String countryCode);
-    List<Holiday> findByCountryCodeAndDateBetween(String countryCode, String start, String end);
-    boolean existsByCountryCodeAndDate(String countryCode, String date);
+    List<Holiday> findByCountryCodeAndDateBetween(String countryCode, LocalDate start, LocalDate end);
+    boolean existsByCountryCodeAndDate(String countryCode, LocalDate date);
 } 

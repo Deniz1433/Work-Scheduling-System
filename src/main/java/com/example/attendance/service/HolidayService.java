@@ -29,8 +29,8 @@ public class HolidayService {
         HolidayDto[] holidays = restTemplate.getForObject(url, HolidayDto[].class);
         if (holidays == null) return List.of();
         List<Holiday> holidayEntities = Arrays.stream(holidays)
-                .filter(h -> !holidayRepository.existsByCountryCodeAndDate(COUNTRY_CODE, h.date))
-                .map(h -> new Holiday(null, h.localName, h.date, h.date, COUNTRY_CODE))
+                .filter(h -> !holidayRepository.existsByCountryCodeAndDate(COUNTRY_CODE, LocalDate.parse(h.getDate())))
+                .map(h -> new Holiday(null, h.getLocalName(), LocalDate.parse(h.getDate()), LocalDate.parse(h.getDate()), COUNTRY_CODE))
                 .collect(Collectors.toList());
         return holidayRepository.saveAll(holidayEntities);
     }

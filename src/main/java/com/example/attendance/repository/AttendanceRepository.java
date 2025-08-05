@@ -1,17 +1,20 @@
 package com.example.attendance.repository;
 
 import com.example.attendance.model.Attendance;
+
+import java.time.LocalDate;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 
 @Repository
 public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
-    Attendance findByUserIdAndWeekStart(String userId, String weekStart);
+    Attendance findByUserIdAndWeekStart(Long userId, LocalDate weekStart);
 
-    // Spring Data will derive this and perform the delete
+   //UserId + weekStart ile attendance silme
     void deleteByUserIdAndWeekStart(
-            String userId,
-            String weekStart
+            Long userId,
+            LocalDate weekStart
     );
 }

@@ -1,6 +1,8 @@
 package com.example.attendance.model;
 
 import jakarta.persistence.*;
+
+import java.time.LocalDate;
 import java.util.List;
 
 import lombok.AllArgsConstructor;
@@ -19,11 +21,13 @@ public class Attendance {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "user_id", nullable = false, length = 36)
-    private String userId;
+    //Users tablosundaki @Id 
+    @Column(name = "user_id", nullable = false)
+    private Long userId;
 
+    //Tarihler tablolarda LocalDate olarak tutuluyor
     @Column(name = "week_start", nullable = false)
-    private String weekStart;
+    private LocalDate weekStart;
 
     @Column(name = "monday", nullable = false)
     private int monday;
@@ -53,7 +57,7 @@ public class Attendance {
     @Column(name = "is_approved", nullable = false)
     private boolean isApproved;
 
-    public Attendance(String userId, String weekStart) {
+    public Attendance(Long userId, LocalDate weekStart) {
       this.userId = userId;
       this.weekStart = weekStart;
       this.monday = 0;

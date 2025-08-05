@@ -3,11 +3,9 @@ package com.example.attendance.dto;
 
 import lombok.Data;
 
-import java.util.UUID;
-
 @Data
 public class UserDto {
-    private UUID id;
+    private Long id;
     private String keycloakId;
     private String username;
     private String email;

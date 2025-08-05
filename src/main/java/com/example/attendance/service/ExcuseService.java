@@ -8,6 +8,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -20,22 +21,22 @@ public class ExcuseService {
     }
 
     @Transactional
-    public void submitExcuses(String userId, ExcusesRequest req) {
+    public void submitExcuses(Long userId, ExcusesRequest req) {
         List<Excuse> excuses = req.getDates().stream() /* 
         excuse database'inin her hafta temizleneceği varsayıldı, 
         belli aralıktakileri döndürecek şekilde güncellenebilir
         */ 
-                .map(d -> new Excuse(userId, d, req.getExcuseType(), req.getDescription()))
+                .map(d -> new Excuse(userId, LocalDate.parse(d), req.getExcuseType(), req.getDescription()))
                 .collect(Collectors.toList());
         repo.saveAll(excuses);
     }
 
-    public List<Excuse> listUserExcuses(String userId) {
+    public List<Excuse> listUserExcuses(Long userId) {
         return repo.findByUserId(userId);
     }
 
     @Transactional
-    public void deleteExcuse(String userId, Long excuseId) {
+    public void deleteExcuse(Long userId, Long excuseId) {
         Excuse e = repo.findById(excuseId).orElseThrow();
         if(e != null){
             repo.delete(e);
@@ -43,7 +44,7 @@ public class ExcuseService {
     }
 
     @Transactional
-    public void updateExcuse(String userId, Long id ,ExcuseUpdateRequest req) {
+    public void updateExcuse(Long userId, Long id ,ExcuseUpdateRequest req) {
         Excuse e = repo.findById(id).orElseThrow();
         if(e != null){
             if (!e.getUserId().equals(userId)) {

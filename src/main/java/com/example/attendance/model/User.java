@@ -1,19 +1,24 @@
 package com.example.attendance.model;
 
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
-import java.util.UUID;
-
+@AllArgsConstructor
+@NoArgsConstructor
+@Getter
+@Setter
 @Entity
 @Table(name = "users")
-@Data
-@NoArgsConstructor
 public class User {
     @Id
-    private UUID id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
+    //Keycloacktan gelen id
     @Column(name = "keycloak_id", nullable = false, unique = true)
     private String keycloakId;
 

@@ -20,7 +20,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -38,7 +37,7 @@ public class UserService {
             return userRepository.findAll().stream().map(this::toDto).collect(Collectors.toList());
       }
 
-      public UserDto getUserById(UUID id) {
+      public UserDto getUserById(Long id) {
             User user = userRepository.findById(id).orElseThrow(() -> new RuntimeException("User not found"));
             return toDto(user);
       }
@@ -64,7 +63,6 @@ public class UserService {
 
             // 3. Mirror to PostgreSQL
             User user = new User();
-            user.setId(UUID.randomUUID());
             user.setKeycloakId(keycloakId);
             user.setUsername(dto.getUsername());
             user.setEmail(dto.getEmail());
@@ -74,12 +72,12 @@ public class UserService {
             user.setIsActive(true);
 
             if (dto.getRoleId() != null) {
-                  Role role = (Role) roleRepository.findById(dto.getRoleId()).orElseThrow(() -> new RuntimeException("Role not found"));
+                  Role role = roleRepository.findById(dto.getRoleId()).orElseThrow(() -> new RuntimeException("Role not found"));
                   user.setRole(role);
             }
 
             if (dto.getDepartmentId() != null) {
-                  Department dept = (Department) departmentRepository.findById(dto.getDepartmentId()).orElseThrow(() -> new RuntimeException("Department not found"));
+                  Department dept = departmentRepository.findById(dto.getDepartmentId()).orElseThrow(() -> new RuntimeException("Department not found"));
                   user.setDepartment(dept);
             }
 
@@ -87,7 +85,7 @@ public class UserService {
             return toDto(user);
       }
 
-      public void deleteUser(UUID id) {
+      public void deleteUser(Long id) {
             Optional<User> optUser = userRepository.findById(id);
             optUser.ifPresent(user -> {
                   try {

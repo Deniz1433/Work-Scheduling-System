@@ -11,7 +11,7 @@ import lombok.Setter;
 @NoArgsConstructor
 public class ExcuseDto {
       private Long id;
-      private String userId;
+      private Long userId;
       private String excuseDate;
       private int excuseType;
       private String description;

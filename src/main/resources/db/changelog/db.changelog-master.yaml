@@ -393,3 +393,165 @@ databaseChangeLog:
             sql: SELECT setval('role_permission_id_seq', (SELECT COALESCE(MAX(id), 0) + 1 FROM role_permission), false);
         - sql:
             sql: SELECT setval('users_id_seq', (SELECT COALESCE(MAX(id), 0) + 1 FROM users), false);
+
+  # Clear existing data from attendance and excuse tables before type conversion
+  - changeSet:
+      id: clear-attendance-excuse-data
+      author: emir
+      changes:
+        - sql:
+            sql: DELETE FROM attendance;
+        - sql:
+            sql: DELETE FROM excuse;
+
+  # Update attendance table user_id column to BIGINT
+  - changeSet:
+      id: update-attendance-user-id-to-bigint
+      author: emir
+      changes:
+        - modifyDataType:
+            tableName: attendance
+            columnName: user_id
+            newDataType: BIGINT
+
+  # Update excuse table user_id column to BIGINT
+  - changeSet:
+      id: update-excuse-user-id-to-bigint
+      author: emir
+      changes:
+        - modifyDataType:
+            tableName: excuse
+            columnName: user_id
+            newDataType: BIGINT
+
+  # Clear existing data from holiday table before type conversion
+  - changeSet:
+      id: clear-holiday-data
+      author: emir
+      changes:
+        - sql:
+            sql: DELETE FROM holiday;
+
+  # Update holiday table date columns to DATE type
+  - changeSet:
+      id: update-holiday-date-columns
+      author: emir
+      changes:
+        - modifyDataType:
+            tableName: holiday
+            columnName: date
+            newDataType: DATE
+        - modifyDataType:
+            tableName: holiday
+            columnName: end_date
+            newDataType: DATE
+
+  - changeSet:
+      id: delete-child-department-row
+      author: emir
+      changes:
+        - dropColumn:
+            tableName: department
+            columnName: child_department_id
+
+  # Drop role hierarchy and role node position tables
+  - changeSet:
+      id: drop-role-hierarchy-tables
+      author: emir
+      changes:
+        - dropTable:
+            tableName: role_hierarchy
+        - dropTable:
+            tableName: role_node_position
+
+  # Create department hierarchy table
+  - changeSet:
+      id: create-department-hierarchy-table
+      author: emir
+      changes:
+        - createTable:
+            tableName: department_hierarchy
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+              - column:
+                  name: parent_department_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: child_department_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: department_hierarchy
+            baseColumnNames: parent_department_id
+            constraintName: fk_department_hierarchy_parent
+            referencedTableName: department
+            referencedColumnNames: id
+        - addForeignKeyConstraint:
+            baseTableName: department_hierarchy
+            baseColumnNames: child_department_id
+            constraintName: fk_department_hierarchy_child
+            referencedTableName: department
+            referencedColumnNames: id
+        - addUniqueConstraint:
+            tableName: department_hierarchy
+            columnNames: parent_department_id,child_department_id
+            constraintName: uq_department_hierarchy
+
+  # Create department node position table
+  - changeSet:
+      id: create-department-node-position-table
+      author: emir
+      changes:
+        - createTable:
+            tableName: department_node_position
+            columns:
+              - column:
+                  name: department
+                  type: VARCHAR(100)
+                  constraints:
+                    primaryKey: true
+              - column:
+                  name: pos_x
+                  type: DOUBLE
+                  constraints:
+                    nullable: false
+              - column:
+                  name: pos_y
+                  type: DOUBLE
+                  constraints:
+                    nullable: false
+
+  # Clear existing data from excuse table before type conversion
+  - changeSet:
+      id: clear-excuse-data
+      author: emir
+      changes:
+        - sql:
+            sql: DELETE FROM excuse;
+
+  # Clear existing data from attendance table before type conversion
+  - changeSet:
+      id: clear-attendance-data
+      author: emir
+      changes:
+        - sql:
+            sql: DELETE FROM attendance;
+
+  # Update attendance table week_start column to DATE type
+  - changeSet:
+      id: update-attendance-week-start-to-date
+      author: emir
+      changes:
+        - modifyDataType:
+            tableName: attendance
+            columnName: week_start
+            newDataType: DATE
+      

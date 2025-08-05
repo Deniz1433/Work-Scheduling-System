@@ -2,17 +2,17 @@ package com.example.attendance.controller;
 
 import com.example.attendance.dto.AttendanceRequest;
 import com.example.attendance.dto.ExcuseDto;
-import com.example.attendance.dto.ExcusesRequest;
 import com.example.attendance.dto.TeamAttendanceDto;
 import com.example.attendance.model.Excuse;
+import com.example.attendance.model.User;
+import com.example.attendance.repository.UserRepository;
 import com.example.attendance.service.AttendanceService;
-
-import jakarta.persistence.PrePersist;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -22,9 +22,18 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/attendance")
 public class AttendanceController {
     private final AttendanceService service;
+    private final UserRepository userRepository;
 
-    public AttendanceController(AttendanceService service) {
+    public AttendanceController(AttendanceService service, UserRepository userRepository) {
         this.service = service;
+        this.userRepository = userRepository;
+    }
+
+    private Long getUserIdFromPrincipal(Principal principal) {
+        String keycloakId = principal.getName();
+        User user = userRepository.findByKeycloakId(keycloakId)
+                .orElseThrow(() -> new RuntimeException("User not found for keycloak ID: " + keycloakId));
+        return user.getId();
     }
 
     @PostMapping
@@ -32,7 +41,8 @@ public class AttendanceController {
             @RequestBody AttendanceRequest req,
             Principal principal
     ) {
-        service.record(principal.getName(),req.getWeekStart(),req.getDates());
+        Long userId = getUserIdFromPrincipal(principal);
+        service.record(userId, LocalDate.parse(req.getWeekStart()), req.getDates());
         return ResponseEntity.ok().build();
     }
 
@@ -43,7 +53,7 @@ public class AttendanceController {
         
         try {
             // Frontend'den gelen userId'yi kullan, principal.getName() değil
-            service.record(req.getUserId(), req.getWeekStart(), req.getDates());
+            service.record(Long.parseLong(req.getUserId()), LocalDate.parse(req.getWeekStart()), req.getDates());
             System.out.println("Service call completed successfully");
             return ResponseEntity.ok(Map.of("message", "Attendance updated successfully", "userId", id));
         } catch (Exception e) {
@@ -56,20 +66,23 @@ public class AttendanceController {
     @PostMapping("/{id}/approve")
     public ResponseEntity<?> approve(@PathVariable Long id, Principal principal) {
         System.out.println("✅ Attendance approval request - ID: " + id + " by user: " + principal.getName());
-        service.approve(id, principal.getName());
+        Long userId = getUserIdFromPrincipal(principal);
+        service.approve(id, userId.toString());
         System.out.println("✅ Attendance approved successfully!");
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("/excuse/{id}/approve")
     public ResponseEntity<?> approveExcuse(@PathVariable Long id, Principal principal) {
-        service.approveExcuse(id, principal.getName());
+        Long userId = getUserIdFromPrincipal(principal);
+        service.approveExcuse(id, userId.toString());
         return ResponseEntity.ok().build();
     }
 
     @GetMapping
     public ResponseEntity<ArrayList<Object>> getAttendanceData(Principal principal, String weekStart) {
-        ArrayList<Object> attendanceResponse = service.fetch(principal.getName(), weekStart);
+        Long userId = getUserIdFromPrincipal(principal);
+        ArrayList<Object> attendanceResponse = service.fetch(userId, LocalDate.parse(weekStart));
         return ResponseEntity.ok(attendanceResponse);
     }
 
@@ -81,8 +94,9 @@ public class AttendanceController {
             @RequestParam(required = false) String searchTerm,
             @RequestParam(required = false) String attendanceStatus
     ) {
+        Long userId = getUserIdFromPrincipal(principal);
         List<TeamAttendanceDto> team = service.getTeamAttendanceWithFilters(
-            principal.getName(), 
+            userId.toString(), 
             departmentId, 
             roleId, 
             searchTerm, 
@@ -93,9 +107,8 @@ public class AttendanceController {
 
     @GetMapping("/excuse/{id}")
     public ResponseEntity<List<ExcuseDto>> getExcuse(Principal principal, @PathVariable Long id) {
-        // Convert the numeric ID to string userId
-        String userId = id.toString();
-        List<Excuse> excuses = service.getExcuse(principal.getName(), userId);
+        Long userId = getUserIdFromPrincipal(principal);
+        List<Excuse> excuses = service.getExcuse(userId, id);
         List<ExcuseDto> excuseDtos = excuses.stream()
             .map(e -> new ExcuseDto(e.getId(), e.getUserId(), e.getExcuseDate().toString(), e.getExcuseType(), e.getDescription(), e.getIsApproved()))
             .collect(Collectors.toList());

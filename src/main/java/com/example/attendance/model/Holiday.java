@@ -1,5 +1,7 @@
 package com.example.attendance.model;
 
+import java.time.LocalDate;
+
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -20,11 +22,12 @@ public class Holiday {
     @Column(name = "name", nullable = false)
     private String name;
 
+    //Tüm tarihler LocalDate olarak tutuluyor
     @Column(name = "date", nullable = false)
-    private String date;
+    private LocalDate date;
 
     @Column(name = "end_date")
-    private String endDate;
+    private LocalDate endDate;
 
     @Column(name = "country_code", nullable = false)
     private String countryCode;

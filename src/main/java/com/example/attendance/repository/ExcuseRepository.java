@@ -8,5 +8,5 @@ import java.util.List;
 
 @Repository
 public interface ExcuseRepository extends JpaRepository<Excuse, Long> {
-    List<Excuse> findByUserId(String userId);
+    List<Excuse> findByUserId(Long userId);
 }

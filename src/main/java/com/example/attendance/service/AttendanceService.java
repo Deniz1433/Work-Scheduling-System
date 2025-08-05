@@ -12,7 +12,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -32,7 +31,7 @@ public class AttendanceService {
     public List<TeamAttendanceDto> getTeamAttendance(String username) {
         // 1. Kullanıcıyı username'e göre bul
         // DENEME İÇİN 
-        User currentUser = userRepo.findByUsername("user");
+        User currentUser = userRepo.findByUsername("user").orElse(null);
         if (currentUser == null) {
             return new ArrayList<>();
         }
@@ -50,14 +49,14 @@ public class AttendanceService {
         return departmentUsers.stream()
                 .map(user -> {
                     TeamAttendanceDto dto = new TeamAttendanceDto();
-                    dto.setId(Long.parseLong(String.valueOf(user.getId())));
+                    dto.setId(user.getId());
                     dto.setName(user.getFirstName());
                     dto.setSurname(user.getLastName());
                     dto.setDepartment(user.getDepartment().getName());
                     dto.setDepartmentId(user.getDepartment().getId());
 
                     // Attendance verilerini al
-                    Attendance attendance = repo.findByUserIdAndWeekStart(String.valueOf(user.getId()), nextWeekStart.toString());
+                    Attendance attendance = repo.findByUserIdAndWeekStart(user.getId(), nextWeekStart);
                     if (attendance != null) {
                        
                         List<Integer> attendanceIntegers = attendance.getDates().stream()
@@ -85,7 +84,7 @@ public class AttendanceService {
             String attendanceStatus
     ) {
         // 1. Kullanıcıyı username'e göre bul
-        User currentUser = userRepo.findByUsername("user");
+        User currentUser = userRepo.findByUsername("user").orElse(null);
         if (currentUser == null) {
             return new ArrayList<>();
         }
@@ -149,14 +148,14 @@ public class AttendanceService {
                 })
                 .map(user -> {
                     TeamAttendanceDto dto = new TeamAttendanceDto();
-                    dto.setId(Long.parseLong(String.valueOf(user.getId())));
+                    dto.setId(user.getId());
                     dto.setName(user.getFirstName());
                     dto.setSurname(user.getLastName());
                     dto.setDepartment(user.getDepartment().getName());
                     dto.setDepartmentId(user.getDepartment().getId());
 
                     // Attendance verilerini al
-                    Attendance attendance = repo.findByUserIdAndWeekStart(String.valueOf(user.getId()), nextWeekStart.toString());
+                    Attendance attendance = repo.findByUserIdAndWeekStart(user.getId(), nextWeekStart);
                     if (attendance != null) {
                         List<Integer> attendanceIntegers = attendance.getDates().stream()
                                 .map(day -> day) 
@@ -195,17 +194,17 @@ public class AttendanceService {
      * by first deleting any existing rows in that range, then saving the new ones.
      */
     @Transactional    // ← ensure this method is transactional
-    public void record(String userId, LocalDate weekStart, List<Integer> dates) {
+    public void record(Long userId, LocalDate weekStart, List<Integer> dates) {
         System.out.println("Record method called with userId: " + userId + ", weekStart: " + weekStart + ", dates: " + dates);
         
         // 1) Attendance verisi var ise al
-        Attendance attendance = repo.findByUserIdAndWeekStart(userId, weekStart.toString());
+        Attendance attendance = repo.findByUserIdAndWeekStart(userId, weekStart);
         System.out.println("Existing attendance found: " + (attendance != null));
 
         // 2) Attendance kaydı yoksa kaydet
         if(attendance == null) {
             System.out.println("Creating new attendance record");
-            Attendance newAttendance = new Attendance(userId, weekStart.toString());
+            Attendance newAttendance = new Attendance(userId, weekStart);
             newAttendance.setMonday(dates.get(0));
             newAttendance.setTuesday(dates.get(1));
             newAttendance.setWednesday(dates.get(2));
@@ -229,7 +228,7 @@ public class AttendanceService {
         }
     }
 
-    public ArrayList<Object> fetch(String userId, String weekStart) {
+    public ArrayList<Object> fetch(Long userId, LocalDate weekStart) {
         Attendance attendance = repo.findByUserIdAndWeekStart(userId, weekStart);   
         if(attendance == null) {
                 return new ArrayList<>(List.of(List.of(0, 0, 0, 0, 0), false));
@@ -244,7 +243,7 @@ public class AttendanceService {
         repo.save(attendance);
     }
 
-    public List<Excuse> getExcuse(String editorId, String userId) {
+    public List<Excuse> getExcuse(Long editorId, Long userId) {
         List<Excuse> excuses = excuseRepo.findByUserId(userId);
         LocalDate weekStart = calculateNextWeekStart();
         return excuses.stream().filter(e -> e.getExcuseDate().isAfter(weekStart)).collect(Collectors.toList());

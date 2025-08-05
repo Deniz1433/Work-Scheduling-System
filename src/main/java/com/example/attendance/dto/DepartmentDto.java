@@ -15,12 +15,10 @@ public class DepartmentDto {
     private Long id;
     private String name;
     private int minDays;
-    private Long childDepartmentId;
 
     public DepartmentDto(Department department) {
         this.id = department.getId();
         this.name = department.getName();
         this.minDays = department.getMinDays();
-        this.childDepartmentId = department.getChildDepartment() != null ? department.getChildDepartment().getId() : null;
     }
 }

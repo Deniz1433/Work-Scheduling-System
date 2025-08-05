@@ -1,10 +1,16 @@
 package com.example.attendance.model;
 
+import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
+
+import java.util.List;
 
 import jakarta.persistence.*;
 
+@AllArgsConstructor
+@NoArgsConstructor
 @Getter
 @Setter
 @Entity
@@ -19,7 +25,4 @@ public class Department {
       @Column(name = "min_days", nullable = false, length = 2)
       private int minDays;// ofiste minimum gün
       
-      @ManyToOne(fetch = FetchType.LAZY)
-      @JoinColumn(name = "child_department_id", nullable = true)
-      private Department childDepartment;
 }

@@ -18,8 +18,9 @@ public class Excuse {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name="user_id", nullable=false, length=36)
-    private String userId;
+    //Users tablosundaki @Id
+    @Column(name="user_id", nullable=false)
+    private Long userId;
 
     @Column(name="excuse_date", nullable=false)
     private LocalDate excuseDate;
@@ -38,7 +39,7 @@ public class Excuse {
     private Boolean isApproved = false;
 
 
-    public Excuse(String userId, LocalDate excuseDate, int excuseType, String description) {
+    public Excuse(Long userId, LocalDate excuseDate, int excuseType, String description) {
         this.userId = userId;
         this.excuseDate = excuseDate;
         this.excuseType = excuseType;

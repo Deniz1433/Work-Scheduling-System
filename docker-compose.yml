@@ -6,6 +6,7 @@ services:
       POSTGRES_DB: attendance-db
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: admin
+      TZ: "Europe/Istanbul" # Türkiye saat dilimi
     ports:
       - "15432:5432"
     volumes:
@@ -77,6 +78,13 @@ services:
       LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_SECURITY:        DEBUG
       LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_SECURITY_OAUTH2_CLIENT: DEBUG
       LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_SECURITY_OAUTH2_CORE:   DEBUG
+
+      # E-postad
+      MAIL_HOST: smtp.gmail.com
+      MAIL_PORT: 587
+      MAIL_USERNAME: emr.sahin35@gmail.com
+      MAIL_PASSWORD: pkkx jjwe ekts bkxl
+      MAIL_PROPERTIES_MAIL_SMTP_AUTH: true
     entrypoint:
       - sh
       - -c

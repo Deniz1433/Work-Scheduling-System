@@ -10,7 +10,7 @@ import lombok.AllArgsConstructor;
 @AllArgsConstructor
 public class HolidayDto {
       public String date;
-        public String localName;
-        public String name;
-        public String countryCode;
+      public String localName;
+      public String name;
+      public String countryCode;
 }

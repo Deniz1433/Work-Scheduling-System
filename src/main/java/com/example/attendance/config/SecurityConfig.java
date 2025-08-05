@@ -1,4 +1,4 @@
-package com.example.attendance;
+package com.example.attendance.config;
 
 import java.util.HashSet;
 import java.util.Map;
