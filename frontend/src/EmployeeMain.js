@@ -1,20 +1,25 @@
-import React, { useState, useEffect } from 'react';
-import { User, Users, FileText, Calendar1, UserPlus, UserCog, LogOut, Building } from 'lucide-react';
+import React, { useState } from 'react';
+import {
+  User,
+  Calendar1,
+  UserCog,
+  LogOut,
+  Building
+} from 'lucide-react';
 import AttendanceRegistration from './EmployeeAttendanceRegistration';
 import TeamAttendance from './EmployeeTeamAttendance';
-import logo from './assets/logo.png';
-import { useUser } from "./UserContext";
 import AdminManageUsers from './AdminManageUsers';
 import AdminDepartmentManagement from './AdminDepartmentManagement';
 import AdminRoleManagement from './AdminRoleManagement';
 import AdminHolidayRegistration from './AdminHolidayRegistration';
 import AdminDepartmentHierarchy from './AdminDepartmentHierarchy';
+import logo from './assets/logo.png';
+import { useUser } from './UserContext';
 
 const EmployeeMain = () => {
-  const {user} = useUser();
+  const { user } = useUser();
   const [activeView, setActiveView] = useState('registration');
 
-  // Tüm menü elemanları
   const allNavigationItems = [
     {
       id: 'registration',
@@ -60,14 +65,15 @@ const EmployeeMain = () => {
     }
   ];
 
-
   const renderActiveComponent = () => {
     const activeItem = allNavigationItems.find(item => item.id === activeView);
-    if (activeItem) {
-      const Component = activeItem.component;
-      return <Component user={user} />;
-    }
-    return null;
+    if (!activeItem) return null;
+    const Component = activeItem.component;
+    return (
+        <div className="w-full">
+          <Component user={user} />
+        </div>
+    );
   };
 
   const handleLogout = () => {
@@ -76,11 +82,10 @@ const EmployeeMain = () => {
 
   return (
       <div className="flex h-screen bg-gray-100">
-        {/* Navigasyon Çubuğu */}
+        {/* Sidebar */}
         <div className="w-64 bg-gray-800 text-white p-4 flex flex-col">
           <h1 className="text-xl font-bold mb-8">Ofis Günü Kayıt Sistemi</h1>
-
-          <nav className="space-y-2">
+          <nav className="space-y-2 flex-1">
             {allNavigationItems.map(item => {
               const Icon = item.icon;
               return (
@@ -102,7 +107,6 @@ const EmployeeMain = () => {
             })}
           </nav>
 
-          {/* Kullanıcı bilgisi */}
           <div className="mt-8 pt-6 border-t border-gray-700">
             <div className="flex items-center gap-3 p-3 bg-gray-700 rounded-lg">
               <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
@@ -119,10 +123,8 @@ const EmployeeMain = () => {
             </div>
           </div>
 
-          {/* Yaşar Bilgi Logosu */}
           <img src={logo} alt="Logo" className="w-max mt-auto mx-auto" />
 
-          {/* Çıkış Yap Butonu */}
           <button
               onClick={handleLogout}
               className="mt-6 w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-left bg-red-600 hover:bg-red-700 text-white font-medium"
@@ -132,9 +134,8 @@ const EmployeeMain = () => {
           </button>
         </div>
 
-        {/* Ana ekran */}
+        {/* Main content */}
         <div className="flex-1 flex flex-col">
-          {/* Başlık */}
           <header className="bg-white shadow-sm border-b border-gray-200 px-6 py-4">
             <div className="flex items-center justify-between">
               <div>
@@ -143,28 +144,22 @@ const EmployeeMain = () => {
                 </h2>
                 <p className="text-sm text-gray-600">
                   {activeView === 'registration' && 'Ofiste çalışacağınız günleri belirleyin'}
-                  {activeView === 'excuse' && 'Devamsızlık için mazeret başvurusu oluşturun'}
                   {activeView === 'team' && 'Ekip üyelerinin ofis günlerini görüntüleyin'}
-                  {activeView === 'department' && 'Departman bilgilerini görüntüleyin'}
-                  {activeView === 'adminAddUser' && 'Kullanıcı ekleyin - çıkarın'}
-                  {activeView === 'manageRoles' && 'Kullanıcı rollerini yönetin'}
+                  {/* add other descriptions as needed */}
                 </p>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="text-sm text-gray-500">
-                  {new Date().toLocaleDateString('tr-TR', {
-                    weekday: 'long',
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                  })}
-                </div>
+              <div className="text-sm text-gray-500">
+                {new Date().toLocaleDateString('tr-TR', {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric'
+                })}
               </div>
             </div>
           </header>
 
-          {/* Dynamic Content */}
-          <main className="flex-1 overflow-auto">
+          <main className="flex-1 overflow-auto px-6 py-4">
             {renderActiveComponent()}
           </main>
         </div>

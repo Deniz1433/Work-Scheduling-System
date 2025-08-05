@@ -263,7 +263,7 @@ const AdminDepartmentHierarchy = () => {
 
     return (
         <div className="admin-hierarchy">
-            <div id="sidebar">
+            <aside className="sidebar">
                 <button
                     id="moveBtn"
                     className={`mode-btn ${mode === 'move' ? 'active' : ''}`}
@@ -312,8 +312,8 @@ const AdminDepartmentHierarchy = () => {
                         positions and links.
                     </li>
                 </ul>
-            </div>
-            <div id="cy" ref={containerRef}></div>
+            </aside>
+            <div className="main-content" ref={containerRef}></div>
         </div>
     );
 };
