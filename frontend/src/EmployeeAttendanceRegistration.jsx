@@ -273,7 +273,9 @@ const EmployeeAttendanceRegistration = () => {
                 Swal.fire('Başarılı', 'Seçiminiz kaydedildi.', 'success');
             } catch (error) {
                 console.error('Kaydetme hatası:', error);
-                Swal.fire('Hata', 'Kayıt sırasında bir sorun oluştu.', 'error');
+                console.error('Error response:', error.response);
+                console.error('Error message:', error.message);
+                Swal.fire('Hata', 'Kayıt sırasında bir sorun oluştu: ' + (error.response?.data?.error || error.message), 'error');
             }
         }
     };

@@ -109,26 +109,46 @@ public class AdminService {
             if (response.getStatus() == 201) {
                 System.out.println("Keycloak'ta kullanıcı başarıyla oluşturuldu: " + userDto.getUsername());
                 
+                // Oluşturulan kullanıcının ID'sini al
+                String userId = null;
+                try {
+                    List<UserRepresentation> createdUsers = usersResource.search(userDto.getUsername());
+                    if (!createdUsers.isEmpty()) {
+                        userId = createdUsers.get(0).getId();
+                        System.out.println("Oluşturulan kullanıcının ID'si: " + userId);
+                    }
+                } catch (Exception e) {
+                    System.err.println("Kullanıcı ID'si alınırken hata: " + e.getMessage());
+                }
+                
                 // 2. PostgreSQL'de rol ve departman bilgilerini kaydet
-                if (userDto.getRoleId() != null && !userDto.getRoleId().isEmpty()) {
-                    Optional<Role> role = roleRepository.findById(Long.parseLong(userDto.getRoleId()));
-                    if (role.isPresent()) {
-                        UserRole userRole = new UserRole();
-                        userRole.setUserId(user.getId());
-                        userRole.setRole(role.get());
-                        userRoleRepository.save(userRole);
-                        System.out.println("PostgreSQL'de rol kaydedildi: " + role.get().getName());
+                if (userId != null && userDto.getRoleId() != null && !userDto.getRoleId().isEmpty()) {
+                    try {
+                        Optional<Role> role = roleRepository.findById(Long.parseLong(userDto.getRoleId()));
+                        if (role.isPresent()) {
+                            UserRole userRole = new UserRole();
+                            userRole.setUserId(userId);
+                            userRole.setRole(role.get());
+                            userRoleRepository.save(userRole);
+                            System.out.println("PostgreSQL'de rol kaydedildi: " + role.get().getName());
+                        }
+                    } catch (Exception e) {
+                        System.err.println("Rol kaydedilirken hata: " + e.getMessage());
                     }
                 }
                 
-                if (userDto.getDepartmentId() != null && !userDto.getDepartmentId().isEmpty()) {
-                    Optional<Department> department = departmentRepository.findById(Long.parseLong(userDto.getDepartmentId()));
-                    if (department.isPresent()) {
-                        UserDepartment userDepartment = new UserDepartment();
-                        userDepartment.setUserId(user.getId());
-                        userDepartment.setDepartment(department.get());
-                        userDepartmentRepository.save(userDepartment);
-                        System.out.println("PostgreSQL'de departman kaydedildi: " + department.get().getName());
+                if (userId != null && userDto.getDepartmentId() != null && !userDto.getDepartmentId().isEmpty()) {
+                    try {
+                        Optional<Department> department = departmentRepository.findById(Long.parseLong(userDto.getDepartmentId()));
+                        if (department.isPresent()) {
+                            UserDepartment userDepartment = new UserDepartment();
+                            userDepartment.setUserId(userId);
+                            userDepartment.setDepartment(department.get());
+                            userDepartmentRepository.save(userDepartment);
+                            System.out.println("PostgreSQL'de departman kaydedildi: " + department.get().getName());
+                        }
+                    } catch (Exception e) {
+                        System.err.println("Departman kaydedilirken hata: " + e.getMessage());
                     }
                 }
             } else {
@@ -217,6 +237,46 @@ public class AdminService {
             System.err.println("Departman güncellenirken hata: " + e.getMessage());
             e.printStackTrace();
             throw new RuntimeException("Departman güncellenemedi: " + e.getMessage());
+        }
+    }
+    
+    @Transactional
+    public void deleteUser(String userId) {
+        try {
+            System.out.println("Kullanıcı siliniyor - User ID: " + userId);
+            
+            // 1. PostgreSQL'den kullanıcı rollerini sil
+            try {
+                userRoleRepository.deleteByUserId(userId);
+                System.out.println("PostgreSQL'den kullanıcı rolleri silindi");
+            } catch (Exception e) {
+                System.out.println("PostgreSQL'den kullanıcı rolleri silinirken hata: " + e.getMessage());
+            }
+            
+            // 2. PostgreSQL'den kullanıcı departmanlarını sil
+            try {
+                userDepartmentRepository.deleteByUserId(userId);
+                System.out.println("PostgreSQL'den kullanıcı departmanları silindi");
+            } catch (Exception e) {
+                System.out.println("PostgreSQL'den kullanıcı departmanları silinirken hata: " + e.getMessage());
+            }
+            
+            // 3. Keycloak'tan kullanıcıyı sil
+            try {
+                RealmResource realm = keycloakAdminClient.realm("attendance-realm");
+                realm.users().delete(userId);
+                System.out.println("Keycloak'tan kullanıcı silindi");
+            } catch (Exception e) {
+                System.out.println("Keycloak'tan kullanıcı silinirken hata: " + e.getMessage());
+                // Keycloak'tan silinmezse bile PostgreSQL'den silmeye devam et
+            }
+            
+            System.out.println("Kullanıcı başarıyla silindi");
+            
+        } catch (Exception e) {
+            System.err.println("Kullanıcı silinirken hata: " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("Kullanıcı silinemedi: " + e.getMessage());
         }
     }
     

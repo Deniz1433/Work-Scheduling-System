@@ -39,7 +39,7 @@ public class HomeController {
         testUser.put("preferredUsername", "admin");
         testUser.put("email", "admin@gmail.com");
         testUser.put("authorities", Arrays.asList("ROLE_attendance_client_admin"));
-        testUser.put("id", 1L);
+        testUser.put("id", "d5478a21-ee0b-400b-bbee-3c155c4a0d56"); // Keycloak ID'si
         testUser.put("firstName", "Admin");
         testUser.put("lastName", "User");
         testUser.put("username", "admin");
@@ -50,47 +50,24 @@ public class HomeController {
         
         log.debug("Returning test user info: {}", testUser);
         return testUser;
-        
-        /* Orijinal kod - şimdilik devre dışı
-        if (oidcUser == null) {
-            log.warn("No authenticated user found");
-            return Collections.emptyMap();
-        }
-
-        Map<String, Object> info = new HashMap<>();
-        info.put("name", oidcUser.getName());
-        info.put("preferredUsername", oidcUser.getPreferredUsername());
-        info.put("email", oidcUser.getEmail());
-        info.put("authorities", oidcUser.getAuthorities().stream()
-                .map(GrantedAuthority::getAuthority)
-                .collect(Collectors.toList()));
-        
-        // Veritabanındaki User bilgilerini de ekle
+    }
+    
+    @GetMapping("/test-db")
+    public Map<String, Object> testDatabase() {
         try {
-            Optional<User> dbUser = userRepository.findByKeycloakId(oidcUser.getSubject());
-            if (dbUser.isPresent()) {
-                User user = dbUser.get();
-                info.put("id", user.getId());
-                info.put("firstName", user.getFirstName());
-                info.put("lastName", user.getLastName());
-                info.put("username", user.getUsername());
-                if (user.getDepartment() != null) {
-                    info.put("departmentId", user.getDepartment().getId());
-                    info.put("departmentName", user.getDepartment().getName());
-                }
-                if (user.getRole() != null) {
-                    info.put("roleId", user.getRole().getId());
-                    info.put("roleName", user.getRole().getName());
-                }
-            }
+            // Veritabanı bağlantısını test et
+            long userCount = userRepository.count();
+            return Map.of(
+                "status", "success",
+                "message", "Database connection successful",
+                "userCount", userCount
+            );
         } catch (Exception e) {
-            log.error("Error fetching user from database", e);
-            // Hata durumunda bile temel bilgileri döndür
-            info.put("error", "Database connection failed");
+            log.error("Database connection failed", e);
+            return Map.of(
+                "status", "error",
+                "message", "Database connection failed: " + e.getMessage()
+            );
         }
-        
-        log.debug("Returning user info: {}", info);
-        return info;
-        */
     }
 }

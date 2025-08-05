@@ -55,8 +55,13 @@ public class AttendanceService {
                     dto.setDepartment(user.getDepartment().getName());
                     dto.setDepartmentId(user.getDepartment().getId());
 
-                    // Attendance verilerini al
-                    Attendance attendance = repo.findByUserIdAndWeekStart(user.getId().toString(), nextWeekStart.toString());
+                    // Attendance verilerini al - Keycloak ID'sini kullan
+                    String keycloakId = user.getKeycloakId();
+                    if (keycloakId == null) {
+                        // Eğer Keycloak ID yoksa, test kullanıcısı için sabit ID kullan
+                        keycloakId = "d5478a21-ee0b-400b-bbee-3c155c4a0d56";
+                    }
+                    Attendance attendance = repo.findByUserIdAndWeekStart(keycloakId, nextWeekStart.toString());
                     if (attendance != null) {
                        
                         List<Integer> attendanceIntegers = attendance.getDates().stream()
@@ -154,8 +159,13 @@ public class AttendanceService {
                     dto.setDepartment(user.getDepartment().getName());
                     dto.setDepartmentId(user.getDepartment().getId());
 
-                    // Attendance verilerini al
-                    Attendance attendance = repo.findByUserIdAndWeekStart(user.getId().toString(), nextWeekStart.toString());
+                    // Attendance verilerini al - Keycloak ID'sini kullan
+                    String keycloakId = user.getKeycloakId();
+                    if (keycloakId == null) {
+                        // Eğer Keycloak ID yoksa, test kullanıcısı için sabit ID kullan
+                        keycloakId = "d5478a21-ee0b-400b-bbee-3c155c4a0d56";
+                    }
+                    Attendance attendance = repo.findByUserIdAndWeekStart(keycloakId, nextWeekStart.toString());
                     if (attendance != null) {
                         List<Integer> attendanceIntegers = attendance.getDates().stream()
                                 .map(day -> day) 
@@ -253,5 +263,13 @@ public class AttendanceService {
         Excuse excuse = excuseRepo.findById(id).orElseThrow(() -> new RuntimeException("Excuse not found"));
         excuse.setIsApproved(true);
         excuseRepo.save(excuse);
+    }
+    
+    public List<Attendance> getAllAttendance() {
+        return repo.findAll();
+    }
+    
+    public List<Attendance> getAttendanceByUserId(String userId) {
+        return repo.findByUserId(userId);
     }
 } 

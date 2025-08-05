@@ -57,4 +57,14 @@ public class AdminController {
             return ResponseEntity.badRequest().body("Departman güncellenemedi: " + e.getMessage());
         }
     }
+    
+    @DeleteMapping("/users/{userId}")
+    public ResponseEntity<String> deleteUser(@PathVariable String userId) {
+        try {
+            adminService.deleteUser(userId);
+            return ResponseEntity.ok("Kullanıcı başarıyla silindi");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Kullanıcı silinemedi: " + e.getMessage());
+        }
+    }
 } 

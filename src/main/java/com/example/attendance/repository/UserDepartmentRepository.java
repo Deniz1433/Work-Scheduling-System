@@ -16,5 +16,7 @@ public interface UserDepartmentRepository extends JpaRepository<UserDepartment, 
     
     void deleteByUserIdAndDepartmentId(String userId, Long departmentId);
     
+    void deleteByUserId(String userId);
+    
     boolean existsByUserIdAndDepartmentId(String userId, Long departmentId);
 } 
