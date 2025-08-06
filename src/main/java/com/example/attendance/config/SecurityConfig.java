@@ -32,7 +32,7 @@ public class SecurityConfig {
         http
                 // disable CSRF for our stateless API endpoints
                 .csrf(csrf -> csrf
-                        .ignoringRequestMatchers("/api/attendance/**","admin/hierarchy" ,"/api/excuse/**", "/api/admin/**", "/api/departments/**", "/api/roles/**", "/api/holidays/**", "/api/user/**","/api/userInfo/**" )
+                        .ignoringRequestMatchers("/api/attendance/**","admin/hierarchy/**" ,"/api/excuse/**", "/api/admin/**", "/api/departments/**", "/api/roles/**", "/api/holidays/**", "/api/user/**","/api/userInfo/**" )
                 )
                 .authorizeHttpRequests(auth -> auth
                         // allow React static assets

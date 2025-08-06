@@ -6,7 +6,7 @@ const AdminDepartmentHierarchy = () => {
     const containerRef = useRef(null);
     const [isDirty, setIsDirty] = useState(false);
     const [mode, setMode] = useState('move');
-    const [roles, setRoles] = useState([]);
+    const [departments, setDepartments] = useState([]);
     const [loadedData, setLoadedData] = useState({
         childrenMap: {},
         positionsMap: {}
@@ -23,11 +23,11 @@ const AdminDepartmentHierarchy = () => {
     useEffect(() => {
         fetch('/api/departments')
             .then(res => {
-                if (!res.ok) throw new Error('Failed to fetch roles');
+                if (!res.ok) throw new Error('Failed to fetch departments');
                 return res.json();
             })
-            .then(data => setRoles(data.map(d => d.name)))
-            .catch(err => console.error('Error fetching roles:', err));
+            .then(data => setDepartments(data.map(d => d.name)))
+            .catch(err => console.error('Error fetching departments:', err));
     }, []);
 
     // Reload and render saved hierarchy
@@ -45,10 +45,10 @@ const AdminDepartmentHierarchy = () => {
                     childrenMap[parent].push(child);
                 });
                 const positionsMap = {};
-                Object.entries(positions).forEach(([role, pos]) => {
+                Object.entries(positions).forEach(([department, pos]) => {
                     const x = pos.x != null ? pos.x : pos.posX;
                     const y = pos.y != null ? pos.y : pos.posY;
-                    positionsMap[role] = { x, y };
+                    positionsMap[department] = { x, y };
                 });
                 setLoadedData({ childrenMap, positionsMap });
                 setDebugData(prev => ({
@@ -64,12 +64,12 @@ const AdminDepartmentHierarchy = () => {
         reloadHierarchy();
     }, []);
 
-    const addRole = (role) => {
+    const addDepartment = (department) => {
         const cy = cyRef.current;
-        if (!cy || cy.$id(role).length) return;
+        if (!cy || cy.$id(department).length) return;
         const x = cy.width() / 2;
         const y = cy.height() / 2;
-        cy.add({ group: 'nodes', data: { id: role, label: role }, position: { x, y } });
+        cy.add({ group: 'nodes', data: { id: department, label: department }, position: { x, y } });
         setIsDirty(true);
     };
 
@@ -225,7 +225,7 @@ const AdminDepartmentHierarchy = () => {
             });
         const positions = cyRef.current
             .nodes()
-            .map(n => ({ role: n.id(), x: n.position('x'), y: n.position('y') }));
+            .map(n => ({ department: n.id(), x: n.position('x'), y: n.position('y') }));;
         const body = { relations, positions };
         setDebugData(prev => ({ ...prev, toSave: body }));
 
@@ -303,13 +303,13 @@ const AdminDepartmentHierarchy = () => {
 
                 {/* Departments List */}
                 <h2 className="text-lg font-bold mt-4 mb-2">Departments</h2>
-                {roles.length === 0 ? (
+                {departments.length === 0 ? (
                     <div className="text-gray-500">Loading...</div>
                 ) : (
-                    roles.map((r, i) => (
+                    departments.map((r, i) => (
                         <div 
                             key={i} 
-                            onClick={() => addRole(r)}
+                            onClick={() => addDepartment(r)}
                             className="cursor-pointer p-1 border border-gray-500 my-1 bg-gray-50 select-none hover:bg-blue-50 rounded"
                         >
                             {r}

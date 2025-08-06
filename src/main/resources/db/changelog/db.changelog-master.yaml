@@ -554,4 +554,26 @@ databaseChangeLog:
             tableName: attendance
             columnName: week_start
             newDataType: DATE
-      
+
+  - changeSet:
+      id: migrate-department-node-position-pk
+      author: yourname
+      changes:
+        - dropPrimaryKey:
+            tableName: department_node_position
+            constraintName: department_node_position_pkey
+        - addColumn:
+            tableName: department_node_position
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+        - addPrimaryKey:
+            tableName: department_node_position
+            columnNames: id
+            constraintName: pk_department_node_position_id
+        - modifyDataType:
+            tableName: department_node_position
+            columnName: department
+            newDataType: VARCHAR(100)

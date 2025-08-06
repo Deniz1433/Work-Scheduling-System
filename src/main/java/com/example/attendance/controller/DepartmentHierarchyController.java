@@ -6,7 +6,6 @@ import com.example.attendance.model.DepartmentNodePosition;
 import com.example.attendance.repository.DepartmentRepository;
 import com.example.attendance.service.DepartmentHierarchyService;
 import com.example.attendance.service.DepartmentNodePositionService;
-import com.example.attendance.dto.DepartmentRelationDto;
 import lombok.Data;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
@@ -21,13 +20,14 @@ public class DepartmentHierarchyController {
     private final DepartmentNodePositionService posSvc;
     private final DepartmentRepository departmentRepo;
 
-    public DepartmentHierarchyController(DepartmentHierarchyService h, DepartmentNodePositionService p, DepartmentRepository d) {
+    public DepartmentHierarchyController(DepartmentHierarchyService h, DepartmentNodePositionService p,
+            DepartmentRepository d) {
         this.hierarchySvc = h;
         this.posSvc = p;
         this.departmentRepo = d;
     }
 
-    @PostMapping(path="/save", consumes="application/json")
+    @PostMapping(path = "/save", consumes = "application/json")
     @ResponseBody
     public ResponseEntity<String> saveAll(@RequestBody SaveDto dto) {
         try {
@@ -35,14 +35,16 @@ public class DepartmentHierarchyController {
             List<DepartmentHierarchy> relations = dto.getRelations().stream()
                     .map(rel -> {
                         Department parent = departmentRepo.findByName(rel.getParent())
-                                .orElseThrow(() -> new RuntimeException("Parent department not found: " + rel.getParent()));
+                                .orElseThrow(
+                                        () -> new RuntimeException("Parent department not found: " + rel.getParent()));
                         Department child = departmentRepo.findByName(rel.getChild())
-                                .orElseThrow(() -> new RuntimeException("Child department not found: " + rel.getChild()));
+                                .orElseThrow(
+                                        () -> new RuntimeException("Child department not found: " + rel.getChild()));
                         return new DepartmentHierarchy(parent, child);
                     })
                     .toList();
             hierarchySvc.saveRelations(relations);
-            
+
             // build entity list from dto.positions
             List<DepartmentNodePosition> posList = dto.getPositions().stream()
                     .map(p -> new DepartmentNodePosition(p.getDepartment(), p.getX(), p.getY()))
@@ -50,6 +52,7 @@ public class DepartmentHierarchyController {
             posSvc.saveAll(posList);
             return ResponseEntity.ok("Saved relations & positions");
         } catch (Exception ex) {
+            ex.printStackTrace(); // Konsola tam stack trace basar
             return ResponseEntity.status(500).body(ex.getMessage());
         }
     }
@@ -59,15 +62,15 @@ public class DepartmentHierarchyController {
     public Map<String, Object> loadHierarchy() {
         List<DepartmentHierarchy> links = hierarchySvc.listAll();
         List<Map<String, String>> rels = links.stream()
-                .map(r -> Map.of("parent", r.getParentDepartment().getName(), "child", r.getChildDepartment().getName()))
+                .map(r -> Map.of("parent", r.getParentDepartment().getName(), "child",
+                        r.getChildDepartment().getName()))
                 .toList();
 
         Map<String, DepartmentNodePosition> positions = posSvc.loadAll();
 
         return Map.of(
                 "relations", rels,
-                "positions", positions
-        );
+                "positions", positions);
     }
 
     @Data
@@ -81,5 +84,11 @@ public class DepartmentHierarchyController {
         private String department;
         private double x;
         private double y;
+    }
+
+    @Data
+    public static class DepartmentRelationDto {
+        private String parent;
+        private String child;
     }
 }

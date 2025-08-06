@@ -1,7 +1,7 @@
 // src/main/java/com/example/attendance/service/DepartmentHierarchyService.java
 package com.example.attendance.service;
 
-import com.example.attendance.dto.DepartmentRelationDto;
+
 import com.example.attendance.model.Department;
 import com.example.attendance.model.DepartmentHierarchy;
 import com.example.attendance.repository.DepartmentHierarchyRepository;

@@ -14,7 +14,10 @@ import lombok.Setter;
 @Table(name = "department_node_position")
 public class DepartmentNodePosition {
     @Id
-    @Column(name = "department", length = 100)
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    private Long id;
+
+    @Column(name = "department", length = 100, nullable = false)
     private String department;
 
     @Column(name = "pos_x", nullable = false)
@@ -22,5 +25,11 @@ public class DepartmentNodePosition {
 
     @Column(name = "pos_y", nullable = false)
     private double posY;
+
+    public DepartmentNodePosition(String department, double posX, double posY) {
+        this.department = department;
+        this.posX = posX;
+        this.posY = posY;
+    }
 
 }
