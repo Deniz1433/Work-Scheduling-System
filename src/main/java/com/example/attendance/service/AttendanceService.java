@@ -7,6 +7,8 @@ import com.example.attendance.repository.AttendanceRepository;
 import com.example.attendance.repository.ExcuseRepository;
 import com.example.attendance.repository.UserRepository;
 import com.example.attendance.dto.TeamAttendanceDto;
+
+import org.springframework.cglib.core.Local;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,10 +30,9 @@ public class AttendanceService {
     }
 
     
-    public List<TeamAttendanceDto> getTeamAttendance(String username) {
-        // 1. Kullanıcıyı username'e göre bul
-        // DENEME İÇİN 
-        User currentUser = userRepo.findByUsername("user").orElse(null);
+    public List<TeamAttendanceDto> getTeamAttendance(String keycloakId) {
+        // 1. Kullanıcıyı keycloakId'ye göre bul
+        User currentUser = userRepo.findByKeycloakId(keycloakId).orElse(null);
         if (currentUser == null) {
             return new ArrayList<>();
         }
@@ -49,13 +50,13 @@ public class AttendanceService {
         return departmentUsers.stream()
                 .map(user -> {
                     TeamAttendanceDto dto = new TeamAttendanceDto();
-                    dto.setId(user.getId());
+                    dto.setId(user.getId()); // Long ID
                     dto.setName(user.getFirstName());
                     dto.setSurname(user.getLastName());
                     dto.setDepartment(user.getDepartment().getName());
                     dto.setDepartmentId(user.getDepartment().getId());
 
-                    // Attendance verilerini al
+
                     Attendance attendance = repo.findByUserIdAndWeekStart(user.getId(), nextWeekStart);
                     if (attendance != null) {
                        
@@ -77,17 +78,25 @@ public class AttendanceService {
     }
 
     public List<TeamAttendanceDto> getTeamAttendanceWithFilters(
-            String username, 
+            String keycloakId, 
             String departmentId, 
             String roleId, 
-            String searchTerm, 
-            String attendanceStatus
+            String searchTerm
     ) {
-        // 1. Kullanıcıyı username'e göre bul
-        User currentUser = userRepo.findByUsername("user").orElse(null);
+        System.out.println("🔍 getTeamAttendanceWithFilters called with:");
+        System.out.println("  - keycloakId: " + keycloakId);
+        System.out.println("  - departmentId: " + departmentId);
+        System.out.println("  - roleId: " + roleId);
+        System.out.println("  - searchTerm: " + searchTerm);
+        
+        // 1. Kullanıcıyı keycloakId'ye göre bul
+        User currentUser = userRepo.findByKeycloakId(keycloakId).orElse(null);
         if (currentUser == null) {
+            System.out.println("❌ User not found for keycloakId: " + keycloakId);
             return new ArrayList<>();
         }
+        
+        System.out.println("✅ User found: " + currentUser.getFirstName() + " " + currentUser.getLastName());
 
         // 2. Filtreleme için kullanıcı listesini al
         List<User> users;
@@ -99,24 +108,27 @@ public class AttendanceService {
             if (departmentIds.length == 1) {
                 // Tek departman
                 users = userRepo.findByDepartmentId(Long.parseLong(departmentIds[0].trim()));
+                System.out.println("🔍 Found " + users.size() + " users in department " + departmentIds[0].trim());
             } else {
                 // Çoklu departman - birleşim (union) mantığı
                 users = new ArrayList<>();
                 for (String deptId : departmentIds) {
                     List<User> deptUsers = userRepo.findByDepartmentId(Long.parseLong(deptId.trim()));
                     users.addAll(deptUsers);
+                    System.out.println("🔍 Found " + deptUsers.size() + " users in department " + deptId.trim());
                 }
             }
         } else {
             // Tüm departmanlardaki kullanıcıları getir
             users = userRepo.findAll();
+            System.out.println("🔍 Found " + users.size() + " total users (no department filter)");
         }
 
         // 3. Gelecek haftanın başlangıç tarihini hesapla
         LocalDate nextWeekStart = calculateNextWeekStart();
 
         // 4. Filtreleme ve DTO dönüşümü
-        return users.stream()
+        List<TeamAttendanceDto> result = users.stream()
                 .filter(user -> {
                     // Çoklu rol filtresi - birleşim mantığı
                     if (roleId != null && !roleId.isEmpty()) {
@@ -148,13 +160,12 @@ public class AttendanceService {
                 })
                 .map(user -> {
                     TeamAttendanceDto dto = new TeamAttendanceDto();
-                    dto.setId(user.getId());
+                    dto.setId(user.getId()); // Long ID
                     dto.setName(user.getFirstName());
                     dto.setSurname(user.getLastName());
                     dto.setDepartment(user.getDepartment().getName());
                     dto.setDepartmentId(user.getDepartment().getId());
 
-                    // Attendance verilerini al
                     Attendance attendance = repo.findByUserIdAndWeekStart(user.getId(), nextWeekStart);
                     if (attendance != null) {
                         List<Integer> attendanceIntegers = attendance.getDates().stream()
@@ -171,15 +182,10 @@ public class AttendanceService {
                     dto.setEmployeeExcuse(null);
                     return dto;
                 })
-                .filter(dto -> {
-                    // Attendance durumu filtresi
-                    if (attendanceStatus != null && !attendanceStatus.isEmpty()) {
-                        int status = Integer.parseInt(attendanceStatus);
-                        return dto.getAttendance().contains(status);
-                    }
-                    return true;
-                })
                 .collect(Collectors.toList());
+                
+        System.out.println("✅ Returning " + result.size() + " team members");
+        return result;
     }
 
     private LocalDate calculateNextWeekStart() {
@@ -237,8 +243,11 @@ public class AttendanceService {
 
     }
 
-    public void approve(Long id, String username) {
-        Attendance attendance = repo.findById(id).orElseThrow(() -> new RuntimeException("Attendance not found"));
+    public void approve(Long id, LocalDate weekStart) {
+        Attendance attendance = repo.findByUserIdAndWeekStart(id, weekStart);
+        if(attendance == null){
+            return;
+        }
         attendance.setApproved(true);
         repo.save(attendance);
     }
@@ -254,4 +263,12 @@ public class AttendanceService {
         excuse.setIsApproved(true);
         excuseRepo.save(excuse);
     }
-}
+    
+    public List<Attendance> getAllAttendance() {
+        return repo.findAll();
+    }
+    
+    public List<Attendance> getAttendanceByUserId(Long userId) {
+        return repo.findByUserId(userId);
+    }
+} 

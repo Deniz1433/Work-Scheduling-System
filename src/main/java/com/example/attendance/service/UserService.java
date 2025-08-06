@@ -42,6 +42,14 @@ public class UserService {
             return toDto(user);
       }
 
+      public Long getUserIdbyKeycloakId(String keycloakId){
+            User u = userRepository.findByKeycloakId(keycloakId).orElse(null);
+            if(u == null){
+                  return null;
+            }
+            return u.getId();
+      }
+
       public UserDto createUser(UserDto dto) {
             // 1. Create user in Keycloak
             UserRepresentation keycloakUser = new UserRepresentation();

@@ -28,6 +28,7 @@ const EXCUSE_TYPES = [
 
 const EmployeeAttendanceRegistration = () => {  
     const {user} = useUser();
+
     // 5 elemanlı array: [monday, tuesday, wednesday, thursday, friday]
     // Her eleman 0-5 arası durum kodunu tutar
     const [weeklyStatus, setWeeklyStatus] = useState([0, 0, 0, 0, 0]);
@@ -76,33 +77,52 @@ const EmployeeAttendanceRegistration = () => {
     };
 
     useEffect(() => {
+        // Check if user is available
+        if (!user || !user.keycloakId) {
+            console.log('User not available yet:', user);
+            return;
+        }
+
         // Fetch attendance data
-        const fetchAttendance = axios.get(`/api/attendance?weekStart=${weekStart}`)
-            .then(res => {
-                if (res.data && res.data.length === 2) {
-                    setWeeklyStatus(res.data[0]);
-                    setOriginalWeeklyStatus(res.data[0]);
+        const fetchData = async () => {
+            try {
+                // First get user ID
+                const userIdResponse = await axios.get(`/api/userInfo/${user.keycloakId}`);
+                const userId = userIdResponse.data;
+                console.log('User ID:', userId);
+                
+                if (!userId) {
+                    console.error('User ID not found for keycloakId:', user.keycloakId);
+                    throw new Error('Kullanıcı ID bulunamadı');
                 }
-                console.log(res.data);
+
+                // Then fetch attendance data
+                const attendanceResponse = await axios.get(`/api/attendance/${weekStart}`);
+                const attendanceData = attendanceResponse.data;
+                
+                if (attendanceData && attendanceData.length === 2) {
+                    setWeeklyStatus(attendanceData[0]);
+                    setOriginalWeeklyStatus(attendanceData[0]);
+                }
+                console.log('Attendance data:', attendanceData);
+                
                 // Check if attendance is approved
-                if (res.data && res.data[1]) {
+                if (attendanceData && attendanceData[1]) {
                     setIsAttendanceApproved(true);
                 }
-            })
-            .catch(err => console.error('Fetch attendance failed', err));
 
-        // Fetch existing excuses
-        const fetchExcuses = axios.get('/api/excuse')
-            .then(res => {
-                setExistingExcuses(res.data);
-            })
-            .catch(console.error);
-
-        Promise.all([fetchAttendance, fetchExcuses])
-            .finally(() => {
+                // Fetch existing excuses
+                const excusesResponse = await axios.get('/api/excuse');
+                setExistingExcuses(excusesResponse.data);
+            } catch (error) {
+                console.error('Error fetching data:', error);
+            } finally {
                 setLoading(false);
-            });
-    }, [weekStart]);
+            }
+        };
+
+        fetchData();
+    }, [weekStart, user]);
 
     const handleStatusChange = async (dayIndex, newStatus) => {
         const oldStatus = weeklyStatus[dayIndex];
@@ -204,6 +224,11 @@ const EmployeeAttendanceRegistration = () => {
             return Swal.fire('Eksik bilgi','Lütfen tüm günleri doldurunuz.','warning');
         }
         
+        // Check if user is available
+        if (!user || !user.keycloakId) {
+            return Swal.fire('Hata', 'Kullanıcı bilgileri yüklenemedi. Lütfen sayfayı yenileyin.', 'error');
+        }
+        
         // Check if attendance was approved and has been modified
         const hasChanges = JSON.stringify(weeklyStatus) !== JSON.stringify(originalWeeklyStatus);
         const needsApprovalWarning = isAttendanceApproved && hasChanges;
@@ -247,12 +272,19 @@ const EmployeeAttendanceRegistration = () => {
                     await Promise.all(excusePromises);
                 }
 
+                // Get user ID first
+                const userIdResponse = await axios.get(`/api/userInfo/${user.keycloakId}`);
+                const userId = userIdResponse.data;
+                
+                if (!userId) {
+                    throw new Error('Kullanıcı ID bulunamadı');
+                }
+
                 // Sonra attendance'ı kaydet - isApproved false olacak
                 await axios.post('/api/attendance', { 
-                    userId: user.id,
+                    userId: userId, // Long ID
                     weekStart: weekStart,
-                    dates: weeklyStatus,
-                    isApproved: false
+                    dates: weeklyStatus
                 });
 
                 // Excuse listesini yenile
@@ -269,7 +301,9 @@ const EmployeeAttendanceRegistration = () => {
                 Swal.fire('Başarılı', 'Seçiminiz kaydedildi.', 'success');
             } catch (error) {
                 console.error('Kaydetme hatası:', error);
-                Swal.fire('Hata', 'Kayıt sırasında bir sorun oluştu.', 'error');
+                console.error('Error response:', error.response);
+                console.error('Error message:', error.message);
+                Swal.fire('Hata', 'Kayıt sırasında bir sorun oluştu: ' + (error.response?.data?.error || error.message), 'error');
             }
         }
     };
@@ -306,8 +340,16 @@ const EmployeeAttendanceRegistration = () => {
                         // State güncellemesi sonrası API çağrısı yap
                         setTimeout(async () => {
                             try {
+                                // Get user ID first
+                                const userIdResponse = await axios.get(`/api/userInfo/${user.keycloakId}`);
+                                const userId = userIdResponse.data;
+                                
+                                if (!userId) {
+                                    throw new Error('Kullanıcı ID bulunamadı');
+                                }
+                                
                                 await axios.post('/api/attendance', { 
-                                    userId: user.id,
+                                    userId: userId, // Long ID
                                     weekStart: weekStart,
                                     dates: newStatusArray
                                 });
@@ -398,8 +440,16 @@ const EmployeeAttendanceRegistration = () => {
                             // State güncellemesi sonrası API çağrısı yap
                             setTimeout(async () => {
                                 try {
+                                    // Get user ID first
+                                    const userIdResponse = await axios.get(`/api/userInfo/${user.keycloakId}`);
+                                    const userId = userIdResponse.data;
+                                    
+                                    if (!userId) {
+                                        throw new Error('Kullanıcı ID bulunamadı');
+                                    }
+                                    
                                     await axios.post('/api/attendance', { 
-                                        userId: user.id,
+                                        userId: userId, // Long ID
                                         weekStart: weekStart,
                                         dates: newStatusArray
                                     });

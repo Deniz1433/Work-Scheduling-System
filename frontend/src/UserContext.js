@@ -10,7 +10,10 @@ export const UserProvider = ({ children }) => {
   useEffect(() => {
     fetch('/api/user')
       .then(response => response.json())
-      .then(data => setUser(data))
+      .then(data => {
+        console.log('User data received:', data);
+        setUser(data);
+      })
       .catch(error => console.error('Hata:', error));
   }, []);
 

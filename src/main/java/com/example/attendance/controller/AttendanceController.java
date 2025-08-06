@@ -63,11 +63,10 @@ public class AttendanceController {
         }
     }
 
-    @PostMapping("/{id}/approve")
-    public ResponseEntity<?> approve(@PathVariable Long id, Principal principal) {
-        System.out.println("✅ Attendance approval request - ID: " + id + " by user: " + principal.getName());
-        Long userId = getUserIdFromPrincipal(principal);
-        service.approve(id, userId.toString());
+    @PostMapping("/{userId}/{weekStart}/approve")
+    public ResponseEntity<?> approve(@PathVariable Long userId,@PathVariable String weekStart, Principal principal) {
+        System.out.println("✅ Attendance approval request by user: " + principal.getName());
+        service.approve(userId, LocalDate.parse(weekStart));
         System.out.println("✅ Attendance approved successfully!");
         return ResponseEntity.ok().build();
     }
@@ -79,8 +78,8 @@ public class AttendanceController {
         return ResponseEntity.ok().build();
     }
 
-    @GetMapping
-    public ResponseEntity<ArrayList<Object>> getAttendanceData(Principal principal, String weekStart) {
+    @GetMapping("/{weekStart}")
+    public ResponseEntity<ArrayList<Object>> getAttendanceData(Principal principal, @PathVariable String weekStart) {
         Long userId = getUserIdFromPrincipal(principal);
         ArrayList<Object> attendanceResponse = service.fetch(userId, LocalDate.parse(weekStart));
         return ResponseEntity.ok(attendanceResponse);
@@ -91,16 +90,14 @@ public class AttendanceController {
             Principal principal,
             @RequestParam(required = false) String departmentId,
             @RequestParam(required = false) String roleId,
-            @RequestParam(required = false) String searchTerm,
-            @RequestParam(required = false) String attendanceStatus
+            @RequestParam(required = false) String searchTerm
     ) {
-        Long userId = getUserIdFromPrincipal(principal);
+        String keycloakId = principal.getName();
         List<TeamAttendanceDto> team = service.getTeamAttendanceWithFilters(
-            userId.toString(), 
+            keycloakId,
             departmentId, 
             roleId, 
-            searchTerm, 
-            attendanceStatus
+            searchTerm
         );
         return ResponseEntity.ok(team);
     }

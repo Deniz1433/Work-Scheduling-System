@@ -13,4 +13,5 @@ public interface UserRepository extends JpaRepository<User, Long> {
     List<User> findByRoleId(Long roleId);
     List<User> findByDepartmentId(Long departmentId);
     List<User> findByIsActive(Boolean isActive);
+    void deleteByKeycloakId(String keycloackId);
 }

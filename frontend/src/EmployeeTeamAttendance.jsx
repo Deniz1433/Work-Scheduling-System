@@ -53,6 +53,7 @@ const EmployeeTeamAttendance = ({ user }) => {
 
       const response = await fetch(`/api/attendance/team?${params.toString()}`);
       const data = await response.json();
+      console.log(data);
       setTeamState(data);
     }
     catch (err) {
@@ -185,21 +186,22 @@ const EmployeeTeamAttendance = ({ user }) => {
 
   const generateWeekDays = () => {
     const today = new Date();
-    const nextWeekStart = new Date(today);
     const day = today.getDay();
-    const diff = today.getDate() - day + (day === 0 ? -6 : 1) + 7; // +7 for next week
-    nextWeekStart.setDate(diff);
-
+    const currentMonday = new Date(today);
+    currentMonday.setDate(today.getDate() - day + (day === 0 ? -6 : 1));
+    const nextMonday = new Date(currentMonday);
+    nextMonday.setDate(currentMonday.getDate() + 7);
     const weekDays = [];
     for (let i = 0; i < 5; i++) {
-      const date = new Date(nextWeekStart);
-      date.setDate(nextWeekStart.getDate() + i);
+      const date = new Date(nextMonday);
+      date.setDate(nextMonday.getDate() + i);
       weekDays.push(date);
     }
     return weekDays;
   };
 
   const weekDays = generateWeekDays();
+  const weekStart = weekDays[0].toISOString().split('T')[0];
 
   // Devam durumu stillerini tanımlama
   const getAttendanceStyle = (status) => {
@@ -266,8 +268,10 @@ const EmployeeTeamAttendance = ({ user }) => {
   // Onaylama fonksiyonu
   const handleApprove = async (memberId) => {
     try {
-      const response = await axios.post(`/api/attendance/${memberId}/approve`);
+      
+      const response = await axios.post(`/api/attendance/${memberId}/${weekStart}/approve`);
       console.log(response);
+      
 
       if (employeeExcuses.length > 0) {
         for (const excuse of employeeExcuses) {
