@@ -7,7 +7,11 @@ import com.example.attendance.model.Excuse;
 import com.example.attendance.model.User;
 import com.example.attendance.repository.UserRepository;
 import com.example.attendance.service.AttendanceService;
+import com.example.attendance.service.EmailService;
 
+import jakarta.ws.rs.Path;
+
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,13 +25,14 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/attendance")
 public class AttendanceController {
-    private final AttendanceService service;
-    private final UserRepository userRepository;
+    @Autowired
+    private AttendanceService service;
+    @Autowired
+    private UserRepository userRepository;
+    @Autowired
+    private EmailService emailService;
 
-    public AttendanceController(AttendanceService service, UserRepository userRepository) {
-        this.service = service;
-        this.userRepository = userRepository;
-    }
+
 
     private Long getUserIdFromPrincipal(Principal principal) {
         String keycloakId = principal.getName();
@@ -61,6 +66,29 @@ public class AttendanceController {
             e.printStackTrace();
             return ResponseEntity.internalServerError().body("Error processing request: " + e.getMessage());
         }
+    }
+
+    @PostMapping("/{id}/editEmail")
+    public ResponseEntity<?> sendEmail(@PathVariable Long id, @RequestBody String explanation ,Principal principal){
+        User u = userRepository.findById(id).orElse(null);
+        User editor = userRepository.findByKeycloakId(principal.getName()).orElse(null);
+        if(u != null && editor != null){
+            try{
+                String explanationText = explanation.toString().replaceAll(".*\"explanation\":\"([^\"]+)\".*", "$1");
+                String body = "Ofis günleriniz " + editor.getFirstName() + " " + editor.getLastName() + " tarafından düzenlenmiştir. \nAçıklama: " + explanationText + "\nLütfen kontrol ediniz.";
+                emailService.sendEmail(u.getEmail(), "Ofis günleriniz düzenlendi", body);
+                return ResponseEntity.ok(Map.of("message", "Email sent successfully", "userId", id));
+            }
+            catch (Exception e) {
+                System.err.println("Error in controller: " + e.getMessage());
+                e.printStackTrace();
+                return ResponseEntity.internalServerError().body("Error processing request: " + e.getMessage());
+            }
+        }
+        else{
+            return ResponseEntity.internalServerError().body("User not found!");
+        }
+       
     }
 
     @PostMapping("/{userId}/{weekStart}/approve")

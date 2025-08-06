@@ -56,4 +56,8 @@ public class HolidayService {
         return holidayRepository.findAll();
     }
 
+    public List<Holiday> getHolidaysBetweenDates(LocalDate startDate, LocalDate endDate) {
+        return holidayRepository.findByCountryCodeAndDateBetween("TR", startDate, endDate);
+    }
+
 } 

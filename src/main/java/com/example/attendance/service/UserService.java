@@ -37,6 +37,10 @@ public class UserService {
             return userRepository.findAll().stream().map(this::toDto).collect(Collectors.toList());
       }
 
+      public List<User> getAllUsersAsEntities() {
+            return userRepository.findAll();
+      }
+
       public UserDto getUserById(Long id) {
             User user = userRepository.findById(id).orElseThrow(() -> new RuntimeException("User not found"));
             return toDto(user);

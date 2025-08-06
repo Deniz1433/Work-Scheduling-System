@@ -183,6 +183,7 @@ const EmployeeTeamAttendance = ({ user }) => {
   const [tempAttendance, setTempAttendance] = useState([]);
   const [editReason, setEditReason] = useState('');
   const [employeeExcuses, setEmployeeExcuses] = useState([]);
+  const [isEditLoading, setIsEditLoading] = useState(false);
 
   const generateWeekDays = () => {
     const today = new Date();
@@ -293,19 +294,36 @@ const EmployeeTeamAttendance = ({ user }) => {
 
   // Düzenleme fonksiyonu - Modal açma
   const handleEdit = async (memberId) => {
-    const member = teamState.find(m => m.id === memberId);
-    setEditingMember(member);
-    setTempAttendance([...member.attendance]);
-    const excuseInfo = await fetch(`/api/attendance/excuse/${memberId}`);
-    const excuseData = await excuseInfo.json();
-    setEmployeeExcuses(excuseData);
-    console.log(excuseData);
-    setEditReason(''); // Düzenleme sebebi başlangıçta boş
-    setIsEditModalOpen(true);
+    if (isEditLoading) return; // Eğer zaten loading durumundaysa, işlemi engelle
+    
+    setIsEditLoading(true);
+    try {
+      const member = teamState.find(m => m.id === memberId);
+      setEditingMember(member);
+      setTempAttendance([...member.attendance]);
+      const excuseInfo = await fetch(`/api/attendance/excuse/${memberId}`);
+      const excuseData = await excuseInfo.json();
+      setEmployeeExcuses(excuseData);
+      console.log(excuseData);
+      setEditReason(''); // Düzenleme sebebi başlangıçta boş
+      setIsEditModalOpen(true);
+    } catch (error) {
+      console.error('Edit modal açılırken hata:', error);
+      Swal.fire({
+        title: 'Hata',
+        text: 'Düzenleme modalı açılırken hata oluştu!',
+        icon: 'error'
+      });
+    } finally {
+      setIsEditLoading(false);
+    }
   };
 
   // Modal'daki değişiklikleri kaydetme
   const handleSaveChanges = async () => {
+    if (isEditLoading) return; // Eğer zaten loading durumundaysa, işlemi engelle
+    
+    setIsEditLoading(true);
     try {
       console.log('Sending request with data:', {
         userId: editingMember.id.toString(),
@@ -318,6 +336,11 @@ const EmployeeTeamAttendance = ({ user }) => {
         weekStart: weekDays[0].toISOString().split('T')[0],
         dates: tempAttendance
       });
+
+      const emailResponse = await axios.post(`/api/attendance/${editingMember.id}/editEmail`,{
+        explanation : editReason
+      });
+
       if(employeeExcuses.length > 0){
         for(let i = 0; i < 5; i++){
           if((editingMember.attendance[i] === 3 || editingMember.attendance[i] === 4) && tempAttendance[i] === 1 || tempAttendance[i] === 2){
@@ -331,13 +354,20 @@ const EmployeeTeamAttendance = ({ user }) => {
       console.log('API Response:', response);
       console.log('Response data:', response.data);
       console.log('Response status:', response.status);
+      console.log('Email Response', emailResponse);
 
     } catch (error) {
       console.error('API Error:', error);
       console.error('Error response:', error.response?.data);
       console.error('Error status:', error.response?.status);
-      alert('Değişiklikler kaydedilirken hata oluştu: ' + (error.response?.data?.message || error.message));
+      Swal.fire({
+        title: 'Hata',
+        text: 'Değişiklikler kaydedilirken hata oluştu: ' + (error.response?.data?.message || error.message),
+        icon: 'error'
+      });
       return; // Hata durumunda işlemi durdur
+    } finally {
+      setIsEditLoading(false);
     }
 
     if (editingMember && editReason.trim()) {
@@ -666,13 +696,14 @@ const EmployeeTeamAttendance = ({ user }) => {
                 </button>
                 <button
                   onClick={handleSaveChanges}
-                  disabled={!editReason.trim()}
-                  className={`px-4 py-2 rounded transition-colors ${editReason.trim()
-                    ? 'bg-blue-500 text-white hover:bg-blue-600'
-                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    }`}
+                  disabled={!editReason.trim() || isEditLoading}
+                  className={`px-4 py-2 rounded transition-colors ${
+                    !editReason.trim() || isEditLoading
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-blue-500 text-white hover:bg-blue-600'
+                  }`}
                 >
-                  Değişiklikleri Kaydet
+                  {isEditLoading ? 'Kaydediliyor...' : 'Değişiklikleri Kaydet'}
                 </button>
               </div>
             </div>
@@ -795,9 +826,14 @@ const EmployeeTeamAttendance = ({ user }) => {
                     <div className="flex gap-2 justify-center">
                       <button
                         onClick={() => handleEdit(member.id)}
-                        className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                        disabled={isEditLoading}
+                        className={`px-3 py-1 text-xs rounded transition-colors ${
+                          isEditLoading 
+                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                            : 'bg-blue-500 text-white hover:bg-blue-600'
+                        }`}
                       >
-                        Düzenle
+                        {isEditLoading ? 'Yükleniyor...' : 'Düzenle'}
                       </button>
                       {!(member.approved || member.isApproved) && (
                         <button
