@@ -28,7 +28,7 @@ public class RoleController {
             Role createdRole = roleService.createRole(role);
             return ResponseEntity.ok(createdRole);
         } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.badRequest().body(null);
         }
     }
 
@@ -38,7 +38,7 @@ public class RoleController {
             Role updatedRole = roleService.updateRole(id, role);
             return ResponseEntity.ok(updatedRole);
         } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.badRequest().body(null);
         }
     }
 
@@ -51,4 +51,5 @@ public class RoleController {
             return ResponseEntity.badRequest().build();
         }
     }
-} 
+}
+

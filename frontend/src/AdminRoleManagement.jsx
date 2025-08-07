@@ -1,32 +1,94 @@
 import React, { useState, useEffect } from 'react';
 
 const RoleManagement = () => {
-    // State'ler
     const [roles, setRoles] = useState([]);
+    const [permissions, setPermissions] = useState([]);
+    const [selectedRole, setSelectedRole] = useState(null);
+    const [selectedPermissions, setSelectedPermissions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [success, setSuccess] = useState(null);
-    const [selectedRole, setSelectedRole] = useState(null);
 
-    // Form state'leri
     const [newRole, setNewRole] = useState({ name: '', description: '' });
     const [editingRole, setEditingRole] = useState(null);
 
     useEffect(() => {
         fetchRoles();
+        fetchPermissions();
     }, []);
 
-    // Rolleri getir
+    // Roller
     const fetchRoles = async () => {
         try {
-            const response = await fetch('/api/roles');
-            if (!response.ok) throw new Error('Roller yüklenemedi');
-            const data = await response.json();
+            const res = await fetch('/api/roles');
+            if (!res.ok) throw new Error('Roller yüklenemedi');
+            const data = await res.json();
             setRoles(data);
+            if (data.length > 0) {
+                setSelectedRole(data[0]);
+                fetchRolePermissions(data[0].id);
+            }
         } catch (err) {
             setError(err.message);
         } finally {
             setLoading(false);
+        }
+    };
+
+    // Yetkiler
+    const fetchPermissions = async () => {
+        try {
+            const res = await fetch('/api/permissions', {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+                }
+            });
+            if (!res.ok) throw new Error('Yetkiler yüklenemedi');
+            const data = await res.json();
+            setPermissions(data);
+        } catch (err) {
+            setError(err.message);
+        }
+    };
+
+    // Seçilen rolün mevcut yetkilerini getir
+    const fetchRolePermissions = async (roleId) => {
+        try {
+            const res = await fetch(`/api/role-permissions/${roleId}`);
+            if (!res.ok) throw new Error('Rolün yetkileri getirilemedi');
+            const data = await res.json();
+            setSelectedPermissions(data.map(rp => rp.permission.id));
+        } catch (err) {
+            setError(err.message);
+        }
+    };
+
+    // Checkbox değişimi
+    const handlePermissionChange = (permId) => {
+        setSelectedPermissions(prev =>
+            prev.includes(permId)
+                ? prev.filter(id => id !== permId)
+                : [...prev, permId]
+        );
+    };
+
+    // Yetkileri kaydet (PUT ile güncelle)
+    const handleSavePermissions = async () => {
+        if (!selectedRole) return;
+        setError(null);
+        setSuccess(null);
+
+        try {
+            const res = await fetch(`/api/role-permissions/${selectedRole.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(selectedPermissions)
+            });
+
+            if (!res.ok) throw new Error('Yetkiler kaydedilemedi');
+            setSuccess('Yetkiler başarıyla kaydedildi!');
+        } catch (err) {
+            setError(err.message);
         }
     };
 
@@ -49,7 +111,7 @@ const RoleManagement = () => {
             });
 
             if (!response.ok) throw new Error('Rol eklenemedi');
-            
+
             setNewRole({ name: '', description: '' });
             setSuccess('Rol başarıyla eklendi!');
             fetchRoles();
@@ -72,7 +134,7 @@ const RoleManagement = () => {
             });
 
             if (!response.ok) throw new Error('Rol güncellenemedi');
-            
+
             setEditingRole(null);
             setSuccess('Rol başarıyla güncellendi!');
             fetchRoles();
@@ -88,7 +150,7 @@ const RoleManagement = () => {
         try {
             const response = await fetch(`/api/roles/${id}`, { method: 'DELETE' });
             if (!response.ok) throw new Error('Rol silinemedi');
-            
+
             setSuccess('Rol başarıyla silindi!');
             fetchRoles();
         } catch (err) {
@@ -96,279 +158,164 @@ const RoleManagement = () => {
         }
     };
 
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center min-h-screen">
-                <div className="text-lg">Yükleniyor...</div>
-            </div>
-        );
-    }
+    if (loading) return <div>Yükleniyor...</div>;
 
     return (
         <div className="flex flex-col items-center min-h-screen bg-gray-50 py-8">
             <h1 className="text-2xl font-bold mb-6 text-blue-800">Rol Yönetimi</h1>
-            
-            {error && (
-                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 w-full max-w-6xl">
-                    {error}
-                </div>
-            )}
-            
-            {success && (
-                <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4 w-full max-w-6xl">
-                    {success}
-                </div>
-            )}
 
-            <div className="w-full max-w-6xl">
-                <div className="flex gap-6">
-                    {/* Sol Taraf: Rol Yönetimi */}
-                    <div className="flex-1 bg-white rounded-xl shadow-lg p-6">
-                        <h2 className="text-lg font-semibold mb-4 text-blue-700">Rol Yönetimi</h2>
-                        
-                        {/* Rol Ekleme Formu */}
-                        {!editingRole ? (
-                            <form onSubmit={handleAddRole} className="mb-6">
-                                <div className="flex flex-col gap-4">
-                                    <input
-                                        type="text"
-                                        placeholder="Rol Adı"
-                                        value={newRole.name}
-                                        onChange={e => setNewRole({...newRole, name: e.target.value})}
-                                        className="border p-2 rounded focus:outline-blue-400"
-                                        required
-                                    />
-                                    <textarea
-                                        placeholder="Rol Açıklaması (opsiyonel)"
-                                        value={newRole.description}
-                                        onChange={e => setNewRole({...newRole, description: e.target.value})}
-                                        className="border p-2 rounded focus:outline-blue-400 resize-none"
-                                        rows="3"
-                                    />
-                                    <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700 transition-all">
-                                        + Rol Ekle
-                                    </button>
-                                </div>
-                            </form>
+            {error && <div className="bg-red-100 text-red-700 p-3 rounded mb-4 w-full max-w-6xl">{error}</div>}
+            {success && <div className="bg-green-100 text-green-700 p-3 rounded mb-4 w-full max-w-6xl">{success}</div>}
+
+            <div className="w-full max-w-6xl flex gap-6">
+                {/* Sol taraf */}
+                <div className="flex-1 bg-white p-6 rounded shadow">
+                    <h2 className="text-lg font-semibold mb-4">Rol Yönetimi</h2>
+
+                    {!editingRole ? (
+                        <form onSubmit={handleAddRole} className="mb-6">
+                            <input
+                                type="text"
+                                placeholder="Rol Adı"
+                                value={newRole.name}
+                                onChange={e => setNewRole({...newRole, name: e.target.value})}
+                                className="border p-2 rounded mb-2 w-full"
+                                required
+                            />
+                            <textarea
+                                placeholder="Rol Açıklaması (opsiyonel)"
+                                value={newRole.description}
+                                onChange={e => setNewRole({...newRole, description: e.target.value})}
+                                className="border p-2 rounded mb-2 w-full"
+                                rows="3"
+                            />
+                            <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded w-full">
+                                + Rol Ekle
+                            </button>
+                        </form>
+                    ) : (
+                        <form onSubmit={handleUpdateRole} className="mb-6">
+                            <input
+                                type="text"
+                                value={editingRole.name}
+                                onChange={e => setEditingRole({...editingRole, name: e.target.value})}
+                                className="border p-2 rounded mb-2 w-full"
+                                required
+                            />
+                            <textarea
+                                value={editingRole.description}
+                                onChange={e => setEditingRole({...editingRole, description: e.target.value})}
+                                className="border p-2 rounded mb-2 w-full"
+                                rows="3"
+                            />
+                            <div className="flex gap-2">
+                                <button type="submit" className="bg-green-600 text-white px-4 py-2 rounded flex-1">
+                                    Güncelle
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setEditingRole(null)}
+                                    className="bg-gray-500 text-white px-4 py-2 rounded flex-1"
+                                >
+                                    İptal
+                                </button>
+                            </div>
+                        </form>
+                    )}
+
+                    <h3 className="text-md font-semibold mb-3">Mevcut Roller</h3>
+                    <div className="space-y-2 max-h-96 overflow-y-auto">
+                        {roles.length === 0 ? (
+                            <p className="text-gray-500">Henüz rol eklenmemiş.</p>
                         ) : (
-                            <form onSubmit={handleUpdateRole} className="mb-6">
-                                <div className="flex flex-col gap-4">
-                                    <input
-                                        type="text"
-                                        placeholder="Rol Adı"
-                                        value={editingRole.name}
-                                        onChange={e => setEditingRole({...editingRole, name: e.target.value})}
-                                        className="border p-2 rounded focus:outline-blue-400"
-                                        required
-                                    />
-                                    <textarea
-                                        placeholder="Rol Açıklaması (opsiyonel)"
-                                        value={editingRole.description}
-                                        onChange={e => setEditingRole({...editingRole, description: e.target.value})}
-                                        className="border p-2 rounded focus:outline-blue-400 resize-none"
-                                        rows="3"
-                                    />
+                            roles.map((role) => (
+                                <div
+                                    key={role.id}
+                                    className={`flex items-center justify-between p-3 rounded cursor-pointer ${
+                                        selectedRole?.id === role.id ? 'bg-blue-100' : 'hover:bg-gray-100'
+                                    }`}
+                                    onClick={() => {
+                                        setSelectedRole(role);
+                                        fetchRolePermissions(role.id);
+                                    }}
+                                >
+                                    <div>
+                                        <h4 className="font-medium">{role.name}</h4>
+                                        {role.description && <p className="text-sm text-gray-600">{role.description}</p>}
+                                    </div>
                                     <div className="flex gap-2">
-                                        <button type="submit" className="bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 transition-all flex-1">
-                                            Güncelle
-                                        </button>
-                                        <button 
-                                            type="button" 
-                                            onClick={() => setEditingRole(null)}
-                                            className="bg-gray-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-gray-600 transition-all flex-1"
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setEditingRole(role);
+                                            }}
+                                            className="text-blue-600"
                                         >
-                                            İptal
+                                            ✏️
+                                        </button>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleDeleteRole(role.id);
+                                            }}
+                                            className="text-red-600"
+                                        >
+                                            🗑️
                                         </button>
                                     </div>
                                 </div>
-                            </form>
+                            ))
                         )}
-
-                        {/* Roller Listesi */}
-                        <div>
-                            <h3 className="text-md font-semibold mb-3 text-gray-700">Mevcut Roller</h3>
-                            <div className="space-y-2 max-h-96 overflow-y-auto">
-                                {roles.length === 0 ? (
-                                    <p className="text-gray-500">Henüz rol eklenmemiş.</p>
-                                ) : (
-                                    roles.map((role) => (
-                                        <div 
-                                            key={role.id} 
-                                            className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors ${
-                                                selectedRole?.id === role.id 
-                                                    ? 'bg-blue-100 border border-blue-300' 
-                                                    : 'bg-gray-50 hover:bg-gray-100'
-                                            }`}
-                                            onClick={() => setSelectedRole(role)}
-                                        >
-                                            <div className="flex-1">
-                                                <h4 className="font-medium text-gray-900">{role.name}</h4>
-                                                {role.description && (
-                                                    <p className="text-sm text-gray-600 mt-1">{role.description}</p>
-                                                )}
-                                            </div>
-                                            <div className="flex gap-2">
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setEditingRole(role);
-                                                    }}
-                                                    className="p-2 text-blue-600 hover:bg-blue-100 rounded transition-colors"
-                                                    title="Düzenle"
-                                                >
-                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                                    </svg>
-                                                </button>
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleDeleteRole(role.id);
-                                                    }}
-                                                    className="p-2 text-red-600 hover:bg-red-100 rounded transition-colors"
-                                                    title="Sil"
-                                                >
-                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                    </svg>
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ))
-                                )}
-                            </div>
-                        </div>
                     </div>
+                </div>
 
-                    {/* Sağ Taraf: Yetkiler */}
-                    <div className="flex-1 bg-white rounded-xl shadow-lg p-6">
-                        <h2 className="text-lg font-semibold mb-4 text-blue-700">Rol Yetkileri</h2>
-                        
-                        {selectedRole ? (
-                            <div>
-                                <div className="mb-4 p-3 bg-blue-50 rounded-lg">
-                                    <h3 className="font-semibold text-blue-800">{selectedRole.name}</h3>
-                                    {selectedRole.description && (
-                                        <p className="text-sm text-blue-600 mt-1">{selectedRole.description}</p>
+                {/* Sağ taraf */}
+                <div className="flex-1 bg-white p-6 rounded shadow">
+                    <h2 className="text-lg font-semibold mb-4">Rol Yetkileri</h2>
+
+                    {selectedRole && (
+                        <div className="mb-4 p-3 bg-blue-50 rounded">
+                            <h3 className="font-semibold text-blue-800">{selectedRole.name}</h3>
+                            {selectedRole.description && (
+                                <p className="text-sm text-blue-600">{selectedRole.description}</p>
+                            )}
+                        </div>
+                    )}
+
+                    {permissions.length === 0 ? (
+                        <p className="text-gray-500">Henüz yetki yok.</p>
+                    ) : (
+                        <div className="space-y-2">
+                            {permissions.map((perm) => (
+                                <label key={perm.id} className="flex items-center">
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedPermissions.includes(perm.id)}
+                                        onChange={() => handlePermissionChange(perm.id)}
+                                        disabled={!selectedRole}
+                                        className="mr-2"
+                                    />
+                                    {perm.name}
+                                    {perm.description && (
+                                        <span className="text-sm text-gray-500 ml-2">({perm.description})</span>
                                     )}
-                                </div>
-                                
-                                <div className="space-y-4">
-                                    <div>
-                                        <h4 className="font-medium text-gray-700 mb-2">Genel Yetkiler</h4>
-                                        <div className="space-y-2">
-                                            <label className="flex items-center">
-                                                <input type="checkbox" className="mr-2" />
-                                                Admin-all
-                                            </label>
-                                        </div>
-                                    </div>
-                                    
-                                    <div>
-                                        <h4 className="font-medium text-gray-700 mb-2">Görüntüleme Yetkileri</h4>
-                                        <div className="space-y-2">
-                                            <label className="flex items-center">
-                                                <input type="checkbox" className="mr-2" />
-                                                view child attendance
-                                            </label>
-                                            <label className="flex items-center">
-                                                <input type="checkbox" className="mr-2" />
-                                                view all attendance
-                                            </label>
-                                            <label className="flex items-center">
-                                                <input type="checkbox" className="mr-2" />
-                                                view dep attendance
-                                            </label>
-                                            <label className="flex items-center">
-                                                <input type="checkbox" className="mr-2" />
-                                                view all users
-                                            </label>
-                                            <label className="flex items-center">
-                                                <input type="checkbox" className="mr-2" />
-                                                view all dep
-                                            </label>
-                                        </div>
-                                    </div>
-                                    
-                                    <div>
-                                        <h4 className="font-medium text-gray-700 mb-2">Düzenleme Yetkileri</h4>
-                                        <div className="space-y-2">
-                                            <label className="flex items-center">
-                                                <input type="checkbox" className="mr-2" />
-                                                edit child attendance
-                                            </label>
-                                            <label className="flex items-center">
-                                                <input type="checkbox" className="mr-2" />
-                                                edit all attendance
-                                            </label>
-                                            <label className="flex items-center">
-                                                <input type="checkbox" className="mr-2" />
-                                                edit dep attendance
-                                            </label>
-                                            <label className="flex items-center">
-                                                <input type="checkbox" className="mr-2" />
-                                                edit user info
-                                            </label>
-                                            <label className="flex items-center">
-                                                <input type="checkbox" className="mr-2" />
-                                                edit user permission
-                                            </label>
-                                            <label className="flex items-center">
-                                                <input type="checkbox" className="mr-2" />
-                                                edit mazeret-sebebi
-                                            </label>
-                                            <label className="flex items-center">
-                                                <input type="checkbox" className="mr-2" />
-                                                edit tatil-gunleri
-                                            </label>
-                                            <label className="flex items-center">
-                                                <input type="checkbox" className="mr-2" />
-                                                edit dep-hiyerarşi
-                                            </label>
-                                        </div>
-                                    </div>
-                                    
-                                    <div>
-                                        <h4 className="font-medium text-gray-700 mb-2">Oluşturma Yetkileri</h4>
-                                        <div className="space-y-2">
-                                            <label className="flex items-center">
-                                                <input type="checkbox" className="mr-2" />
-                                                create user
-                                            </label>
-                                            <label className="flex items-center">
-                                                <input type="checkbox" className="mr-2" />
-                                                create dep
-                                            </label>
-                                            <label className="flex items-center">
-                                                <input type="checkbox" className="mr-2" />
-                                                create mazeret
-                                            </label>
-                                            <label className="flex items-center">
-                                                <input type="checkbox" className="mr-2" />
-                                                create tatil
-                                            </label>
-                                            <label className="flex items-center">
-                                                <input type="checkbox" className="mr-2" />
-                                                create role
-                                            </label>
-                                        </div>
-                                    </div>
-                                    
-                                    <div className="pt-4">
-                                        <button className="w-full bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 transition-all">
-                                            Yetkileri Kaydet
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="text-center text-gray-500 py-8">
-                                <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                </svg>
-                                <p>Yetkileri görüntülemek için sol taraftan bir rol seçin</p>
-                            </div>
-                        )}
+                                </label>
+                            ))}
+                        </div>
+                    )}
+
+                    <div className="pt-4">
+                        <button
+                            onClick={handleSavePermissions}
+                            disabled={!selectedRole}
+                            className={`w-full px-4 py-2 rounded font-semibold ${
+                                selectedRole
+                                    ? 'bg-green-600 text-white hover:bg-green-700'
+                                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                            }`}
+                        >
+                            Yetkileri Kaydet
+                        </button>
                     </div>
                 </div>
             </div>
@@ -376,4 +323,4 @@ const RoleManagement = () => {
     );
 };
 
-export default RoleManagement; 
+export default RoleManagement;
