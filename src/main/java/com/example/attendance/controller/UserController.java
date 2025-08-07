@@ -59,4 +59,14 @@ public class UserController {
             String keycloakId = SecurityContextHolder.getContext().getAuthentication().getName();
             return getOrCreateUserIdByKeycloakId(keycloakId);
       }
+
+      @GetMapping("/current")
+      public ResponseEntity<User> getCurrentUser() {
+            String keycloakId = SecurityContextHolder.getContext().getAuthentication().getName();
+            User user = userService.getUserByKeycloakId(keycloakId);
+            if (user != null) {
+                  return ResponseEntity.ok(user);
+            }
+            return ResponseEntity.notFound().build();
+      }
 }

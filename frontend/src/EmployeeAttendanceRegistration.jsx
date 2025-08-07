@@ -38,7 +38,15 @@ const EmployeeAttendanceRegistration = () => {
     const [loading, setLoading] = useState(true);
     const [isAttendanceApproved, setIsAttendanceApproved] = useState(false);
     const [originalWeeklyStatus, setOriginalWeeklyStatus] = useState([0, 0, 0, 0, 0]);
-    const minDay = 2;
+    // Get minDay from user's department, fallback to 2
+    const [minDay, setMinDay] = useState(2);
+
+    // Update minDay when user data changes
+    useEffect(() => {
+        if (user?.department?.minDays !== undefined) {
+            setMinDay(user.department.minDays);
+        }
+    }, [user]);
 
     // Next week's Monday→Friday
     const weekDays = (() => {
@@ -326,8 +334,8 @@ const EmployeeAttendanceRegistration = () => {
 
         if (result.isConfirmed) {
             try {
-                // Excuse'u sil
-                await axios.delete(`/api/excuse/${excuse.id}`);
+                // Kendi excuse'ını sil
+                await axios.delete(`/api/excuse/my/${excuse.id}`);
                 
                 // Attendance durumunu güncelle
                 const excuseDate = excuse.excuseDate;

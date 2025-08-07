@@ -35,6 +35,10 @@ public class ExcuseService {
         return repo.findByUserId(userId);
     }
 
+    public Excuse getExcuseById(Long excuseId) {
+        return repo.findById(excuseId).orElse(null);
+    }
+
     @Transactional
     public void deleteExcuse(Long userId, Long excuseId) {
         Excuse e = repo.findById(excuseId).orElseThrow();

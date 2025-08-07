@@ -26,7 +26,16 @@ public class RolePermissionService {
 
     // Belirli bir rolün tüm izinlerini getir
     public List<RolePermission> getPermissionsByRole(Long roleId) {
-        return rolePermissionRepository.findByRoleId(roleId);
+        try {
+            System.out.println("🔍 Service: Getting permissions for roleId: " + roleId);
+            List<RolePermission> result = rolePermissionRepository.findByRoleId(roleId);
+            System.out.println("✅ Service: Found " + result.size() + " permissions for roleId: " + roleId);
+            return result;
+        } catch (Exception e) {
+            System.err.println("❌ Service: Error in getPermissionsByRole: " + e.getMessage());
+            e.printStackTrace();
+            throw e;
+        }
     }
 
     // Tek izin ata
@@ -45,24 +54,37 @@ public class RolePermissionService {
 
     // Tüm yetkileri güncelle (öncekileri silip yenilerini ekler)
     public List<RolePermission> updateRolePermissions(Long roleId, List<Long> permissionIds) {
-        Role role = roleRepository.findById(roleId)
-                .orElseThrow(() -> new RuntimeException("Rol bulunamadı"));
+        try {
+            System.out.println("🔍 Service: Updating permissions for roleId: " + roleId + " with permissionIds: " + permissionIds);
+            
+            Role role = roleRepository.findById(roleId)
+                    .orElseThrow(() -> new RuntimeException("Rol bulunamadı"));
+            System.out.println("✅ Service: Found role: " + role.getName());
 
-        // Mevcut tüm izinleri sil
-        List<RolePermission> existing = rolePermissionRepository.findByRoleId(roleId);
-        rolePermissionRepository.deleteAll(existing);
+            // Mevcut tüm izinleri sil
+            List<RolePermission> existing = rolePermissionRepository.findByRoleId(roleId);
+            System.out.println("🔍 Service: Deleting " + existing.size() + " existing permissions");
+            rolePermissionRepository.deleteAll(existing);
 
-        // Yeni izinleri ekle
-        List<RolePermission> newRolePermissions = permissionIds.stream().map(pid -> {
-            Permission permission = permissionRepository.findById(pid)
-                    .orElseThrow(() -> new RuntimeException("Yetki bulunamadı: " + pid));
-            RolePermission rp = new RolePermission();
-            rp.setRole(role);
-            rp.setPermission(permission);
-            return rp;
-        }).collect(Collectors.toList());
+            // Yeni izinleri ekle
+            List<RolePermission> newRolePermissions = permissionIds.stream().map(pid -> {
+                Permission permission = permissionRepository.findById(pid)
+                        .orElseThrow(() -> new RuntimeException("Yetki bulunamadı: " + pid));
+                RolePermission rp = new RolePermission();
+                rp.setRole(role);
+                rp.setPermission(permission);
+                return rp;
+            }).collect(Collectors.toList());
 
-        return rolePermissionRepository.saveAll(newRolePermissions);
+            System.out.println("🔍 Service: Saving " + newRolePermissions.size() + " new permissions");
+            List<RolePermission> result = rolePermissionRepository.saveAll(newRolePermissions);
+            System.out.println("✅ Service: Successfully updated permissions for roleId: " + roleId);
+            return result;
+        } catch (Exception e) {
+            System.err.println("❌ Service: Error in updateRolePermissions: " + e.getMessage());
+            e.printStackTrace();
+            throw e;
+        }
     }
 
     // Tek izin sil

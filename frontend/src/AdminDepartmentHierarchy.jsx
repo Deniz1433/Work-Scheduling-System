@@ -32,7 +32,7 @@ const AdminDepartmentHierarchy = () => {
 
     // Reload and render saved hierarchy
     const reloadHierarchy = () => {
-        fetch('/admin/hierarchy/load', {
+        fetch('/api/admin/hierarchy/load', {
             method: 'GET',
             credentials: 'include'
         })
@@ -233,7 +233,7 @@ const AdminDepartmentHierarchy = () => {
         const csrf = getCsrfTokenFromCookie();
         if (csrf) headers['X-XSRF-TOKEN'] = csrf;
 
-        fetch('/admin/hierarchy/save', {
+        fetch('/api/admin/hierarchy/save', {
             method: 'POST',
             headers,
             credentials: 'include',

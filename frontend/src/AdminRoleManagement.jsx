@@ -84,7 +84,7 @@ const RoleManagement = () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(selectedPermissions)
             });
-
+            console.log(selectedPermissions)
             if (!res.ok) throw new Error('Yetkiler kaydedilemedi');
             setSuccess('Yetkiler başarıyla kaydedildi!');
         } catch (err) {

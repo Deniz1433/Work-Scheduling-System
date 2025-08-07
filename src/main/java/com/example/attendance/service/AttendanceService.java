@@ -7,8 +7,10 @@ import com.example.attendance.repository.AttendanceRepository;
 import com.example.attendance.repository.ExcuseRepository;
 import com.example.attendance.repository.UserRepository;
 import com.example.attendance.dto.TeamAttendanceDto;
+import com.example.attendance.security.CustomAnnotationEvaluator;
 
 import org.springframework.cglib.core.Local;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,11 +24,13 @@ public class AttendanceService {
     private final AttendanceRepository repo;
     private final ExcuseRepository excuseRepo;
     private final UserRepository userRepo;
+    private final CustomAnnotationEvaluator permissionEvaluator;
 
-    public AttendanceService(AttendanceRepository repo, UserRepository userRepo, ExcuseRepository excuseRepo) {
+    public AttendanceService(AttendanceRepository repo, UserRepository userRepo, ExcuseRepository excuseRepo, CustomAnnotationEvaluator permissionEvaluator) {
         this.repo = repo;
         this.userRepo = userRepo;
         this.excuseRepo = excuseRepo;
+        this.permissionEvaluator = permissionEvaluator;
     }
 
     
@@ -188,6 +192,120 @@ public class AttendanceService {
         return result;
     }
 
+    public List<TeamAttendanceDto> getTeamAttendanceWithFiltersAndPermissions(
+            String keycloakId,
+            Authentication authentication,
+            String departmentId, 
+            String roleId, 
+            String searchTerm
+    ) {
+        System.out.println("🔍 getTeamAttendanceWithFiltersAndPermissions called with:");
+        System.out.println("  - keycloakId: " + keycloakId);
+        System.out.println("  - departmentId: " + departmentId);
+        System.out.println("  - roleId: " + roleId);
+        System.out.println("  - searchTerm: " + searchTerm);
+        
+        // 1. Kullanıcıyı keycloakId'ye göre bul
+        User currentUser = userRepo.findByKeycloakId(keycloakId).orElse(null);
+        if (currentUser == null) {
+            System.out.println("❌ User not found for keycloakId: " + keycloakId);
+            return new ArrayList<>();
+        }
+        
+        System.out.println("✅ User found: " + currentUser.getFirstName() + " " + currentUser.getLastName());
+
+        // 2. Tüm kullanıcıları al
+        List<User> allUsers = userRepo.findAll();
+        System.out.println("🔍 Total users in system: " + allUsers.size());
+
+        // 3. Yetki kontrolü yaparak hangi kullanıcıları görebileceğini belirle
+        List<User> authorizedUsers = allUsers.stream()
+                .filter(user -> permissionEvaluator.canViewAttendance(authentication, user.getId()))
+                .collect(Collectors.toList());
+        
+        System.out.println("🔍 Users after permission check: " + authorizedUsers.size());
+
+        // 4. Filtreleri uygula
+        List<User> filteredUsers = authorizedUsers.stream()
+                .filter(user -> {
+                    // Departman filtresi
+                    if (departmentId != null && !departmentId.isEmpty()) {
+                        String[] deptIds = departmentId.split(",");
+                        boolean hasMatchingDept = false;
+                        for (String deptId : deptIds) {
+                            if (user.getDepartment() != null && user.getDepartment().getId().toString().equals(deptId.trim())) {
+                                hasMatchingDept = true;
+                                break;
+                            }
+                        }
+                        if (!hasMatchingDept) return false;
+                    }
+                    
+                    // Rol filtresi
+                    if (roleId != null && !roleId.isEmpty()) {
+                        String[] roleIds = roleId.split(",");
+                        boolean hasMatchingRole = false;
+                        for (String rId : roleIds) {
+                            if (user.getRole() != null && user.getRole().getId().toString().equals(rId.trim())) {
+                                hasMatchingRole = true;
+                                break;
+                            }
+                        }
+                        if (!hasMatchingRole) return false;
+                    }
+                    
+                    // Arama filtresi
+                    if (searchTerm != null && !searchTerm.trim().isEmpty()) {
+                        String search = searchTerm.toLowerCase().trim();
+                        String fullName = (user.getFirstName() + " " + user.getLastName()).toLowerCase();
+                        String email = user.getEmail() != null ? user.getEmail().toLowerCase() : "";
+                        
+                        if (!fullName.contains(search) && !email.contains(search)) {
+                            return false;
+                        }
+                    }
+                    
+                    return true;
+                })
+                .collect(Collectors.toList());
+
+        System.out.println("🔍 Users after filtering: " + filteredUsers.size());
+
+        // 5. Gelecek haftanın başlangıç tarihini hesapla
+        LocalDate nextWeekStart = calculateNextWeekStart();
+
+        // 6. Her kullanıcı için attendance verilerini al ve DTO'ya dönüştür
+        List<TeamAttendanceDto> result = filteredUsers.stream()
+                .map(user -> {
+                    TeamAttendanceDto dto = new TeamAttendanceDto();
+                    dto.setId(user.getId());
+                    dto.setName(user.getFirstName());
+                    dto.setSurname(user.getLastName());
+                    dto.setDepartment(user.getDepartment() != null ? user.getDepartment().getName() : "N/A");
+                    dto.setDepartmentId(user.getDepartment() != null ? user.getDepartment().getId() : null);
+
+                    Attendance attendance = repo.findByUserIdAndWeekStart(user.getId(), nextWeekStart);
+                    if (attendance != null) {
+                        List<Integer> attendanceIntegers = attendance.getDates().stream()
+                                .map(day -> day) 
+                                .collect(Collectors.toList());
+                        dto.setAttendance(attendanceIntegers);
+                        dto.setApproved(attendance.isApproved());
+                    } else {
+                        // Attendance kaydı yoksa varsayılan değerler
+                        dto.setAttendance(List.of(0,0,0,0,0));
+                        dto.setApproved(false);
+                    }
+
+                    dto.setEmployeeExcuse(null);
+                    return dto;
+                })
+                .collect(Collectors.toList());
+                
+        System.out.println("✅ Returning " + result.size() + " team members with permissions");
+        return result;
+    }
+
     private LocalDate calculateNextWeekStart() {
         LocalDate today = LocalDate.now();
         int dayOfWeek = today.getDayOfWeek().getValue(); // 1=Pazartesi, 7=Pazar
@@ -262,6 +380,10 @@ public class AttendanceService {
         Excuse excuse = excuseRepo.findById(id).orElseThrow(() -> new RuntimeException("Excuse not found"));
         excuse.setIsApproved(true);
         excuseRepo.save(excuse);
+    }
+    
+    public Excuse getExcuseById(Long excuseId) {
+        return excuseRepo.findById(excuseId).orElse(null);
     }
     
     public List<Attendance> getAllAttendance() {

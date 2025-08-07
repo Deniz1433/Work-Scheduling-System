@@ -7,11 +7,14 @@ import java.util.Set;
 import org.keycloak.TokenVerifier;
 import org.keycloak.common.VerificationException;
 import org.keycloak.representations.AccessToken;
-
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.access.expression.method.DefaultMethodSecurityExpressionHandler;
+import org.springframework.security.access.expression.method.MethodSecurityExpressionHandler;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
@@ -23,17 +26,25 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.logout.LogoutSuccessHandler;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import com.example.attendance.security.CustomAnnotationEvaluator;
+
 @Configuration
-@EnableMethodSecurity
+@EnableWebSecurity
+@EnableMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
+
+    @Autowired
+    private CustomAnnotationEvaluator customAnnotationEvaluator;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 // disable CSRF for our stateless API endpoints
                 .csrf(csrf -> csrf
-                        .ignoringRequestMatchers("/api/attendance/**", "/api/excuse/**", "/api/admin/**", "/api/departments/**", "/api/roles/**", "/api/holidays/**","/api/permissions/**","/api/role-permissions/**")
-                )
+                        .ignoringRequestMatchers("/api/attendance/**",
+                                "/api/admin/hierarchy/**", "/api/excuse/**",
+                                "/api/admin/**", "/api/departments/**", "/api/roles/**",
+                                "/api/role-permissions/**", "/api/holidays/**", "/api/user/**", "/api/userInfo/**"))
                 .authorizeHttpRequests(auth -> auth
                         // allow React static assets
                         .requestMatchers(
@@ -44,48 +55,24 @@ public class SecurityConfig {
                                 "/images/**"
                         ).permitAll()
 
-                        // UI entrypoints under /admin/**
-                        .requestMatchers("/admin/**")
-                        .hasAnyAuthority(
-                                "ROLE_attendance_client_admin",
-                                "ROLE_attendance_client_superadmin"
-                        )
-
-                        // our admin REST API
-                        .requestMatchers("/api/admin/**")
-                        .hasAnyAuthority(
-                                "ROLE_attendance_client_admin",
-                                "ROLE_attendance_client_superadmin"
-                        )
-
-                        // departments API - temporarily allow all users for testing
-                        .requestMatchers("/api/departments/**")
-                        .permitAll()
-
-                        // attendance & excuse APIs require any authenticated user
-                        .requestMatchers("/api/attendance/**", "/api/excuse/**")
-                        .authenticated()
-
-                        // everything else also needs authentication
+                        // diğer tüm istekler için authentication kontrolü
                         .anyRequest()
                         .authenticated()
                 )
                 .oauth2Login(oauth -> oauth
                         .defaultSuccessUrl("/", true)
-                        .userInfoEndpoint(userInfo ->
-                                userInfo.oidcUserService(oidcUserServiceWithTokenVerifier())
-                        )
-                )
+                        .userInfoEndpoint(userInfo -> userInfo
+                                .oidcUserService(oidcUserServiceWithTokenVerifier())))
                 .logout(logout -> logout
                         .logoutSuccessHandler(keycloakLogoutSuccessHandler())
                         .invalidateHttpSession(true)
                         .clearAuthentication(true)
-                        .deleteCookies("JSESSIONID")
-                );
+                        .deleteCookies("JSESSIONID"));
 
         return http.build();
     }
 
+    // Bu method'u değiştirmeyin - authentication için gerekli
     private OAuth2UserService<OidcUserRequest, OidcUser> oidcUserServiceWithTokenVerifier() {
         OidcUserService delegate = new OidcUserService();
         return userRequest -> {
@@ -97,33 +84,32 @@ public class SecurityConfig {
                         .create(tokenString, AccessToken.class)
                         .getToken();
 
-                // realm-level roles
+                // realm-level roles - bunları koruyun ama kullanmayın
                 if (kcToken.getRealmAccess() != null) {
-                    kcToken.getRealmAccess().getRoles().forEach(r ->
-                            mapped.add(new SimpleGrantedAuthority("ROLE_realm_" + r))
-                    );
+                    kcToken.getRealmAccess().getRoles().forEach(
+                            r -> mapped.add(new SimpleGrantedAuthority("ROLE_realm_" + r)));
                 }
 
-                // client-specific roles
+                // client-specific roles - bunları koruyun ama kullanmayın
                 Map<String, AccessToken.Access> resources = kcToken.getResourceAccess();
                 if (resources != null && resources.containsKey("attendance-client")) {
-                    resources.get("attendance-client").getRoles().forEach(r ->
-                            mapped.add(new SimpleGrantedAuthority(
-                                    "ROLE_attendance_client_" + r.replace('-', '_')
-                            ))
-                    );
+                    resources.get("attendance-client").getRoles()
+                            .forEach(r -> mapped.add(new SimpleGrantedAuthority(
+                                    "ROLE_attendance_client_"
+                                            + r.replace('-', '_'))));
                 }
-            } catch (VerificationException ignored) { }
+            } catch (VerificationException ignored) {
+            }
 
             OidcUser userInfo = delegate.loadUser(userRequest);
             return new DefaultOidcUser(
                     mapped,
                     userInfo.getIdToken(),
-                    userInfo.getUserInfo()
-            );
+                    userInfo.getUserInfo());
         };
     }
 
+    // Bu method'u değiştirmeyin - logout için gerekli
     private LogoutSuccessHandler keycloakLogoutSuccessHandler() {
         return (request, response, auth) -> {
             String redirectUri = "http://localhost:8080/";
@@ -142,4 +128,12 @@ public class SecurityConfig {
             response.sendRedirect(logoutUrl);
         };
     }
+
+    @Bean
+    public MethodSecurityExpressionHandler methodSecurityExpressionHandler() {
+        DefaultMethodSecurityExpressionHandler expressionHandler = new DefaultMethodSecurityExpressionHandler();
+        expressionHandler.setPermissionEvaluator(customAnnotationEvaluator);
+        return expressionHandler;
+    }
 }
+

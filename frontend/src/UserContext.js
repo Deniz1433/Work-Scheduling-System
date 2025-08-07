@@ -8,7 +8,7 @@ export const UserProvider = ({ children }) => {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    fetch('/api/user')
+    fetch('/api/userInfo/current')
       .then(response => response.json())
       .then(data => {
         console.log('User data received:', data);

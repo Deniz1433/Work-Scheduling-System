@@ -15,20 +15,69 @@ const EmployeeTeamAttendance = ({ user }) => {
   const [selectedDepartments, setSelectedDepartments] = useState([]);
   const [selectedRoles, setSelectedRoles] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [userPermissions, setUserPermissions] = useState(null);
+  const [editPermissions, setEditPermissions] = useState(null);
+  const [memberEditPermissions, setMemberEditPermissions] = useState({});
+  const [filteredDepartments, setFilteredDepartments] = useState([]);
+  const [filteredRoles, setFilteredRoles] = useState([]);
 
-  // Departman ve rol verilerini yükle
+  // Kullanıcı yetkilerini yükle
+  const fetchUserPermissions = async () => {
+    try {
+      const [permissionsResponse, editPermissionsResponse] = await Promise.all([
+        fetch('/api/attendance/user-permissions'),
+        fetch('/api/attendance/edit-permissions')
+      ]);
+      
+      const permissions = await permissionsResponse.json();
+      const editPerms = await editPermissionsResponse.json();
+      
+      setUserPermissions(permissions);
+      setEditPermissions(editPerms);
+      console.log('User permissions:', permissions);
+      console.log('Edit permissions:', editPerms);
+    } catch (err) {
+      console.error('Kullanıcı yetkileri yüklenemedi:', err);
+    }
+  };
+
+  // Departman ve rol verilerini yükle (yetkilere göre filtrelenmiş)
   const fetchFilterData = async () => {
     try {
-      const [departmentsResponse, rolesResponse] = await Promise.all([
-        fetch('/api/departments'),
+      const [rolesResponse] = await Promise.all([
         fetch('/api/roles')
       ]);
       
-      const departmentsData = await departmentsResponse.json();
       const rolesData = await rolesResponse.json();
       
-      setDepartments(departmentsData);
+      // Yetkilere göre departmanları filtrele
+      let filteredDepts = [];
+      if (userPermissions) {
+        if (userPermissions.canViewAll) {
+          // Tüm departmanları göster
+          const departmentsResponse = await fetch('/api/departments');
+          filteredDepts = await departmentsResponse.json();
+        } else if (userPermissions.canViewChild) {
+          // Child departmanları göster
+          const childDepartmentsResponse = await fetch('/api/departments/child-departments');
+          filteredDepts = await childDepartmentsResponse.json();
+        } else if (userPermissions.canViewDepartment) {
+          // Sadece kendi departmanını göster
+          const departmentsResponse = await fetch('/api/departments');
+          const departmentsData = await departmentsResponse.json();
+          filteredDepts = departmentsData.filter(dept => 
+            dept.id === userPermissions.userDepartmentId
+          );
+        } else {
+          // Hiçbir yetki yoksa boş liste
+          filteredDepts = [];
+        }
+      }
+      
+      setDepartments(filteredDepts);
+      setFilteredDepartments(filteredDepts);
       setRoles(rolesData);
+      setFilteredRoles(rolesData);
     } catch (err) {
       console.error('Filtre verileri yüklenemedi:', err);
     }
@@ -55,6 +104,24 @@ const EmployeeTeamAttendance = ({ user }) => {
       const data = await response.json();
       console.log(data);
       setTeamState(data);
+      
+      // Takım üyelerinin edit yetkilerini kontrol et
+      if (data.length > 0) {
+        const userIds = data.map(member => member.id);
+        const editPermissionsResponse = await fetch('/api/attendance/check-edit-permissions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(userIds)
+        });
+        
+        if (editPermissionsResponse.ok) {
+          const permissions = await editPermissionsResponse.json();
+          setMemberEditPermissions(permissions);
+          console.log('Member edit permissions:', permissions);
+        }
+      }
     }
     catch (err) {
       setError('Veri alınamadı.');
@@ -171,10 +238,34 @@ const EmployeeTeamAttendance = ({ user }) => {
     }
   };
 
-  // Component mount olduğunda filtre verilerini yükle ve tüm kullanıcıları getir
+  // Component mount olduğunda kullanıcı yetkilerini yükle, sonra filtre verilerini yükle
   useEffect(() => {
-    fetchFilterData();
+    const initializeData = async () => {
+      await fetchUserPermissions();
+    };
+    initializeData();
   }, []);
+
+  // Kullanıcı yetkileri yüklendiğinde filtre verilerini yükle
+  useEffect(() => {
+    if (userPermissions) {
+      fetchFilterData();
+    }
+  }, [userPermissions]);
+
+  // Kullanıcının belirli bir takım üyesini düzenleyip düzenleyemeyeceğini kontrol eder
+  const canEditMember = (member) => {
+    // Backend'den gelen kesin yetki kontrolü
+    if (memberEditPermissions[member.id.toString()] !== undefined) {
+      return memberEditPermissions[member.id.toString()];
+    }
+    
+    // Fallback: Kendi attendance'ını her zaman düzenleyebilir
+    if (user && user.id === member.id) return true;
+    
+    // Yetki bilgisi yoksa false döndür
+    return false;
+  };
 
 
 
@@ -269,6 +360,16 @@ const EmployeeTeamAttendance = ({ user }) => {
   // Onaylama fonksiyonu
   const handleApprove = async (memberId) => {
     try {
+      // Yetki kontrolü yap
+      const member = teamState.find(m => m.id === memberId);
+      if (!member || !canEditMember(member)) {
+        Swal.fire({
+          title: 'Yetki Hatası',
+          text: 'Bu kullanıcının attendance bilgisini onaylama yetkiniz yok.',
+          icon: 'error'
+        });
+        return;
+      }
       
       const response = await axios.post(`/api/attendance/${memberId}/${weekStart}/approve`);
       console.log(response);
@@ -287,7 +388,19 @@ const EmployeeTeamAttendance = ({ user }) => {
 
     } catch (error) {
       console.error('API Error:', error);
-      alert('Onaylama işlemi sırasında hata oluştu: ' + (error.response?.data?.message || error.message));
+      if (error.response?.status === 403) {
+        Swal.fire({
+          title: 'Yetki Hatası',
+          text: 'Bu kullanıcının attendance bilgisini onaylama yetkiniz yok.',
+          icon: 'error'
+        });
+      } else {
+        Swal.fire({
+          title: 'Hata',
+          text: 'Onaylama işlemi sırasında hata oluştu: ' + (error.response?.data?.message || error.message),
+          icon: 'error'
+        });
+      }
       return;
     }
   };
@@ -296,9 +409,19 @@ const EmployeeTeamAttendance = ({ user }) => {
   const handleEdit = async (memberId) => {
     if (isEditLoading) return; // Eğer zaten loading durumundaysa, işlemi engelle
     
+    // Yetki kontrolü yap
+    const member = teamState.find(m => m.id === memberId);
+    if (!member || !canEditMember(member)) {
+      Swal.fire({
+        title: 'Yetki Hatası',
+        text: 'Bu kullanıcının attendance bilgisini düzenleme yetkiniz yok.',
+        icon: 'error'
+      });
+      return;
+    }
+    
     setIsEditLoading(true);
     try {
-      const member = teamState.find(m => m.id === memberId);
       setEditingMember(member);
       setTempAttendance([...member.attendance]);
       const excuseInfo = await fetch(`/api/attendance/excuse/${memberId}`);
@@ -328,25 +451,25 @@ const EmployeeTeamAttendance = ({ user }) => {
       console.log('Sending request with data:', {
         userId: editingMember.id.toString(),
         weekStart: weekDays[0].toISOString().split('T')[0],
-        dates: tempAttendance
+        dates: tempAttendance,
+        explanation: editReason
       });
 
+      // Birleştirilmiş endpoint - attendance güncelleme ve e-posta gönderme
       const response = await axios.post(`/api/attendance/${editingMember.id}`, {
         userId: editingMember.id.toString(),
         weekStart: weekDays[0].toISOString().split('T')[0],
-        dates: tempAttendance
+        dates: tempAttendance,
+        explanation: editReason
       });
 
-      const emailResponse = await axios.post(`/api/attendance/${editingMember.id}/editEmail`,{
-        explanation : editReason
-      });
-
+      // Excuse silme işlemi (eğer gerekirse)
       if(employeeExcuses.length > 0){
         for(let i = 0; i < 5; i++){
-          if((editingMember.attendance[i] === 3 || editingMember.attendance[i] === 4) && tempAttendance[i] === 1 || tempAttendance[i] === 2){
-            console.log(employeeExcuses[i]);
+          if((editingMember.attendance[i] === 3 || editingMember.attendance[i] === 4) && (tempAttendance[i] === 1 || tempAttendance[i] === 2)){
+            console.log('Deleting excuse:', employeeExcuses[i]);
             const responseExcuseDelete = await axios.delete(`/api/excuse/${employeeExcuses[i].id}`);
-            console.log(responseExcuseDelete);
+            console.log('Excuse delete response:', responseExcuseDelete);
           }
         }
       }
@@ -354,23 +477,7 @@ const EmployeeTeamAttendance = ({ user }) => {
       console.log('API Response:', response);
       console.log('Response data:', response.data);
       console.log('Response status:', response.status);
-      console.log('Email Response', emailResponse);
 
-    } catch (error) {
-      console.error('API Error:', error);
-      console.error('Error response:', error.response?.data);
-      console.error('Error status:', error.response?.status);
-      Swal.fire({
-        title: 'Hata',
-        text: 'Değişiklikler kaydedilirken hata oluştu: ' + (error.response?.data?.message || error.message),
-        icon: 'error'
-      });
-      return; // Hata durumunda işlemi durdur
-    } finally {
-      setIsEditLoading(false);
-    }
-
-    if (editingMember && editReason.trim()) {
       // Başarılı düzenleme sonrası verileri yeniden çek
       await fetchTeamData();
 
@@ -382,15 +489,21 @@ const EmployeeTeamAttendance = ({ user }) => {
       // Başarı mesajı
       Swal.fire({
         title: 'Başarılı',
-        text: 'Değişiklikler kaydedildi!',
+        text: 'Değişiklikler kaydedildi ve e-posta gönderildi!',
         icon: 'success'
       });
-    } else if (!editReason.trim()) {
+
+    } catch (error) {
+      console.error('API Error:', error);
+      console.error('Error response:', error.response?.data);
+      console.error('Error status:', error.response?.status);
       Swal.fire({
         title: 'Hata',
-        text: 'Lütfen düzenleme sebebini belirtin.',
+        text: 'Değişiklikler kaydedilirken hata oluştu: ' + (error.response?.data?.message || error.message),
         icon: 'error'
       });
+    } finally {
+      setIsEditLoading(false);
     }
   };
 
@@ -441,45 +554,56 @@ const EmployeeTeamAttendance = ({ user }) => {
              <label className="block text-sm font-medium text-gray-700 mb-2">
                Departman
              </label>
-             <Select
-               isMulti
-               value={selectedDepartments}
-               onChange={setSelectedDepartments}
-               options={departments.map(dept => ({ value: dept.id, label: dept.name }))}
-               placeholder="Departman seçin..."
-               className="text-sm"
-               classNamePrefix="select"
-               noOptionsMessage={() => "Departman bulunamadı"}
-               isClearable={true}
-               isSearchable={true}
-               styles={{
-                 control: (provided, state) => ({
-                   ...provided,
-                   borderColor: state.isFocused ? '#3b82f6' : '#d1d5db',
-                   boxShadow: state.isFocused ? '0 0 0 1px #3b82f6' : 'none',
-                   '&:hover': {
-                     borderColor: '#3b82f6'
-                   }
-                 }),
-                 multiValue: (provided) => ({
-                   ...provided,
-                   backgroundColor: '#3b82f6',
-                   color: 'white'
-                 }),
-                 multiValueLabel: (provided) => ({
-                   ...provided,
-                   color: 'white'
-                 }),
-                 multiValueRemove: (provided) => ({
-                   ...provided,
-                   color: 'white',
-                   '&:hover': {
-                     backgroundColor: '#2563eb',
+             {userPermissions && (
+               <Select
+                 isMulti
+                 value={selectedDepartments}
+                 onChange={setSelectedDepartments}
+                 options={filteredDepartments.map(dept => ({ value: dept.id, label: dept.name }))}
+                 placeholder={
+                   userPermissions.canViewAll ? "Tüm departmanlar" :
+                   userPermissions.canViewChild ? "Alt departmanlar" :
+                   userPermissions.canViewDepartment ? "Kendi departmanınız" :
+                   "Yetkiniz yok"
+                 }
+                 className="text-sm"
+                 classNamePrefix="select"
+                 noOptionsMessage={() => "Departman bulunamadı"}
+                 isClearable={true}
+                 isSearchable={true}
+                 isDisabled={!userPermissions.canViewAll && !userPermissions.canViewChild && !userPermissions.canViewDepartment}
+                 styles={{
+                   control: (provided, state) => ({
+                     ...provided,
+                     borderColor: state.isFocused ? '#3b82f6' : '#d1d5db',
+                     boxShadow: state.isFocused ? '0 0 0 1px #3b82f6' : 'none',
+                     '&:hover': {
+                       borderColor: '#3b82f6'
+                     }
+                   }),
+                   multiValue: (provided) => ({
+                     ...provided,
+                     backgroundColor: '#3b82f6',
                      color: 'white'
-                   }
-                 })
-               }}
-             />
+                   }),
+                   multiValueLabel: (provided) => ({
+                     ...provided,
+                     color: 'white'
+                   }),
+                   multiValueRemove: (provided) => ({
+                     ...provided,
+                     color: 'white',
+                     '&:hover': {
+                       backgroundColor: '#2563eb',
+                       color: 'white'
+                     }
+                   })
+                 }}
+               />
+             )}
+             {!userPermissions && (
+               <div className="text-sm text-gray-500">Yetkiler yükleniyor...</div>
+             )}
            </div>
 
            {/* Rol Filtresi */}
@@ -714,9 +838,14 @@ const EmployeeTeamAttendance = ({ user }) => {
       <div className="mb-6">
         <div className="flex justify-between items-center mb-4">
                      <h2 className="text-xl">
-             {selectedDepartments.length > 0 || selectedRoles.length > 0 || searchTerm.trim()
-               ? 'Filtrelenmiş Takım Verileri'
-               : 'Tüm Takım Verileri'
+             {userPermissions ? (
+               selectedDepartments.length > 0 || selectedRoles.length > 0 || searchTerm.trim()
+                 ? 'Filtrelenmiş Takım Verileri'
+                 : userPermissions.canViewAll ? 'Tüm Takım Verileri' :
+                   userPermissions.canViewChild ? 'Alt Departman Takım Verileri' :
+                   userPermissions.canViewDepartment ? 'Departman Takım Verileri' :
+                   'Yetkiniz Yok'
+             ) : 'Yükleniyor...'
              }
            </h2>
           <div className="flex items-center gap-4">
@@ -734,16 +863,65 @@ const EmployeeTeamAttendance = ({ user }) => {
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2 mb-4">
-          {user?.departmentId && (
-            <span className="text-sm text-gray-600">
-              Departman ID: {user.departmentId}
-            </span>
-          )}
-        </div>
+                <div className="flex items-center gap-2 mb-4">
+           {user?.departmentId && (
+             <span className="text-sm text-gray-600">
+               Departman ID: {user.departmentId}
+             </span>
+           )}
+                       {userPermissions && (
+              <div className="flex items-center gap-4 text-sm">
+                <span className="text-gray-600">Görüntüleme Yetkileri:</span>
+                {userPermissions.canViewAll && (
+                  <span className="px-2 py-1 bg-green-100 text-green-800 rounded">Tüm Görüntüleme</span>
+                )}
+                {userPermissions.canViewChild && (
+                  <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded">Alt Departman Görüntüleme</span>
+                )}
+                {userPermissions.canViewDepartment && (
+                  <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded">Departman Görüntüleme</span>
+                )}
+                {!userPermissions.canViewAll && !userPermissions.canViewChild && !userPermissions.canViewDepartment && (
+                  <span className="px-2 py-1 bg-red-100 text-red-800 rounded">Görüntüleme Yetkisi Yok</span>
+                )}
+              </div>
+            )}
+            {editPermissions && (
+              <div className="flex items-center gap-4 text-sm">
+                <span className="text-gray-600">Düzenleme Yetkileri:</span>
+                {editPermissions.canEditAll && (
+                  <span className="px-2 py-1 bg-green-100 text-green-800 rounded">Tüm Düzenleme</span>
+                )}
+                {editPermissions.canEditChild && (
+                  <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded">Alt Departman Düzenleme</span>
+                )}
+                {editPermissions.canEditDepartment && (
+                  <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded">Departman Düzenleme</span>
+                )}
+                {!editPermissions.canEditAll && !editPermissions.canEditChild && !editPermissions.canEditDepartment && (
+                  <span className="px-2 py-1 bg-red-100 text-red-800 rounded">Düzenleme Yetkisi Yok</span>
+                )}
+              </div>
+            )}
+         </div>
       </div>
 
-      {teamState.length === 0 ? (
+      {!userPermissions ? (
+        <div className="bg-white border rounded-lg p-8 text-center">
+          <div className="text-gray-500 mb-4">
+            <div className="text-4xl mb-2">⏳</div>
+            <div className="text-lg font-medium">Yetkiler yükleniyor...</div>
+          </div>
+        </div>
+      ) : !userPermissions.canViewAll && !userPermissions.canViewChild && !userPermissions.canViewDepartment ? (
+        <div className="bg-white border rounded-lg p-8 text-center">
+          <div className="text-red-500 mb-4">
+            <div className="text-4xl mb-2">🚫</div>
+            <div className="text-lg font-medium">Görüntüleme Yetkiniz Yok</div>
+            <div className="text-sm">Takım verilerini görüntülemek için gerekli yetkilere sahip değilsiniz.</div>
+          </div>
+        </div>
+      ) : teamState.length === 0 ? (
         <div className="bg-white border rounded-lg p-8 text-center">
           <div className="text-gray-500 mb-4">
             <div className="text-4xl mb-2">🔍</div>
@@ -822,34 +1000,41 @@ const EmployeeTeamAttendance = ({ user }) => {
                       </td>
                     );
                   })}
-                  <td className="p-3 border-b text-center">
-                    <div className="flex gap-2 justify-center">
-                      <button
-                        onClick={() => handleEdit(member.id)}
-                        disabled={isEditLoading}
-                        className={`px-3 py-1 text-xs rounded transition-colors ${
-                          isEditLoading 
-                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
-                            : 'bg-blue-500 text-white hover:bg-blue-600'
-                        }`}
-                      >
-                        {isEditLoading ? 'Yükleniyor...' : 'Düzenle'}
-                      </button>
-                      {!(member.approved || member.isApproved) && (
-                        <button
-                          onClick={() => handleApprove(member.id)}
-                          className="px-3 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
-                        >
-                          Onayla
-                        </button>
-                      )}
-                      {(member.approved || member.isApproved) && (
-                        <span className="px-3 py-1 text-xs bg-gray-200 text-gray-600 rounded">
-                          Onaylandı
-                        </span>
-                      )}
-                    </div>
-                  </td>
+                                     <td className="p-3 border-b text-center">
+                     <div className="flex gap-2 justify-center">
+                       <button
+                         onClick={() => handleEdit(member.id)}
+                         disabled={isEditLoading || !canEditMember(member)}
+                         className={`px-3 py-1 text-xs rounded transition-colors ${
+                           isEditLoading || !canEditMember(member)
+                             ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                             : 'bg-blue-500 text-white hover:bg-blue-600'
+                         }`}
+                         title={!canEditMember(member) ? 'Bu kullanıcının attendance bilgisini düzenleme yetkiniz yok' : ''}
+                       >
+                         {isEditLoading ? 'Yükleniyor...' : 'Düzenle'}
+                       </button>
+                       {!(member.approved || member.isApproved) && (
+                         <button
+                           onClick={() => handleApprove(member.id)}
+                           disabled={!canEditMember(member)}
+                           className={`px-3 py-1 text-xs rounded transition-colors ${
+                             !canEditMember(member)
+                               ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                               : 'bg-green-500 text-white hover:bg-green-600'
+                           }`}
+                           title={!canEditMember(member) ? 'Bu kullanıcının attendance bilgisini onaylama yetkiniz yok' : ''}
+                         >
+                           Onayla
+                         </button>
+                       )}
+                       {(member.approved || member.isApproved) && (
+                         <span className="px-3 py-1 text-xs bg-gray-200 text-gray-600 rounded">
+                           Onaylandı
+                         </span>
+                       )}
+                     </div>
+                   </td>
                 </tr>
               ))}
             </tbody>

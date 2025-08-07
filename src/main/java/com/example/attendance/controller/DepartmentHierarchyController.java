@@ -8,13 +8,14 @@ import com.example.attendance.service.DepartmentHierarchyService;
 import com.example.attendance.service.DepartmentNodePositionService;
 import lombok.Data;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
 
 @Controller
-@RequestMapping("/admin/hierarchy")
+@RequestMapping("/api/admin/hierarchy")
 public class DepartmentHierarchyController {
     private final DepartmentHierarchyService hierarchySvc;
     private final DepartmentNodePositionService posSvc;
@@ -27,6 +28,7 @@ public class DepartmentHierarchyController {
         this.departmentRepo = d;
     }
 
+    @PreAuthorize("@CustomAnnotationEvaluator.hasAnyPermission(authentication, null, {'ADMIN_ALL', 'EDIT_DEPARTMENT_HIERARCHY'})")
     @PostMapping(path = "/save", consumes = "application/json")
     @ResponseBody
     public ResponseEntity<String> saveAll(@RequestBody SaveDto dto) {
@@ -57,6 +59,7 @@ public class DepartmentHierarchyController {
         }
     }
 
+    @PreAuthorize("@CustomAnnotationEvaluator.hasAnyPermission(authentication, null, {'ADMIN_ALL', 'VIEW_DEPARTMENT_HIERARCHY'})")
     @GetMapping("/load")
     @ResponseBody
     public Map<String, Object> loadHierarchy() {
