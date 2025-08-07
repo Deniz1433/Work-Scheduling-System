@@ -38,6 +38,7 @@ const AdminManageUsers = () => {
         .then(data => {
           if (Array.isArray(data)) {
             setUsers(data);
+            console.log("Aktif Kullanıcı:", data)
           } else {
             console.error("Beklenmeyen veri formatı:", data);
             setUsers([]); // Hatalı veri gelirse boş dizi ata
@@ -56,6 +57,8 @@ const AdminManageUsers = () => {
   };
 
   const handleAddUser = () => {
+    console.log("Gönderilecek kullanıcı verisi:", JSON.stringify(newUser, null, 2));
+    console.log("Yeni kullanıcı payload:", newUser);
     fetch('/api/admin/users', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -371,20 +374,35 @@ const AdminManageUsers = () => {
             <input type="text" name="username" placeholder="Kullanıcı Adı" value={newUser.username} onChange={handleInputChange} className="border p-2 rounded" />
             <input type="email" name="email" placeholder="Email" value={newUser.email} onChange={handleInputChange} className="border p-2 rounded" />
             <input type="password" name="password" placeholder="Şifre" value={newUser.password} onChange={handleInputChange} className="border p-2 rounded" />
-            <select name="roleId" value={newUser.roleId || ''} onChange={handleInputChange} className="border p-2 rounded">
+            <select
+                name="roleId"
+                value={newUser.roleId || ''}
+                onChange={e => setNewUser({ ...newUser, roleId: parseInt(e.target.value) || null })}>
               <option value="">Rol Seç</option>
               {roles.map(role => <option key={role.id} value={role.id}>{role.name}</option>)}
             </select>
-            <select name="departmentId" value={newUser.departmentId || ''} onChange={handleInputChange} className="border p-2 rounded">
+            <select
+                value={newUser.departmentId || ""}
+                onChange={(e) => {
+                  const selectedId = parseInt(e.target.value);
+                  setNewUser({
+                    ...newUser,
+                    departmentId: isNaN(selectedId) ? null : selectedId,
+                  });
+                }}
+            >
               <option value="">Departman Seç</option>
-              {departments.map(dept => <option key={dept.id} value={dept.id}>{dept.name}</option>)}
+              {departments.map((dept) => (
+                  <option key={dept.id} value={dept.id}>
+                    {dept.name}
+                  </option>
+              ))}
             </select>
           </div>
           <button onClick={handleAddUser} className="mt-4 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
             Kullanıcı Ekle
           </button>
         </div>
-
         <div className="grid grid-cols-5 gap-4 mb-6">
           <input type="text" placeholder="Ad" className="border p-2 rounded" value={filters.firstName} onChange={e => setFilters({ ...filters, firstName: e.target.value })} />
           <input type="text" placeholder="Soyad" className="border p-2 rounded" value={filters.lastName} onChange={e => setFilters({ ...filters, lastName: e.target.value })} />

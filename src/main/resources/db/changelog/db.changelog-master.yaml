@@ -167,7 +167,7 @@ databaseChangeLog:
                   name: password
                   type: VARCHAR(255)
                   constraints:
-                    nullable: true
+                    nullable: false
               - column:
                   name: role_id
                   type: BIGINT
@@ -577,3 +577,53 @@ databaseChangeLog:
             tableName: department_node_position
             columnName: department
             newDataType: VARCHAR(100)
+  - changeSet:
+      id: insert-initial-roles
+      author: emir
+      changes:
+        - insert:
+            tableName: role
+            columns:
+              - column:
+                  name: name
+                  value: "staff"
+              - column:
+                  name: description
+                  value: "default staff"
+              - column:
+                  name: is_active
+                  valueBoolean: true
+        - insert:
+            tableName: role
+            columns:
+              - column:
+                  name: name
+                  value: "admin"
+              - column:
+                  name: description
+                  value: "admin role"
+              - column:
+                  name: is_active
+                  valueBoolean: true
+  - changeSet:
+      id: insert-initial-departments
+      author: emir
+      changes:
+        - insert:
+            tableName: department
+            columns:
+              - column:
+                  name: name
+                  value: "Yazılım"
+              - column:
+                  name: min_days
+                  valueNumeric: 3
+        - insert:
+            tableName: department
+            columns:
+              - column:
+                  name: name
+                  value: "İK"
+              - column:
+                  name: min_days
+                  valueNumeric: 2

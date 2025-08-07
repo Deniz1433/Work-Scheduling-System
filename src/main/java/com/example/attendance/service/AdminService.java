@@ -1,5 +1,6 @@
 package com.example.attendance.service;
 
+import com.example.attendance.dto.CreateUserDto;
 import com.example.attendance.dto.UserDto;
 import com.example.attendance.model.Role;
 import com.example.attendance.model.User;
@@ -27,15 +28,17 @@ public class AdminService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final DepartmentRepository departmentRepository;
+    private final KeycloakAdminService keycloakAdminService;
 
     public AdminService(Keycloak keycloakAdminClient,
-            RoleRepository roleRepository,
-            DepartmentRepository departmentRepository,
-            UserRepository userRepository) {
+                        RoleRepository roleRepository,
+                        DepartmentRepository departmentRepository,
+                        UserRepository userRepository, KeycloakAdminService keycloakAdminService) {
         this.keycloakAdminClient = keycloakAdminClient;
         this.roleRepository = roleRepository;
         this.departmentRepository = departmentRepository;
         this.userRepository = userRepository;
+        this.keycloakAdminService = keycloakAdminService;
     }
 
     @Transactional(readOnly = true)
@@ -53,15 +56,17 @@ public class AdminService {
                 userDto.setLastName(keycloakUser.getLastName());
                 userDto.setEmail(keycloakUser.getEmail());
                 userDto.setUsername(keycloakUser.getUsername());
-                // PostgreSQL'den rol ve departman bilgilerini al
+
                 User u = userRepository.findByKeycloakId(keycloakUser.getId()).orElse(null);
                 if (u != null) {
+                    userDto.setId(u.getId()); // <- Bu satır kritik
                     userDto.setDepartmentId(u.getDepartment().getId());
                     userDto.setRoleId(u.getRole().getId());
                 } else {
                     userDto.setDepartmentId(null);
                     userDto.setRoleId(null);
                 }
+
                 users.add(userDto);
             }
             return users;
@@ -74,7 +79,6 @@ public class AdminService {
     @Transactional
     public UserRepresentation createKeycloakUser(UserDto userDto) {
         try {
-            // 1. Keycloak'ta kullanıcı oluştur
             RealmResource realm = keycloakAdminClient.realm("attendance-realm");
             UsersResource usersResource = realm.users();
 
@@ -85,20 +89,17 @@ public class AdminService {
             user.setFirstName(userDto.getFirstName());
             user.setLastName(userDto.getLastName());
 
-            // Şifre ayarla
             CredentialRepresentation credential = new CredentialRepresentation();
             credential.setType(CredentialRepresentation.PASSWORD);
             credential.setValue(userDto.getPassword());
             credential.setTemporary(false);
             user.setCredentials(List.of(credential));
 
-            // Kullanıcıyı oluştur
             var response = usersResource.create(user);
 
             if (response.getStatus() == 201) {
                 System.out.println("Keycloak'ta kullanıcı başarıyla oluşturuldu: " + userDto.getUsername());
 
-                // Oluşturulan kullanıcının ID'sini al
                 String userId = null;
                 try {
                     List<UserRepresentation> createdUsers = usersResource.search(userDto.getUsername());
@@ -109,7 +110,6 @@ public class AdminService {
                 } catch (Exception e) {
                     System.err.println("Kullanıcı ID'si alınırken hata: " + e.getMessage());
                 }
-
             } else {
                 throw new RuntimeException("Kullanıcı oluşturulamadı. Status: " + response.getStatus());
             }
@@ -119,16 +119,17 @@ public class AdminService {
             System.err.println("Keycloak kullanıcısı oluşturulurken hata: " + e.getMessage());
             throw new RuntimeException("Kullanıcı oluşturulamadı: " + e.getMessage());
         }
-
     }
 
     @Transactional
-    public void createUser(UserDto userDto, String keycloackId) {
+    public void createUser(UserDto userDto, String keycloakId) {
         try {
-
+            if (userDto.getDepartmentId() == null) {
+                throw new IllegalArgumentException("Departman seçilmedi");
+            }
             User user = new User();
             user.setIsActive(true);
-            user.setKeycloakId(keycloackId);
+            user.setKeycloakId(keycloakId);
             user.setUsername(userDto.getUsername());
             user.setEmail(userDto.getEmail());
             user.setFirstName(userDto.getFirstName());
@@ -137,10 +138,34 @@ public class AdminService {
             user.setDepartment(departmentRepository.findById(userDto.getDepartmentId()).orElse(null));
             user.setRole(roleRepository.findById(userDto.getRoleId()).orElse(null));
 
+            userRepository.save(user);  // ✅ PostgreSQL'e kaydet
+
+            System.out.println("PostgreSQL'de kullanıcı başarıyla oluşturuldu: " + user.getUsername());
+
         } catch (Exception e) {
             System.err.println("Kullanıcı oluşturulurken hata: " + e.getMessage());
             throw new RuntimeException("Kullanıcı oluşturulamadı: " + e.getMessage());
         }
+    }
+    public void createUser(CreateUserDto dto) {
+        // 1. Keycloak’ta kullanıcıyı oluştur
+        String keycloakId = keycloakAdminService.createKeycloakUser(dto);
+
+        // 2. PostgreSQL’e ekle (ŞU ANDA BU KISIM YOK YA DA ÇALIŞMIYOR)
+        User user = new User();
+        user.setKeycloakId(keycloakId);
+        user.setUsername(dto.getUsername());
+        user.setEmail(dto.getEmail());
+        user.setFirstName(dto.getFirstName());
+        user.setLastName(dto.getLastName());
+        user.setIsActive(true);
+        user.setPassword(dto.getPassword()); // çünkü Keycloak’ta tutuluyor
+        System.out.println("Gelen Role ID: " + dto.getRoleId());
+        user.setRole(roleRepository.findById(dto.getRoleId()).orElseThrow());
+        System.out.println("Gelen departmentId: " + dto.getDepartmentId());
+        user.setDepartment(departmentRepository.findById(dto.getDepartmentId()).orElseThrow());
+
+        userRepository.save(user); // ← BU SATIR PG’ye ekler
     }
 
     @Transactional
@@ -148,13 +173,11 @@ public class AdminService {
         try {
             System.out.println("Kullanıcı rolü güncelleniyor - User ID: " + userId + ", Role ID: " + roleId);
 
-            // Rol ID kontrolü
             if (roleId == null) {
                 System.out.println("Rol ID boş, işlem iptal edildi");
                 return;
             }
 
-            // Rolü değiştir
             User u = userRepository.findById(userId).orElse(null);
             if (u == null) {
                 System.out.println("Kullanıcı bulunamadı");
@@ -171,16 +194,13 @@ public class AdminService {
     @Transactional
     public void updateUserDepartment(Long userId, Long departmentId) {
         try {
-            System.out.println(
-                    "Kullanıcı departmanı güncelleniyor - User ID: " + userId + ", Departman ID: " + departmentId);
+            System.out.println("Kullanıcı departmanı güncelleniyor - User ID: " + userId + ", Department ID: " + departmentId);
 
-            // Departman ID kontrolü
             if (departmentId == null) {
                 System.out.println("Departman ID boş, işlem iptal edildi");
                 return;
             }
 
-            // Departmanı değiştir
             User u = userRepository.findById(userId).orElse(null);
             if (u == null) {
                 System.out.println("Kullanıcı bulunamadı");
@@ -198,9 +218,7 @@ public class AdminService {
     public void deleteUser(String keycloakId) {
         try {
             System.out.println("Kullanıcı siliniyor - Keycloak ID: " + keycloakId);
-           
-            
-            // 1. Keycloak'tan kullanıcıyı sil
+
             try {
                 RealmResource realm = keycloakAdminClient.realm("attendance-realm");
                 realm.users().delete(keycloakId);
@@ -208,29 +226,22 @@ public class AdminService {
             } catch (Exception e) {
                 System.out.println("Keycloak'tan kullanıcı silinirken hata: " + e.getMessage());
             }
-            // 2. Users tablosundan kullanıcıyı sil
+
             try {
                 User u = userRepository.findByKeycloakId(keycloakId).orElse(null);
-                if(u == null){
+                if (u == null) {
                     System.out.println("Kullanıcı bulunamadı");
-                }
-                else{
+                } else {
                     userRepository.deleteByKeycloakId(keycloakId);
                 }
-            }
-            catch (Exception e) {
+            } catch (Exception e) {
                 System.out.println("Users tablosundan kullanıcı silinirken hata: " + e.getMessage());
             }
-        } 
-    
-        catch(
 
-    Exception e)
-    {
-        System.err.println("Kullanıcı silinirken hata: " + e.getMessage());
-        e.printStackTrace();
-        throw new RuntimeException("Kullanıcı silinemedi: " + e.getMessage());
+        } catch (Exception e) {
+            System.err.println("Kullanıcı silinirken hata: " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("Kullanıcı silinemedi: " + e.getMessage());
+        }
     }
-    }
-
 }
