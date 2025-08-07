@@ -200,6 +200,7 @@ const AdminDepartmentHierarchy = () => {
             const layout = cy.layout({ name: 'preset' });
             layout.on('layoutstop', () => {
                 cy.fit(cy.elements(), 50);
+                cy.center();
             });
             layout.run();
         });
@@ -260,7 +261,7 @@ const AdminDepartmentHierarchy = () => {
     };
 
     return (
-        <div className="flex h-screen w-screen m-0 font-sans">
+        <div className="flex h-full w-full m-0 font-sans">
             {/* Sidebar */}
             <div className="flex-none w-60 p-4 box-border border-r border-gray-300 overflow-auto">
                 {/* Mode Buttons */}
@@ -337,7 +338,7 @@ const AdminDepartmentHierarchy = () => {
             {/* Cytoscape Container */}
             <div 
                 ref={containerRef}
-                className="flex-1 min-w-0 h-full block"
+                className="flex-1 min-w-0 h-full overflow-hidden"
             />
         </div>
     );
