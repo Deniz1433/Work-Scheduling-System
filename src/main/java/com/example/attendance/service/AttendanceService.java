@@ -268,14 +268,18 @@ public class AttendanceService {
         return repo.findAll();
     }
     
-    public List<Attendance> getAttendanceByUserId(Long userId) {
+        public List<Attendance> getAttendanceByUserId(Long userId) {
         return repo.findByUserId(userId);
     }
-    
+
+    public List<Attendance> getUserAttendance(Long userId) {
+        return repo.findByUserId(userId);
+    }
+
     public Attendance getAttendanceByUserIdAndWeekStart(Long userId, LocalDate weekStart) {
         return repo.findByUserIdAndWeekStart(userId, weekStart);
     }
-    
+
     public void saveAttendance(Attendance attendance) {
         repo.save(attendance);
     }

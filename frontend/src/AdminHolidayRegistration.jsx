@@ -59,6 +59,39 @@ const HolidayRegistration = () => {
             });
     };
 
+    // Önümüzdeki 5 senenin tatillerini çek
+    const handleFetchNext5Years = () => {
+        setFetchLoading(true);
+        setError(null);
+        setSuccess(null);
+        
+        const currentYear = new Date().getFullYear();
+        const promises = [];
+        
+        for (let year = currentYear; year <= currentYear + 4; year++) {
+            promises.push(
+                fetch(`/api/holidays/fetch?year=${year}`, {
+                    method: 'POST'
+                }).then(res => {
+                    if (!res.ok) throw new Error(`${year} yılı tatilleri çekilemedi`);
+                    return res.json();
+                })
+            );
+        }
+        
+        Promise.all(promises)
+            .then(results => {
+                const totalHolidays = results.reduce((sum, data) => sum + data.length, 0);
+                setSuccess(`${totalHolidays} adet tatil başarıyla çekildi! (${currentYear}-${currentYear + 4})`);
+                fetchHolidays(); // Liste yenileme
+                setFetchLoading(false);
+            })
+            .catch(err => {
+                setError(err.message);
+                setFetchLoading(false);
+            });
+    };
+
     // Sadece bu senenin tatillerini filtrele
     const currentYear = new Date().getFullYear();
     const currentYearHolidays = holidays.filter(holiday => {
@@ -225,6 +258,27 @@ const HolidayRegistration = () => {
                                 </span>
                             ) : (
                                 `📅 ${currentYear} Yılı Tatillerini Çek`
+                            )}
+                        </button>
+                        <button 
+                            onClick={handleFetchNext5Years}
+                            disabled={fetchLoading}
+                            className={`w-full px-4 py-3 rounded-lg font-semibold transition-all ${
+                                fetchLoading 
+                                    ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
+                                    : 'bg-purple-600 text-white hover:bg-purple-700'
+                            }`}
+                        >
+                            {fetchLoading ? (
+                                <span className="flex items-center justify-center gap-2">
+                                    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    Tatiller Çekiliyor...
+                                </span>
+                            ) : (
+                                `📅 Önümüzdeki 5 Yılın Tatillerini Çek`
                             )}
                         </button>
                         </div>

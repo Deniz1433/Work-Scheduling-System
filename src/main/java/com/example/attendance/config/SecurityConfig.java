@@ -62,6 +62,13 @@ public class SecurityConfig {
                         .requestMatchers("/api/departments/**")
                         .permitAll()
 
+                        // holiday API - admin only
+                        .requestMatchers("/api/holidays/**")
+                        .hasAnyAuthority(
+                                "ROLE_attendance_client_admin",
+                                "ROLE_attendance_client_superadmin"
+                        )
+
                         // attendance & excuse APIs require any authenticated user
                         .requestMatchers("/api/attendance/**", "/api/excuse/**")
                         .authenticated()

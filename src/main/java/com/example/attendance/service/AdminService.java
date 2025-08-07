@@ -44,34 +44,52 @@ public class AdminService {
     @Transactional(readOnly = true)
     public List<UserDto> getAllUsers() {
         try {
-            RealmResource realm = keycloakAdminClient.realm("attendance-realm");
-            UsersResource usersResource = realm.users();
-            List<UserRepresentation> keycloakUsers = usersResource.list();
-
+            // Sadece PostgreSQL'de olan kullanıcıları al
+            List<User> dbUsers = userRepository.findAll();
             List<UserDto> users = new ArrayList<>();
-            for (UserRepresentation keycloakUser : keycloakUsers) {
+            
+            for (User dbUser : dbUsers) {
                 UserDto userDto = new UserDto();
-                userDto.setKeycloakId(keycloakUser.getId());
-                userDto.setFirstName(keycloakUser.getFirstName());
-                userDto.setLastName(keycloakUser.getLastName());
-                userDto.setEmail(keycloakUser.getEmail());
-                userDto.setUsername(keycloakUser.getUsername());
-
-                User u = userRepository.findByKeycloakId(keycloakUser.getId()).orElse(null);
-                if (u != null) {
-                    userDto.setId(u.getId()); // <- Bu satır kritik
-                    userDto.setDepartmentId(u.getDepartment().getId());
-                    userDto.setRoleId(u.getRole().getId());
-                } else {
-                    userDto.setDepartmentId(null);
-                    userDto.setRoleId(null);
-                }
-
+                userDto.setId(dbUser.getId());
+                userDto.setKeycloakId(dbUser.getKeycloakId());
+                userDto.setFirstName(dbUser.getFirstName());
+                userDto.setLastName(dbUser.getLastName());
+                userDto.setEmail(dbUser.getEmail());
+                userDto.setUsername(dbUser.getUsername());
+                userDto.setDepartmentId(dbUser.getDepartment() != null ? dbUser.getDepartment().getId() : null);
+                userDto.setRoleId(dbUser.getRole() != null ? dbUser.getRole().getId() : null);
+                
                 users.add(userDto);
             }
+            
             return users;
         } catch (Exception e) {
             System.err.println("Kullanıcılar alınırken hata: " + e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public UserDto getUserById(Long userId) {
+        try {
+            User user = userRepository.findById(userId).orElse(null);
+            if (user == null) {
+                return null;
+            }
+
+            UserDto userDto = new UserDto();
+            userDto.setId(user.getId());
+            userDto.setKeycloakId(user.getKeycloakId());
+            userDto.setFirstName(user.getFirstName());
+            userDto.setLastName(user.getLastName());
+            userDto.setEmail(user.getEmail());
+            userDto.setUsername(user.getUsername());
+            userDto.setDepartmentId(user.getDepartment() != null ? user.getDepartment().getId() : null);
+            userDto.setRoleId(user.getRole() != null ? user.getRole().getId() : null);
+
+            return userDto;
+        } catch (Exception e) {
+            System.err.println("Kullanıcı alınırken hata: " + e.getMessage());
             return null;
         }
     }
@@ -181,8 +199,16 @@ public class AdminService {
             User u = userRepository.findById(userId).orElse(null);
             if (u == null) {
                 System.out.println("Kullanıcı bulunamadı");
+                throw new RuntimeException("Kullanıcı bulunamadı");
             } else {
-                u.setRole(roleRepository.findById(roleId).orElse(null));
+                Role role = roleRepository.findById(roleId).orElse(null);
+                if (role == null) {
+                    System.out.println("Rol bulunamadı");
+                    throw new RuntimeException("Rol bulunamadı");
+                }
+                u.setRole(role);
+                userRepository.save(u); // Değişiklikleri kaydet
+                System.out.println("Kullanıcı rolü başarıyla güncellendi");
             }
         } catch (Exception e) {
             System.err.println("Rol güncellenirken hata: " + e.getMessage());
@@ -204,8 +230,16 @@ public class AdminService {
             User u = userRepository.findById(userId).orElse(null);
             if (u == null) {
                 System.out.println("Kullanıcı bulunamadı");
+                throw new RuntimeException("Kullanıcı bulunamadı");
             } else {
-                u.setDepartment(departmentRepository.findById(departmentId).orElse(null));
+                Department department = departmentRepository.findById(departmentId).orElse(null);
+                if (department == null) {
+                    System.out.println("Departman bulunamadı");
+                    throw new RuntimeException("Departman bulunamadı");
+                }
+                u.setDepartment(department);
+                userRepository.save(u); // Değişiklikleri kaydet
+                System.out.println("Kullanıcı departmanı başarıyla güncellendi");
             }
         } catch (Exception e) {
             System.err.println("Departman güncellenirken hata: " + e.getMessage());
@@ -219,29 +253,96 @@ public class AdminService {
         try {
             System.out.println("Kullanıcı siliniyor - Keycloak ID: " + keycloakId);
 
+            // Önce PostgreSQL'den sil
+            try {
+                User u = userRepository.findByKeycloakId(keycloakId).orElse(null);
+                if (u != null) {
+                    userRepository.deleteByKeycloakId(keycloakId);
+                    System.out.println("PostgreSQL'den kullanıcı silindi");
+                } else {
+                    System.out.println("PostgreSQL'de kullanıcı bulunamadı");
+                }
+            } catch (Exception e) {
+                System.out.println("PostgreSQL'den kullanıcı silinirken hata: " + e.getMessage());
+            }
+
+            // Sonra Keycloak'tan sil
             try {
                 RealmResource realm = keycloakAdminClient.realm("attendance-realm");
                 realm.users().delete(keycloakId);
                 System.out.println("Keycloak'tan kullanıcı silindi");
             } catch (Exception e) {
                 System.out.println("Keycloak'tan kullanıcı silinirken hata: " + e.getMessage());
-            }
-
-            try {
-                User u = userRepository.findByKeycloakId(keycloakId).orElse(null);
-                if (u == null) {
-                    System.out.println("Kullanıcı bulunamadı");
-                } else {
-                    userRepository.deleteByKeycloakId(keycloakId);
-                }
-            } catch (Exception e) {
-                System.out.println("Users tablosundan kullanıcı silinirken hata: " + e.getMessage());
+                // Keycloak'tan silinmezse bile PostgreSQL'den silindiği için devam et
             }
 
         } catch (Exception e) {
             System.err.println("Kullanıcı silinirken hata: " + e.getMessage());
             e.printStackTrace();
             throw new RuntimeException("Kullanıcı silinemedi: " + e.getMessage());
+        }
+    }
+
+    @Transactional
+    public void syncUsersFromKeycloak() {
+        try {
+            System.out.println("Keycloak'tan kullanıcılar senkronize ediliyor...");
+            
+            RealmResource realm = keycloakAdminClient.realm("attendance-realm");
+            UsersResource usersResource = realm.users();
+            List<UserRepresentation> keycloakUsers = usersResource.list();
+
+            int addedCount = 0;
+            int updatedCount = 0;
+
+            for (UserRepresentation keycloakUser : keycloakUsers) {
+                // PostgreSQL'de bu kullanıcı var mı kontrol et
+                Optional<User> existingUser = userRepository.findByKeycloakId(keycloakUser.getId());
+                
+                if (existingUser.isPresent()) {
+                    // Kullanıcı zaten var, güncelle
+                    User user = existingUser.get();
+                    user.setFirstName(keycloakUser.getFirstName());
+                    user.setLastName(keycloakUser.getLastName());
+                    user.setEmail(keycloakUser.getEmail());
+                    user.setUsername(keycloakUser.getUsername());
+                    userRepository.save(user);
+                    updatedCount++;
+                    System.out.println("Kullanıcı güncellendi: " + keycloakUser.getUsername());
+                } else {
+                    // Yeni kullanıcı, ekle
+                    User newUser = new User();
+                    newUser.setKeycloakId(keycloakUser.getId());
+                    newUser.setFirstName(keycloakUser.getFirstName());
+                    newUser.setLastName(keycloakUser.getLastName());
+                    newUser.setEmail(keycloakUser.getEmail());
+                    newUser.setUsername(keycloakUser.getUsername());
+                    newUser.setIsActive(true);
+                    newUser.setPassword(""); // Keycloak'ta tutuluyor
+                    
+                    // Varsayılan rol ve departman ata (ID'leri kontrol et)
+                    try {
+                        Role defaultRole = roleRepository.findById(1L).orElse(null);
+                        Department defaultDept = departmentRepository.findById(1L).orElse(null);
+                        
+                        newUser.setRole(defaultRole);
+                        newUser.setDepartment(defaultDept);
+                        
+                        userRepository.save(newUser);
+                        addedCount++;
+                        System.out.println("Yeni kullanıcı eklendi: " + keycloakUser.getUsername());
+                    } catch (Exception e) {
+                        System.err.println("Kullanıcı eklenirken hata: " + keycloakUser.getUsername() + " - " + e.getMessage());
+                    }
+                }
+            }
+            
+            System.out.println("Senkronizasyon tamamlandı. Eklenen: " + addedCount + ", Güncellenen: " + updatedCount);
+            
+        } catch (Exception e) {
+            System.err.println("Senkronizasyon hatası: " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("Kullanıcılar senkronize edilemedi: " + e.getMessage());
         }
     }
 }
