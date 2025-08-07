@@ -37,7 +37,7 @@ public class User {
     @Column(name = "is_active")
     private Boolean isActive;
 
-    @Column(nullable = true)
+    @Column(nullable = false)
     private String password;
     @ManyToOne
     @JoinColumn(name = "role_id")
