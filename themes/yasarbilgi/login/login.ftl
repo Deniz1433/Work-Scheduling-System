@@ -23,6 +23,12 @@
                 <input type="password" name="password" placeholder="Şifre" required>
             </div>
 
+            <#if message?has_content>
+                <div style="color: red; text-align: center; margin: 10px 0;">
+                    Geçersiz kullanıcı adı veya şifre.
+                </div>
+            </#if>
+
             <button type="submit" class="login-button">Giriş</button>
         </form>
     </div>

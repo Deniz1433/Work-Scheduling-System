@@ -68,10 +68,34 @@ public class AdminController {
     @DeleteMapping("/users/{userId}")
     public ResponseEntity<String> deleteUser(@PathVariable String userId) {
         try {
-            adminService.deleteUser(userId);
-            return ResponseEntity.ok("Kullanıcı başarıyla silindi");
+            // Önce userId'nin Long olup olmadığını kontrol et
+            try {
+                Long longUserId = Long.parseLong(userId);
+                // Eğer Long ise, önce kullanıcıyı bul ve keycloakId'sini al
+                UserDto user = adminService.getUserById(longUserId);
+                if (user != null && user.getKeycloakId() != null) {
+                    adminService.deleteUser(user.getKeycloakId());
+                    return ResponseEntity.ok("Kullanıcı başarıyla silindi");
+                } else {
+                    return ResponseEntity.badRequest().body("Kullanıcı bulunamadı");
+                }
+            } catch (NumberFormatException e) {
+                // Eğer Long değilse, direkt keycloakId olarak kullan
+                adminService.deleteUser(userId);
+                return ResponseEntity.ok("Kullanıcı başarıyla silindi");
+            }
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Kullanıcı silinemedi: " + e.getMessage());
+        }
+    }
+    @PreAuthorize("@CustomAnnotationEvaluator.hasAnyPermission(authentication, null, {'ADMIN_ALL', 'VIEW_ALL_USERS'})")
+    @PostMapping("/users/sync")
+    public ResponseEntity<String> syncUsersFromKeycloak() {
+        try {
+            adminService.syncUsersFromKeycloak();
+            return ResponseEntity.ok("Kullanıcılar başarıyla senkronize edildi");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Senkronizasyon başarısız: " + e.getMessage());
         }
     }
 }

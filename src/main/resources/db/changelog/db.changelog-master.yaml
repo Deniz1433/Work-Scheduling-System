@@ -557,7 +557,7 @@ databaseChangeLog:
 
   - changeSet:
       id: migrate-department-node-position-pk
-      author: yourname
+      author: emir
       changes:
         - dropPrimaryKey:
             tableName: department_node_position

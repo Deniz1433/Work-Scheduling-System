@@ -10,6 +10,18 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Kırmızı nokta bildirimlerini gizle */
+button::after,
+button::before {
+  display: none !important;
+}
+
+/* Menü öğelerindeki bildirim noktalarını gizle */
+nav button::after,
+nav button::before {
+  display: none !important;
+}
+
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;

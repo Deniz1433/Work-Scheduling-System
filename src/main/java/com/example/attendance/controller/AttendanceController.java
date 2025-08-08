@@ -3,6 +3,7 @@ package com.example.attendance.controller;
 import com.example.attendance.dto.AttendanceRequest;
 import com.example.attendance.dto.ExcuseDto;
 import com.example.attendance.dto.TeamAttendanceDto;
+import com.example.attendance.model.Attendance;
 import com.example.attendance.model.Excuse;
 import com.example.attendance.model.User;
 import com.example.attendance.repository.UserRepository;
@@ -293,5 +294,62 @@ public class AttendanceController {
             return ResponseEntity.internalServerError().build();
         }
     }
-
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<?> getUserAttendance(@PathVariable Long userId) {
+        try {
+            // Kullanıcının tüm attendance kayıtlarını getir
+            List<Attendance> attendances = service.getAttendanceByUserId(userId);
+            
+            // DTO formatına dönüştür
+            List<Map<String, Object>> attendanceRecords = attendances.stream()
+                .map(attendance -> {
+                    Map<String, Object> record = new HashMap<>();
+                    record.put("weekStart", attendance.getWeekStart().toString());
+                    record.put("monday", attendance.getMonday());
+                    record.put("tuesday", attendance.getTuesday());
+                    record.put("wednesday", attendance.getWednesday());
+                    record.put("thursday", attendance.getThursday());
+                    record.put("friday", attendance.getFriday());
+                    record.put("isApproved", attendance.isApproved());
+                    return record;
+                })
+                .collect(Collectors.toList());
+            
+            Map<String, Object> response = new HashMap<>();
+            Map<String, Object> data = new HashMap<>();
+            data.put("attendanceRecords", attendanceRecords);
+            response.put("data", data);
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            System.err.println("Error getting user attendance: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().body("Error getting attendance data");
+        }
+    }
+    @PutMapping("/user/{userId}")
+    public ResponseEntity<?> updateUserAttendance(@PathVariable Long userId, @RequestBody Map<String, Object> request) {
+        try {
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> attendanceRecords = (List<Map<String, Object>>) request.get("attendanceRecords");
+            
+            for (Map<String, Object> record : attendanceRecords) {
+                String weekStart = (String) record.get("weekStart");
+                int monday = (Integer) record.get("monday");
+                int tuesday = (Integer) record.get("tuesday");
+                int wednesday = (Integer) record.get("wednesday");
+                int thursday = (Integer) record.get("thursday");
+                int friday = (Integer) record.get("friday");
+                
+                List<Integer> dates = List.of(monday, tuesday, wednesday, thursday, friday);
+                service.record(userId, LocalDate.parse(weekStart), dates);
+            }
+            
+            return ResponseEntity.ok("Attendance records updated successfully");
+        } catch (Exception e) {
+            System.err.println("Error updating user attendance: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().body("Error updating attendance data");
+        }
+    }
 }

@@ -50,24 +50,51 @@ const EmployeeTeamAttendance = ({ user }) => {
       
       const rolesData = await rolesResponse.json();
       
+      // Rolleri kontrol et
+      if (!Array.isArray(rolesData)) {
+        console.warn('Roller için beklenmeyen veri formatı alındı:', rolesData);
+        setRoles([]);
+        setFilteredRoles([]);
+      } else {
+        setRoles(rolesData);
+        setFilteredRoles(rolesData);
+      }
+      
       // Yetkilere göre departmanları filtrele
       let filteredDepts = [];
       if (userPermissions) {
         if (userPermissions.canViewAll) {
           // Tüm departmanları göster
           const departmentsResponse = await fetch('/api/departments');
-          filteredDepts = await departmentsResponse.json();
+          const departmentsData = await departmentsResponse.json();
+          if (Array.isArray(departmentsData)) {
+            filteredDepts = departmentsData;
+          } else {
+            console.warn('Departmanlar için beklenmeyen veri formatı alındı:', departmentsData);
+            filteredDepts = [];
+          }
         } else if (userPermissions.canViewChild) {
           // Child departmanları göster
           const childDepartmentsResponse = await fetch('/api/departments/child-departments');
-          filteredDepts = await childDepartmentsResponse.json();
+          const childDepartmentsData = await childDepartmentsResponse.json();
+          if (Array.isArray(childDepartmentsData)) {
+            filteredDepts = childDepartmentsData;
+          } else {
+            console.warn('Child departmanlar için beklenmeyen veri formatı alındı:', childDepartmentsData);
+            filteredDepts = [];
+          }
         } else if (userPermissions.canViewDepartment) {
           // Sadece kendi departmanını göster
           const departmentsResponse = await fetch('/api/departments');
           const departmentsData = await departmentsResponse.json();
-          filteredDepts = departmentsData.filter(dept => 
-            dept.id === userPermissions.userDepartmentId
-          );
+          if (Array.isArray(departmentsData)) {
+            filteredDepts = departmentsData.filter(dept => 
+              dept.id === userPermissions.userDepartmentId
+            );
+          } else {
+            console.warn('Departmanlar için beklenmeyen veri formatı alındı:', departmentsData);
+            filteredDepts = [];
+          }
         } else {
           // Hiçbir yetki yoksa boş liste
           filteredDepts = [];
@@ -76,10 +103,12 @@ const EmployeeTeamAttendance = ({ user }) => {
       
       setDepartments(filteredDepts);
       setFilteredDepartments(filteredDepts);
-      setRoles(rolesData);
-      setFilteredRoles(rolesData);
     } catch (err) {
       console.error('Filtre verileri yüklenemedi:', err);
+      setRoles([]);
+      setFilteredRoles([]);
+      setDepartments([]);
+      setFilteredDepartments([]);
     }
   };
 
@@ -103,6 +132,15 @@ const EmployeeTeamAttendance = ({ user }) => {
       const response = await fetch(`/api/attendance/team?${params.toString()}`);
       const data = await response.json();
       console.log(data);
+      
+      // Veri formatını kontrol et
+      if (!Array.isArray(data)) {
+        console.warn('Backend\'den beklenmeyen veri formatı alındı:', data);
+        setTeamState([]);
+        setMemberEditPermissions({});
+        return;
+      }
+      
       setTeamState(data);
       
       // Takım üyelerinin edit yetkilerini kontrol et
@@ -121,10 +159,16 @@ const EmployeeTeamAttendance = ({ user }) => {
           setMemberEditPermissions(permissions);
           console.log('Member edit permissions:', permissions);
         }
+      } else {
+        // Boş array durumunda edit permissions'ları temizle
+        setMemberEditPermissions({});
       }
     }
     catch (err) {
+      console.error('Takım verileri alınırken hata:', err);
       setError('Veri alınamadı.');
+      setTeamState([]);
+      setMemberEditPermissions({});
     } finally {
       setLoading(false);
     }

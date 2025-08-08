@@ -5,10 +5,7 @@ const AdminManageUsers = () => {
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
   const [departments, setDepartments] = useState([]);
-  const [editRoleUserId, setEditRoleUserId] = useState(null);
-  const [editDeptUserId, setEditDeptUserId] = useState(null);
-  const [selectedRole, setSelectedRole] = useState('');
-  const [selectedDepartment, setSelectedDepartment] = useState('');
+  const [editingUser, setEditingUser] = useState(null); // { userId: 1, field: 'role', value: '2' }
   const [showAttendanceModal, setShowAttendanceModal] = useState(false);
   const [selectedUserAttendance, setSelectedUserAttendance] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
@@ -41,15 +38,43 @@ const AdminManageUsers = () => {
             console.log("Aktif Kullanıcı:", data)
           } else {
             console.error("Beklenmeyen veri formatı:", data);
-            setUsers([]); // Hatalı veri gelirse boş dizi ata
+            setUsers([]);
           }
         })
         .catch(err => {
           console.error("Kullanıcılar çekilirken hata oluştu:", err);
           setUsers([]);
         });
-    fetch('/api/roles').then(res => res.json()).then(setRoles);
-    fetch('/api/departments').then(res => res.json()).then(setDepartments);
+    
+    fetch('/api/roles')
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) {
+            setRoles(data);
+          } else {
+            console.error("Roller için beklenmeyen veri formatı:", data);
+            setRoles([]);
+          }
+        })
+        .catch(err => {
+          console.error("Roller çekilirken hata oluştu:", err);
+          setRoles([]);
+        });
+    
+    fetch('/api/departments')
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) {
+            setDepartments(data);
+          } else {
+            console.error("Departmanlar için beklenmeyen veri formatı:", data);
+            setDepartments([]);
+          }
+        })
+        .catch(err => {
+          console.error("Departmanlar çekilirken hata oluştu:", err);
+          setDepartments([]);
+        });
   }, []);
 
   const handleInputChange = (e) => {
@@ -58,7 +83,6 @@ const AdminManageUsers = () => {
 
   const handleAddUser = () => {
     console.log("Gönderilecek kullanıcı verisi:", JSON.stringify(newUser, null, 2));
-    console.log("Yeni kullanıcı payload:", newUser);
     fetch('/api/admin/users', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -71,16 +95,88 @@ const AdminManageUsers = () => {
         .then(msg => {
           Swal.fire('Başarılı', msg, 'success');
           setNewUser({ firstName: '', lastName: '', email: '', username: '', password: '', roleId: '', departmentId: '' });
-          fetch('/api/admin/users').then(res => res.json()).then(setUsers);
+          // Kullanıcı listesini güncelle
+          fetch('/api/admin/users')
+              .then(res => res.json())
+              .then(data => {
+                if (Array.isArray(data)) {
+                  setUsers(data);
+                } else {
+                  console.error("Kullanıcı listesi güncellenirken beklenmeyen veri formatı:", data);
+                  setUsers([]);
+                }
+              })
+              .catch(err => {
+                console.error("Kullanıcı listesi güncellenirken hata:", err);
+                setUsers([]);
+              });
         })
         .catch(err => Swal.fire('Hata', err.message, 'error'));
   };
 
+  const handleSyncUsers = () => {
+    Swal.fire({
+      title: 'Kullanıcıları Senkronize Et',
+      text: 'Keycloak\'taki tüm kullanıcılar PostgreSQL\'e eklenecek. Devam etmek istiyor musunuz?',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#3085d6',
+      cancelButtonColor: '#d33',
+      confirmButtonText: 'Evet, Senkronize Et',
+      cancelButtonText: 'İptal'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        fetch('/api/admin/users/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        })
+        .then(res => {
+          if (!res.ok) throw new Error('Senkronizasyon başarısız');
+          return res.text();
+        })
+        .then(msg => {
+          Swal.fire('Başarılı', msg, 'success');
+          // Kullanıcı listesini yenile
+          fetch('/api/admin/users')
+              .then(res => res.json())
+              .then(data => {
+                if (Array.isArray(data)) {
+                  setUsers(data);
+                } else {
+                  console.error("Senkronizasyon sonrası kullanıcı listesi için beklenmeyen veri formatı:", data);
+                  setUsers([]);
+                }
+              })
+              .catch(err => {
+                console.error("Senkronizasyon sonrası kullanıcı listesi güncellenirken hata:", err);
+                setUsers([]);
+              });
+        })
+        .catch(err => Swal.fire('Hata', err.message, 'error'));
+      }
+    });
+  };
+
+  const startEditing = (user, field) => {
+    const value = field === 'role' ? user.roleId : user.departmentId;
+    setEditingUser({ userId: user.id, field: field, value: value });
+  };
+
+  const cancelEditing = () => {
+    setEditingUser(null);
+  };
+
+  const updateEditingValue = (value) => {
+    setEditingUser(prev => ({ ...prev, value: value }));
+  };
+
   const handleRoleChange = (userId, newRoleId) => {
+    console.log(`Rol değiştiriliyor - User ID: ${userId}, New Role ID: ${newRoleId}`);
+    
     fetch(`/api/admin/users/${userId}/role`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ roleId: newRoleId })
+      body: JSON.stringify({ roleId: parseInt(newRoleId) })
     })
     .then(res => {
       if (res.ok) {
@@ -91,27 +187,30 @@ const AdminManageUsers = () => {
             user.id === userId 
               ? { 
                   ...user, 
-                  roleId: newRoleId, 
-                  role: roles.find(r => r.id.toString() === newRoleId)?.name 
+                  roleId: parseInt(newRoleId), 
+                  role: roles.find(r => r.id === parseInt(newRoleId))?.name 
                 }
               : user
           )
         );
-        setEditRoleUserId(null);
+        cancelEditing();
       } else {
         throw new Error('Rol güncellenemedi');
       }
     })
     .catch(err => {
+      console.error('Rol güncelleme hatası:', err);
       Swal.fire('Hata', err.message, 'error');
     });
   };
 
   const handleDepartmentChange = (userId, newDeptId) => {
+    console.log(`Departman değiştiriliyor - User ID: ${userId}, New Dept ID: ${newDeptId}`);
+    
     fetch(`/api/admin/users/${userId}/department`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ departmentId: newDeptId })
+      body: JSON.stringify({ departmentId: parseInt(newDeptId) })
     })
     .then(res => {
       if (res.ok) {
@@ -122,23 +221,26 @@ const AdminManageUsers = () => {
             user.id === userId 
               ? { 
                   ...user, 
-                  departmentId: newDeptId, 
-                  department: departments.find(d => d.id.toString() === newDeptId)?.name 
+                  departmentId: parseInt(newDeptId), 
+                  department: departments.find(d => d.id === parseInt(newDeptId))?.name 
                 }
               : user
           )
         );
-        setEditDeptUserId(null);
+        cancelEditing();
       } else {
         throw new Error('Departman güncellenemedi');
       }
     })
     .catch(err => {
+      console.error('Departman güncelleme hatası:', err);
       Swal.fire('Hata', err.message, 'error');
     });
   };
 
   const handleDeleteUser = (user) => {
+    console.log('Silinecek kullanıcı:', user);
+    
     Swal.fire({
       title: 'Kullanıcıyı Sil',
       text: `${user.firstName} ${user.lastName} kullanıcısını silmek istediğinizden emin misiniz?`,
@@ -150,7 +252,11 @@ const AdminManageUsers = () => {
       cancelButtonText: 'İptal'
     }).then((result) => {
       if (result.isConfirmed) {
-        fetch(`/api/admin/users/${user.id}`, {
+        // Kullanıcının keycloakId'sini kullan
+        const keycloakId = user.keycloakId || user.id;
+        console.log('Silme için keycloakId:', keycloakId);
+        
+        fetch(`/api/admin/users/${keycloakId}`, {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' }
         })
@@ -167,6 +273,7 @@ const AdminManageUsers = () => {
           setUsers(prevUsers => prevUsers.filter(u => u.id !== user.id));
         })
         .catch(err => {
+          console.error('Silme hatası:', err);
           Swal.fire('Hata', err.message, 'error');
         });
       }
@@ -175,60 +282,42 @@ const AdminManageUsers = () => {
 
   const handleAttendanceClick = (user) => {
     console.log('Attendance butonuna tıklandı, kullanıcı:', user);
-    console.log('Kullanıcı ID:', user.id);
     setSelectedUser(user);
     setShowAttendanceModal(true);
     
-    // Önce Keycloak ID ile dene, sonra Long ID ile dene
     const tryGetAttendance = (userId) => {
       return fetch(`/api/attendance/user/${userId}`)
-        .then(res => res.json())
+        .then(res => {
+          if (!res.ok) {
+            throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+          }
+          return res.json();
+        })
         .then(data => {
           console.log(`Attendance API response for ${userId}:`, data);
           return data;
         });
     };
     
-    // Önce Keycloak ID ile dene
     tryGetAttendance(user.id)
       .then(data => {
-        if (data.data && data.data.attendanceRecords && data.data.attendanceRecords.length > 0) {
-          // Keycloak ID ile veri bulundu
+        if (data && data.data && data.data.attendanceRecords && Array.isArray(data.data.attendanceRecords) && data.data.attendanceRecords.length > 0) {
           formatAndSetAttendance(data);
         } else {
-          // Keycloak ID ile veri bulunamadı, Long ID ile dene
-          console.log('Keycloak ID ile veri bulunamadı, Long ID ile deneniyor...');
-          // Long ID'yi tahmin et (genellikle 1, 2, 3...)
-          const possibleLongIds = ['1', '2', '3', '4', '5'];
-          
-          const tryLongIds = async () => {
-            for (const longId of possibleLongIds) {
-              try {
-                const longData = await tryGetAttendance(longId);
-                if (longData.data && longData.data.attendanceRecords && longData.data.attendanceRecords.length > 0) {
-                  console.log(`Long ID ${longId} ile veri bulundu`);
-                  formatAndSetAttendance(longData);
-                  return;
-                }
-              } catch (err) {
-                console.log(`Long ID ${longId} ile hata:`, err);
-              }
-            }
-            // Hiçbir ID ile veri bulunamadı
-            setSelectedUserAttendance({ attendanceRecords: [] });
-          };
-          
-          tryLongIds();
+          console.log('Attendance verisi boş veya beklenmeyen format:', data);
+          setSelectedUserAttendance({ attendanceRecords: [] });
+          setEditingAttendanceData([]);
         }
       })
       .catch(err => {
         console.error('Attendance verileri alınırken hata:', err);
         setSelectedUserAttendance({ attendanceRecords: [] });
+        setEditingAttendanceData([]);
       });
   };
   
   const formatAndSetAttendance = (data) => {
-    if (data.data && data.data.attendanceRecords) {
+    if (data && data.data && data.data.attendanceRecords && Array.isArray(data.data.attendanceRecords)) {
       const formattedRecords = data.data.attendanceRecords.map(record => {
         const weekStart = new Date(record.weekStart);
         const days = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma'];
@@ -258,9 +347,9 @@ const AdminManageUsers = () => {
       }).flat();
       
       setSelectedUserAttendance({ attendanceRecords: formattedRecords });
-      // Düzenleme için ham veriyi de sakla
       setEditingAttendanceData(data.data.attendanceRecords);
     } else {
+      console.warn('Attendance verisi beklenmeyen format veya boş:', data);
       setSelectedUserAttendance({ attendanceRecords: [] });
       setEditingAttendanceData([]);
     }
@@ -272,7 +361,6 @@ const AdminManageUsers = () => {
 
   const handleSaveAttendance = async () => {
     try {
-      // Düzenlenen verileri backend'e gönder
       const response = await fetch(`/api/attendance/user/${selectedUser.id}`, {
         method: 'PUT',
         headers: {
@@ -286,7 +374,6 @@ const AdminManageUsers = () => {
       if (response.ok) {
         Swal.fire('Başarılı', 'Attendance kayıtları güncellendi', 'success');
         setIsEditingAttendance(false);
-        // Verileri yeniden yükle
         handleAttendanceClick(selectedUser);
       } else {
         throw new Error('Güncelleme başarısız');
@@ -315,10 +402,9 @@ const AdminManageUsers = () => {
 
     const newValue = statusMap[newStatus] || 0;
     
-    // Ham veriyi güncelle
     const updatedData = [...editingAttendanceData];
-    const record = updatedData[Math.floor(recordIndex / 5)]; // Hangi hafta
-    const dayIndex = recordIndex % 5; // Hangi gün (0-4)
+    const record = updatedData[Math.floor(recordIndex / 5)];
+    const dayIndex = recordIndex % 5;
     
     switch (dayIndex) {
       case 0: record.monday = newValue; break;
@@ -330,7 +416,6 @@ const AdminManageUsers = () => {
     
     setEditingAttendanceData(updatedData);
     
-    // Görüntülenen veriyi de güncelle
     const updatedRecords = [...selectedUserAttendance.attendanceRecords];
     updatedRecords[recordIndex] = {
       ...updatedRecords[recordIndex],
@@ -343,24 +428,28 @@ const AdminManageUsers = () => {
   };
 
   const getRoleName = (roleId) => {
-    if (!roleId) return 'Rol atanmamış';
+    if (!roleId || !Array.isArray(roles) || roles.length === 0) return 'Rol atanmamış';
     const role = roles.find(r => r.id.toString() === roleId.toString());
     return role ? role.name : 'Rol atanmamış';
   };
 
   const getDepartmentName = (departmentId) => {
-    if (!departmentId) return 'Departman atanmamış';
+    if (!departmentId || !Array.isArray(departments) || departments.length === 0) return 'Departman atanmamış';
     const dept = departments.find(d => d.id.toString() === departmentId.toString());
     return dept ? dept.name : 'Departman atanmamış';
   };
 
-  const filteredUsers = users.filter(user => {
+  const filteredUsers = users && Array.isArray(users) ? users.filter(user => {
     return (!filters.firstName || user.firstName?.toLowerCase().includes(filters.firstName.toLowerCase())) &&
         (!filters.lastName || user.lastName?.toLowerCase().includes(filters.lastName.toLowerCase())) &&
         (!filters.email || user.email?.toLowerCase().includes(filters.email.toLowerCase())) &&
         (!filters.department || getDepartmentName(user.departmentId) === filters.department) &&
         (!filters.role || getRoleName(user.roleId) === filters.role);
-  });
+  }) : [];
+
+  const isEditing = (userId, field) => {
+    return editingUser && editingUser.userId === userId && editingUser.field === field;
+  };
 
   return (
       <div className="p-8">
@@ -379,7 +468,7 @@ const AdminManageUsers = () => {
                 value={newUser.roleId || ''}
                 onChange={e => setNewUser({ ...newUser, roleId: parseInt(e.target.value) || null })}>
               <option value="">Rol Seç</option>
-              {roles.map(role => <option key={role.id} value={role.id}>{role.name}</option>)}
+              {Array.isArray(roles) && roles.map(role => <option key={role.id} value={role.id}>{role.name}</option>)}
             </select>
             <select
                 value={newUser.departmentId || ""}
@@ -392,28 +481,34 @@ const AdminManageUsers = () => {
                 }}
             >
               <option value="">Departman Seç</option>
-              {departments.map((dept) => (
+              {Array.isArray(departments) && departments.map((dept) => (
                   <option key={dept.id} value={dept.id}>
                     {dept.name}
                   </option>
               ))}
             </select>
           </div>
-          <button onClick={handleAddUser} className="mt-4 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
-            Kullanıcı Ekle
-          </button>
+          <div className="flex gap-2 mt-4">
+            <button onClick={handleAddUser} className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
+              Kullanıcı Ekle
+            </button>
+            <button onClick={handleSyncUsers} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+              Keycloak'tan Senkronize Et
+            </button>
+          </div>
         </div>
+        
         <div className="grid grid-cols-5 gap-4 mb-6">
           <input type="text" placeholder="Ad" className="border p-2 rounded" value={filters.firstName} onChange={e => setFilters({ ...filters, firstName: e.target.value })} />
           <input type="text" placeholder="Soyad" className="border p-2 rounded" value={filters.lastName} onChange={e => setFilters({ ...filters, lastName: e.target.value })} />
           <input type="text" placeholder="Email" className="border p-2 rounded" value={filters.email} onChange={e => setFilters({ ...filters, email: e.target.value })} />
           <select className="border p-2 rounded" value={filters.role} onChange={e => setFilters({ ...filters, role: e.target.value })}>
             <option value="">Tüm Roller</option>
-            {roles.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
+            {Array.isArray(roles) && roles.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
           </select>
           <select className="border p-2 rounded" value={filters.department} onChange={e => setFilters({ ...filters, department: e.target.value })}>
             <option value="">Tüm Departmanlar</option>
-            {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+            {Array.isArray(departments) && departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
           </select>
         </div>
 
@@ -435,25 +530,25 @@ const AdminManageUsers = () => {
                 <td className="p-2 border">{user.lastName}</td>
                 <td className="p-2 border">{user.email}</td>
                 <td className="p-2 border">
-                  {editRoleUserId === user.id ? (
+                  {isEditing(user.id, 'role') ? (
                       <div className="flex gap-2">
                         <select 
                           className="border px-2 py-1 flex-1" 
-                          value={selectedRole} 
-                          onChange={e => setSelectedRole(e.target.value)}
+                          value={editingUser.value || ''} 
+                          onChange={e => updateEditingValue(e.target.value)}
                         >
                           <option value="">Rol Seç</option>
-                          {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                          {Array.isArray(roles) && roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                         </select>
                         <button 
-                          onClick={() => handleRoleChange(user.id, selectedRole)} 
+                          onClick={() => handleRoleChange(user.id, editingUser.value)} 
                           className="bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600"
-                          disabled={!selectedRole}
+                          disabled={!editingUser.value}
                         >
                           Kaydet
                         </button>
                         <button 
-                          onClick={() => setEditRoleUserId(null)} 
+                          onClick={cancelEditing} 
                           className="bg-gray-500 text-white px-2 py-1 rounded hover:bg-gray-600"
                         >
                           İptal
@@ -465,10 +560,7 @@ const AdminManageUsers = () => {
                           {getRoleName(user.roleId)}
                         </span>
                         <button 
-                          onClick={() => { 
-                            setEditRoleUserId(user.id); 
-                            setSelectedRole(user.roleId || ''); 
-                          }} 
+                          onClick={() => startEditing(user, 'role')} 
                           className="bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600 text-xs"
                         >
                           Değiştir
@@ -477,25 +569,25 @@ const AdminManageUsers = () => {
                   )}
                 </td>
                 <td className="p-2 border">
-                  {editDeptUserId === user.id ? (
+                  {isEditing(user.id, 'department') ? (
                       <div className="flex gap-2">
                         <select 
                           className="border px-2 py-1 flex-1" 
-                          value={selectedDepartment} 
-                          onChange={e => setSelectedDepartment(e.target.value)}
+                          value={editingUser.value || ''} 
+                          onChange={e => updateEditingValue(e.target.value)}
                         >
                           <option value="">Departman Seç</option>
-                          {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                          {Array.isArray(departments) && departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                         </select>
                         <button 
-                          onClick={() => handleDepartmentChange(user.id, selectedDepartment)} 
+                          onClick={() => handleDepartmentChange(user.id, editingUser.value)} 
                           className="bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600"
-                          disabled={!selectedDepartment}
+                          disabled={!editingUser.value}
                         >
                           Kaydet
                         </button>
                         <button 
-                          onClick={() => setEditDeptUserId(null)} 
+                          onClick={cancelEditing} 
                           className="bg-gray-500 text-white px-2 py-1 rounded hover:bg-gray-600"
                         >
                           İptal
@@ -507,10 +599,7 @@ const AdminManageUsers = () => {
                           {getDepartmentName(user.departmentId)}
                         </span>
                         <button 
-                          onClick={() => { 
-                            setEditDeptUserId(user.id); 
-                            setSelectedDepartment(user.departmentId || ''); 
-                          }} 
+                          onClick={() => startEditing(user, 'department')} 
                           className="bg-purple-500 text-white px-2 py-1 rounded hover:bg-purple-600 text-xs"
                         >
                           Değiştir
@@ -588,50 +677,50 @@ const AdminManageUsers = () => {
                     </p>
                   </div>
                   
-                                     <table className="w-full table-auto border border-gray-300">
-                     <thead>
-                       <tr className="bg-gray-100">
-                         <th className="p-2 border">Tarih</th>
-                         <th className="p-2 border">Durum</th>
-                         <th className="p-2 border">Açıklama</th>
-                       </tr>
-                     </thead>
-                     <tbody>
-                       {selectedUserAttendance.attendanceRecords?.map((record, index) => (
-                         <tr key={index}>
-                           <td className="p-2 border">{record.date}</td>
-                           <td className="p-2 border">
-                             {isEditingAttendance ? (
-                               <select
-                                 value={record.status}
-                                 onChange={(e) => handleStatusChange(index, e.target.value)}
-                                 className="border px-2 py-1 rounded text-sm w-full"
-                               >
-                                 <option value="Veri Yok">Veri Yok</option>
-                                 <option value="Ofiste">Ofiste</option>
-                                 <option value="Uzaktan">Uzaktan</option>
-                                 <option value="İzinli">İzinli</option>
-                                 <option value="Mazeretli">Mazeretli</option>
-                                 <option value="Resmi Tatil">Resmi Tatil</option>
-                               </select>
-                             ) : (
-                               <span className={`px-2 py-1 rounded text-xs ${
-                                 record.status === 'Ofiste' ? 'bg-green-100 text-green-800' :
-                                 record.status === 'Uzaktan' ? 'bg-blue-100 text-blue-800' :
-                                 record.status === 'İzinli' ? 'bg-yellow-100 text-yellow-800' :
-                                 record.status === 'Mazeretli' ? 'bg-purple-100 text-purple-800' :
-                                 record.status === 'Resmi Tatil' ? 'bg-red-100 text-red-800' :
-                                 'bg-gray-100 text-gray-800'
-                               }`}>
-                                 {record.status}
-                               </span>
-                             )}
-                           </td>
-                           <td className="p-2 border">{record.description}</td>
-                         </tr>
-                       ))}
-                     </tbody>
-                   </table>
+                  <table className="w-full table-auto border border-gray-300">
+                    <thead>
+                      <tr className="bg-gray-100">
+                        <th className="p-2 border">Tarih</th>
+                        <th className="p-2 border">Durum</th>
+                        <th className="p-2 border">Açıklama</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedUserAttendance.attendanceRecords && Array.isArray(selectedUserAttendance.attendanceRecords) && selectedUserAttendance.attendanceRecords.map((record, index) => (
+                        <tr key={index}>
+                          <td className="p-2 border">{record.date}</td>
+                          <td className="p-2 border">
+                            {isEditingAttendance ? (
+                              <select
+                                value={record.status}
+                                onChange={(e) => handleStatusChange(index, e.target.value)}
+                                className="border px-2 py-1 rounded text-sm w-full"
+                              >
+                                <option value="Veri Yok">Veri Yok</option>
+                                <option value="Ofiste">Ofiste</option>
+                                <option value="Uzaktan">Uzaktan</option>
+                                <option value="İzinli">İzinli</option>
+                                <option value="Mazeretli">Mazeretli</option>
+                                <option value="Resmi Tatil">Resmi Tatil</option>
+                              </select>
+                            ) : (
+                              <span className={`px-2 py-1 rounded text-xs ${
+                                record.status === 'Ofiste' ? 'bg-green-100 text-green-800' :
+                                record.status === 'Uzaktan' ? 'bg-blue-100 text-blue-800' :
+                                record.status === 'İzinli' ? 'bg-yellow-100 text-yellow-800' :
+                                record.status === 'Mazeretli' ? 'bg-purple-100 text-purple-800' :
+                                record.status === 'Resmi Tatil' ? 'bg-red-100 text-red-800' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>
+                                {record.status}
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-2 border">{record.description}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                   
                   {(!selectedUserAttendance.attendanceRecords || selectedUserAttendance.attendanceRecords.length === 0) && (
                     <p className="text-center text-gray-500 py-4">
