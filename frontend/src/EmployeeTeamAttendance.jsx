@@ -18,6 +18,7 @@ const EmployeeTeamAttendance = ({ user }) => {
   const [userPermissions, setUserPermissions] = useState(null);
   const [editPermissions, setEditPermissions] = useState(null);
   const [memberEditPermissions, setMemberEditPermissions] = useState({});
+  const [memberApprovePermissions, setMemberApprovePermissions] = useState({});
   const [filteredDepartments, setFilteredDepartments] = useState([]);
   const [filteredRoles, setFilteredRoles] = useState([]);
 
@@ -297,19 +298,31 @@ const EmployeeTeamAttendance = ({ user }) => {
     }
   }, [userPermissions]);
 
-  // Kullanıcının belirli bir takım üyesini düzenleyip düzenleyemeyeceğini kontrol eder
+  // helper: normalize id types
+  const toNum = (v) => (v == null ? null : Number(v));
+
+  // helper: is this row the current user?
+  const isSelf = (member) => toNum(user?.id) === toNum(member?.id);
+
+  // helper: do I have any "edit others" ability?
+  const canEditOthers =
+      !!(editPermissions?.canEditAll || editPermissions?.canEditChild || editPermissions?.canEditDepartment);
+
+
   const canEditMember = (member) => {
-    // Backend'den gelen kesin yetki kontrolü
-    if (memberEditPermissions[member.id.toString()] !== undefined) {
-      return memberEditPermissions[member.id.toString()];
+    // Team view: self is only allowed if the user can edit others
+    if (isSelf(member)) return canEditOthers;
+
+    // If backend supplied a per-member answer, trust it
+    const key = String(member?.id);
+    if (memberEditPermissions[key] !== undefined) {
+      return memberEditPermissions[key];
     }
-    
-    // Fallback: Kendi attendance'ını her zaman düzenleyebilir
-    if (user && user.id === member.id) return true;
-    
-    // Yetki bilgisi yoksa false döndür
+
+    // Default conservative: no
     return false;
   };
+
 
 
 
@@ -1047,30 +1060,42 @@ const EmployeeTeamAttendance = ({ user }) => {
                                      <td className="p-3 border-b text-center">
                      <div className="flex gap-2 justify-center">
                        <button
-                         onClick={() => handleEdit(member.id)}
-                         disabled={isEditLoading || !canEditMember(member)}
-                         className={`px-3 py-1 text-xs rounded transition-colors ${
-                           isEditLoading || !canEditMember(member)
-                             ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
-                             : 'bg-blue-500 text-white hover:bg-blue-600'
-                         }`}
-                         title={!canEditMember(member) ? 'Bu kullanıcının attendance bilgisini düzenleme yetkiniz yok' : ''}
+                           onClick={() => handleEdit(member.id)}
+                           disabled={isEditLoading || !canEditMember(member)}
+                           className={`px-3 py-1 text-xs rounded transition-colors ${
+                               isEditLoading || !canEditMember(member)
+                                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                   : 'bg-blue-500 text-white hover:bg-blue-600'
+                           }`}
+                           title={
+                             !canEditMember(member)
+                                 ? (isSelf(member)
+                                     ? "Kendi attendance'ınızı takım görünümünden düzenleyemezsiniz"
+                                     : "Bu kullanıcının attendance bilgisini düzenleme yetkiniz yok")
+                                 : ''
+                           }
                        >
                          {isEditLoading ? 'Yükleniyor...' : 'Düzenle'}
                        </button>
                        {!(member.approved || member.isApproved) && (
-                         <button
-                           onClick={() => handleApprove(member.id)}
-                           disabled={!canEditMember(member)}
-                           className={`px-3 py-1 text-xs rounded transition-colors ${
-                             !canEditMember(member)
-                               ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
-                               : 'bg-green-500 text-white hover:bg-green-600'
-                           }`}
-                           title={!canEditMember(member) ? 'Bu kullanıcının attendance bilgisini onaylama yetkiniz yok' : ''}
-                         >
-                           Onayla
-                         </button>
+                           <button
+                               onClick={() => handleApprove(member.id)}
+                               disabled={!canEditMember(member)}
+                               className={`px-3 py-1 text-xs rounded transition-colors ${
+                                   !canEditMember(member)
+                                       ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                       : 'bg-green-500 text-white hover:bg-green-600'
+                               }`}
+                               title={
+                                 !canEditMember(member)
+                                     ? (isSelf(member)
+                                         ? "Kendi attendance'ınızı takım görünümünden onaylayamazsınız"
+                                         : "Bu kullanıcının attendance bilgisini onaylama yetkiniz yok")
+                                     : ''
+                               }
+                           >
+                             Onayla
+                           </button>
                        )}
                        {(member.approved || member.isApproved) && (
                          <span className="px-3 py-1 text-xs bg-gray-200 text-gray-600 rounded">

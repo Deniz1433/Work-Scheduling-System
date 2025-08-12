@@ -167,6 +167,25 @@ public class CustomAnnotationEvaluator implements PermissionEvaluator {
             return false;
       }
 
+      public boolean canApproveAttendance(Authentication authentication, Long targetUserId) {
+            String keycloakId = authentication.getName();
+            User actor = userRepository.findByKeycloakId(keycloakId).orElse(null);
+            if (actor == null) return false;
+
+            // For self: require the ability to approve/edit OTHERS (i.e., edit beyond self)
+            if (actor.getId().equals(targetUserId)) {
+                  return hasAnyPermission(authentication, null, List.of(
+                          "ADMIN_ALL",
+                          "EDIT_ALL_ATTENDANCE",
+                          "EDIT_CHILD_ATTENDANCE",
+                          "EDIT_DEPARTMENT_ATTENDANCE"
+                  ));
+            }
+
+            // For others: same scope as edit-perms for that target
+            return canEditAttendance(authentication, targetUserId);
+      }
+
       private boolean isInChildDepartments(Department parentDepartment, Department childDepartment) {
             if (parentDepartment == null || childDepartment == null) return false;
             if (parentDepartment.getId().equals(childDepartment.getId())) return true;

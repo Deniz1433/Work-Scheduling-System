@@ -71,11 +71,18 @@ public class AttendanceController {
             // Yetki kontrolü yap
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             Long targetUserId = Long.parseLong(req.getUserId());
-            
+
+            // ❌ Team view üzerinden kendini düzenleme yasak
+            Long currentUserId = getUserIdFromPrincipal(principal);
+            if (currentUserId.equals(targetUserId)) {
+                return ResponseEntity.status(403).body(Map.of("error", "You cannot edit your own attendance from the team view"));
+            }
+
             if (!permissionEvaluator.canEditAttendance(authentication, targetUserId)) {
                 return ResponseEntity.status(403).body(Map.of("error", "Insufficient permissions to edit this user's attendance"));
             }
-            
+
+
             // Frontend'den gelen userId'yi kullan, principal.getName() değil
             service.record(Long.parseLong(req.getUserId()), LocalDate.parse(req.getWeekStart()), req.getDates());
             System.out.println("Service call completed successfully");
@@ -112,12 +119,19 @@ public class AttendanceController {
         System.out.println("✅ Attendance approval request by user: " + principal.getName());
         
         try {
-            // Yetki kontrolü yap
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            if (!permissionEvaluator.canEditAttendance(authentication, userId)) {
+
+            // ❌ Team view üzerinden kendi attendance'ını onaylama yasak
+            Long currentUserId = getUserIdFromPrincipal(principal);
+            if (currentUserId.equals(userId)) {
+                return ResponseEntity.status(403).body(Map.of("error", "You cannot approve your own attendance from the team view"));
+            }
+
+            if (!permissionEvaluator.canApproveAttendance(authentication, userId)) {
                 return ResponseEntity.status(403).body(Map.of("error", "Insufficient permissions to approve this user's attendance"));
             }
-            
+
+
             service.approve(userId, LocalDate.parse(weekStart));
             System.out.println("✅ Attendance approved successfully!");
             return ResponseEntity.ok().build();
@@ -136,13 +150,20 @@ public class AttendanceController {
             if (excuse == null) {
                 return ResponseEntity.notFound().build();
             }
-            
-            // Yetki kontrolü yap
+
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            if (!permissionEvaluator.canEditAttendance(authentication, excuse.getUserId())) {
+
+            // ❌ Team view üzerinden kendi mazeretini onaylama yasak
+            Long currentUserId = getUserIdFromPrincipal(principal);
+            if (currentUserId.equals(excuse.getUserId())) {
+                return ResponseEntity.status(403).body(Map.of("error", "You cannot approve your own excuse from the team view"));
+            }
+
+            if (!permissionEvaluator.canApproveAttendance(authentication, excuse.getUserId())) {
                 return ResponseEntity.status(403).body(Map.of("error", "Insufficient permissions to approve this user's excuse"));
             }
-            
+
+
             Long userId = getUserIdFromPrincipal(principal);
             service.approveExcuse(id, userId.toString());
             return ResponseEntity.ok().build();
