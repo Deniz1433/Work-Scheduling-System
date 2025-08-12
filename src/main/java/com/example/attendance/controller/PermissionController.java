@@ -17,7 +17,7 @@ public class PermissionController {
     @Autowired
     private PermissionService permissionService;
 
-    @PreAuthorize("@CustomAnnotationEvaluator.hasAnyPermission(authentication, null, {'ADMIN_ALL', 'EDIT_ROLES'})")
+    @PreAuthorize("isAuthenticated()")
     @GetMapping
     public ResponseEntity<List<Permission>> getAllPermissions() {
         return ResponseEntity.ok(permissionService.getAllPermissions());

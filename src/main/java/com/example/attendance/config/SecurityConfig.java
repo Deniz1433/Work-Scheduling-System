@@ -1,8 +1,7 @@
 package com.example.attendance.config;
 
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
+import java.util.stream.Collectors;
 
 import org.keycloak.TokenVerifier;
 import org.keycloak.common.VerificationException;
@@ -39,40 +38,43 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                // disable CSRF for our stateless API endpoints
-                .csrf(csrf -> csrf
-                        .ignoringRequestMatchers("/api/attendance/**",
-                                "/api/admin/hierarchy/**", "/api/excuse/**",
-                                "/api/admin/**", "/api/departments/**", "/api/roles/**",
-                                "/api/role-permissions/**", "/api/holidays/**", "/api/user/**", "/api/userInfo/**"))
+                .csrf(csrf -> csrf.ignoringRequestMatchers(
+                        "/api/attendance/**",
+                        "/api/admin/hierarchy/**",
+                        "/api/excuse/**",
+                        "/api/admin/**",
+                        "/api/departments/**",
+                        "/api/roles/**",
+                        "/api/role-permissions/**",
+                        "/api/holidays/**",
+                        "/api/user/**",
+                        "/api/userInfo/**"
+                ))
                 .authorizeHttpRequests(auth -> auth
-                        // allow React static assets
-                        .requestMatchers(
-                                "/static/**",
-                                "/favicon.ico",
-                                "/css/**",
-                                "/js/**",
-                                "/images/**"
-                        ).permitAll()
-
-                        // diğer tüm istekler için authentication kontrolü
-                        .anyRequest()
-                        .authenticated()
+                        .requestMatchers("/static/**","/favicon.ico","/css/**","/js/**","/images/**").permitAll()
+                        .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth -> oauth
                         .defaultSuccessUrl("/", true)
-                        .userInfoEndpoint(userInfo -> userInfo
-                                .oidcUserService(oidcUserServiceWithTokenVerifier())))
+                        .userInfoEndpoint(userInfo -> userInfo.oidcUserService(oidcUserServiceWithTokenVerifier()))
+                )
                 .logout(logout -> logout
                         .logoutSuccessHandler(keycloakLogoutSuccessHandler())
                         .invalidateHttpSession(true)
                         .clearAuthentication(true)
-                        .deleteCookies("JSESSIONID"));
+                        .deleteCookies("JSESSIONID")
+                );
 
         return http.build();
     }
 
-    // Bu method'u değiştirmeyin - authentication için gerekli
+    /**
+     * Maps Keycloak roles/claims to Spring authorities:
+     * - Realm roles -> ROLE_realm_{role}
+     * - Client roles (attendance-client) -> ROLE_attendance_client_{role}
+     * - Optional custom claim 'permissions' -> PERM_{PermissionName}
+     * - If client/realm role 'superadmin' present -> grant a bundle of PERM_* (ADMIN_ALL, VIEW_ROLES, EDIT_ROLES, etc.)
+     */
     private OAuth2UserService<OidcUserRequest, OidcUser> oidcUserServiceWithTokenVerifier() {
         OidcUserService delegate = new OidcUserService();
         return userRequest -> {
@@ -80,36 +82,71 @@ public class SecurityConfig {
             Set<GrantedAuthority> mapped = new HashSet<>();
 
             try {
-                AccessToken kcToken = TokenVerifier
-                        .create(tokenString, AccessToken.class)
-                        .getToken();
+                AccessToken kcToken = TokenVerifier.create(tokenString, AccessToken.class).getToken();
 
-                // realm-level roles - bunları koruyun ama kullanmayın
+                // Realm roles -> authorities
                 if (kcToken.getRealmAccess() != null) {
                     kcToken.getRealmAccess().getRoles().forEach(
-                            r -> mapped.add(new SimpleGrantedAuthority("ROLE_realm_" + r)));
+                            r -> mapped.add(new SimpleGrantedAuthority("ROLE_realm_" + r))
+                    );
                 }
 
-                // client-specific roles - bunları koruyun ama kullanmayın
+                // Client roles (attendance-client) -> authorities
                 Map<String, AccessToken.Access> resources = kcToken.getResourceAccess();
+                boolean isSuperadmin = false;
                 if (resources != null && resources.containsKey("attendance-client")) {
-                    resources.get("attendance-client").getRoles()
-                            .forEach(r -> mapped.add(new SimpleGrantedAuthority(
-                                    "ROLE_attendance_client_"
-                                            + r.replace('-', '_'))));
+                    var clientRoles = resources.get("attendance-client").getRoles();
+                    for (String r : clientRoles) {
+                        String norm = r.replace('-', '_');
+                        mapped.add(new SimpleGrantedAuthority("ROLE_attendance_client_" + norm));
+                        if ("superadmin".equalsIgnoreCase(r)) {
+                            isSuperadmin = true;
+                        }
+                    }
                 }
+
+                // Optional: read custom claim "permissions" (add a protocol mapper in Keycloak!)
+                Object rawPerms = kcToken.getOtherClaims().get("permissions");
+                if (rawPerms instanceof Collection<?> perms) {
+                    for (Object p : perms) {
+                        String name = String.valueOf(p).trim();
+                        if (!name.isEmpty()) {
+                            mapped.add(new SimpleGrantedAuthority("PERM_" + name));
+                        }
+                    }
+                }
+
+                // If they have 'superadmin' client/realm role, grant a bundle of permissions
+                if (isSuperadmin
+                        || mapped.stream().anyMatch(a -> a.getAuthority().equalsIgnoreCase("ROLE_realm_superadmin"))) {
+                    grantSuperadminPermissions(mapped);
+                }
+
             } catch (VerificationException ignored) {
             }
 
             OidcUser userInfo = delegate.loadUser(userRequest);
-            return new DefaultOidcUser(
-                    mapped,
-                    userInfo.getIdToken(),
-                    userInfo.getUserInfo());
+            return new DefaultOidcUser(mapped, userInfo.getIdToken(), userInfo.getUserInfo());
         };
     }
 
-    // Bu method'u değiştirmeyin - logout için gerekli
+    private void grantSuperadminPermissions(Set<GrantedAuthority> mapped) {
+        // Grant whatever your app needs to pass the @PreAuthorize checks
+        List<String> perms = List.of(
+                "ADMIN_ALL",
+                "VIEW_ROLES",
+                "EDIT_ROLES",
+                "CREATE_ROLE",
+                "VIEW_ALL_ATTENDANCE",
+                "EDIT_ALL_ATTENDANCE",
+                "VIEW_ALL_USERS",
+                "VIEW_ALL_DEPARTMENTS",
+                "VIEW_HOLIDAYS",
+                "VIEW_DEPARTMENT_HIERARCHY"
+        );
+        perms.forEach(p -> mapped.add(new SimpleGrantedAuthority("PERM_" + p)));
+    }
+
     private LogoutSuccessHandler keycloakLogoutSuccessHandler() {
         return (request, response, auth) -> {
             String redirectUri = "http://localhost:8080/";
@@ -131,9 +168,8 @@ public class SecurityConfig {
 
     @Bean
     public MethodSecurityExpressionHandler methodSecurityExpressionHandler() {
-        DefaultMethodSecurityExpressionHandler expressionHandler = new DefaultMethodSecurityExpressionHandler();
-        expressionHandler.setPermissionEvaluator(customAnnotationEvaluator);
-        return expressionHandler;
+        DefaultMethodSecurityExpressionHandler handler = new DefaultMethodSecurityExpressionHandler();
+        handler.setPermissionEvaluator(customAnnotationEvaluator);
+        return handler;
     }
 }
-

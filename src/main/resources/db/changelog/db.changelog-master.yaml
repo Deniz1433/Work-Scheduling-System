@@ -559,23 +559,40 @@ databaseChangeLog:
       id: migrate-department-node-position-pk
       author: emir
       changes:
+        # 1) Drop existing PK on 'department'
         - dropPrimaryKey:
             tableName: department_node_position
-            constraintName: department_node_position_pkey
+            # safer to omit constraintName, or set the exact one for your DB
+            # constraintName: department_node_position_pkey
+
+        # 2) Add new id column
         - addColumn:
             tableName: department_node_position
             columns:
               - column:
                   name: id
                   type: BIGINT
-                  autoIncrement: true
+
+        # 3) Make it auto-increment (creates sequence + default)
+        - addAutoIncrement:
+            tableName: department_node_position
+            columnName: id
+            columnDataType: BIGINT
+
+        # 4) Backfill existing rows so id is not NULL
+        - sql:
+            sql: "UPDATE department_node_position SET id = DEFAULT WHERE id IS NULL;"
+
+        # 5) Enforce NOT NULL
+        - addNotNullConstraint:
+            tableName: department_node_position
+            columnName: id
+            columnDataType: BIGINT
+
+        # 6) Make it the primary key
         - addPrimaryKey:
             tableName: department_node_position
             columnNames: id
             constraintName: pk_department_node_position_id
-        - modifyDataType:
-            tableName: department_node_position
-            columnName: department
-            newDataType: VARCHAR(100)
 
  
