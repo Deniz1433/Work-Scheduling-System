@@ -15,6 +15,16 @@ const EmployeeTeamAttendance = ({ user }) => {
   const [selectedDepartments, setSelectedDepartments] = useState([]);
   const [selectedRoles, setSelectedRoles] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedWorkStatus, setSelectedWorkStatus] = useState([]);
+  
+  // Çalışma durumu seçenekleri
+  const workStatusOptions = [
+    { value: '1', label: 'Ofiste' },
+    { value: '2', label: 'Uzaktan' },
+    { value: '3', label: 'İzinli' },
+    { value: '4', label: 'Mazeretli' }
+  ];
+  
   const [userPermissions, setUserPermissions] = useState(null);
   const [editPermissions, setEditPermissions] = useState(null);
   const [memberEditPermissions, setMemberEditPermissions] = useState({});
@@ -123,16 +133,29 @@ const EmployeeTeamAttendance = ({ user }) => {
       if (selectedDepartments.length > 0) {
         const deptIds = selectedDepartments.map(dept => dept.value).join(',');
         params.append('departmentId', deptIds);
+        console.log('🔍 Adding department filter:', deptIds);
       }
       if (selectedRoles.length > 0) {
         const roleIds = selectedRoles.map(role => role.value).join(',');
         params.append('roleId', roleIds);
+        console.log('🔍 Adding role filter:', roleIds);
       }
-      if (searchTerm) params.append('searchTerm', searchTerm);
+      if (searchTerm) {
+        params.append('searchTerm', searchTerm);
+        console.log('🔍 Adding search filter:', searchTerm);
+      }
+      if (selectedWorkStatus.length > 0) {
+        const workStatusIds = selectedWorkStatus.map(status => status.value).join(',');
+        params.append('workStatus', workStatusIds);
+        console.log('🔍 Adding workStatus filter:', workStatusIds);
+        console.log('🔍 Selected work status options:', selectedWorkStatus);
+      }
 
+      console.log('🔍 Fetching team data with params:', params.toString());
       const response = await fetch(`/api/attendance/team?${params.toString()}`);
       const data = await response.json();
-      console.log(data);
+      console.log('🔍 Backend response:', data);
+      console.log('🔍 Response status:', response.status);
       
       // Veri formatını kontrol et
       if (!Array.isArray(data)) {
@@ -142,6 +165,7 @@ const EmployeeTeamAttendance = ({ user }) => {
         return;
       }
       
+      console.log('🔍 Setting team state with', data.length, 'users');
       setTeamState(data);
       
       // Takım üyelerinin edit yetkilerini kontrol et
@@ -180,6 +204,7 @@ const EmployeeTeamAttendance = ({ user }) => {
     setSelectedDepartments([]);
     setSelectedRoles([]);
     setSearchTerm('');
+    setSelectedWorkStatus([]);
   };
 
   // Excel export fonksiyonu
@@ -223,7 +248,10 @@ const EmployeeTeamAttendance = ({ user }) => {
          'Rol Filtresi': selectedRoles.length > 0 
            ? selectedRoles.map(r => r.label).join(', ') 
            : 'Tüm Roller',
-         'Arama Terimi': searchTerm || 'Yok'
+         'Arama Terimi': searchTerm || 'Yok',
+         'Çalışma Durumu Filtresi': selectedWorkStatus.length > 0 
+           ? selectedWorkStatus.map(s => s.label).join(', ') 
+           : 'Tüm Durumlar'
        };
 
       // Workbook oluşturma
@@ -244,7 +272,8 @@ const EmployeeTeamAttendance = ({ user }) => {
         { 'Bilgi': 'Filtre Bilgileri', 'Değer': '' },
         { 'Bilgi': 'Departman Filtresi', 'Değer': filterInfo['Departman Filtresi'] },
         { 'Bilgi': 'Rol Filtresi', 'Değer': filterInfo['Rol Filtresi'] },
-        { 'Bilgi': 'Arama Terimi', 'Değer': filterInfo['Arama Terimi'] }
+        { 'Bilgi': 'Arama Terimi', 'Değer': filterInfo['Arama Terimi'] },
+        { 'Bilgi': 'Çalışma Durumu Filtresi', 'Değer': filterInfo['Çalışma Durumu Filtresi'] }
       ];
       const wsInfo = XLSX.utils.json_to_sheet(infoData);
       XLSX.utils.book_append_sheet(wb, wsInfo, 'Bilgiler');
@@ -605,7 +634,7 @@ const EmployeeTeamAttendance = ({ user }) => {
       <div className="mb-6 bg-gray-50 p-4 rounded-lg border">
                  <h3 className="text-lg font-medium text-gray-800 mb-4">Sorgu Seçenekleri</h3>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
                      {/* Departman Filtresi */}
            <div>
              <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -691,7 +720,7 @@ const EmployeeTeamAttendance = ({ user }) => {
                  multiValue: (provided) => ({
                    ...provided,
                    backgroundColor: '#3b82f6',
-                   color: 'white'
+                   color: 'text-white'
                  }),
                  multiValueLabel: (provided) => ({
                    ...provided,
@@ -720,6 +749,52 @@ const EmployeeTeamAttendance = ({ user }) => {
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="İsim, soyisim veya email..."
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+
+          {/* Çalışma Durumu Filtresi */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Çalışma Durumu
+            </label>
+            <Select
+              isMulti
+              value={selectedWorkStatus}
+              onChange={setSelectedWorkStatus}
+              options={workStatusOptions}
+              placeholder="Durum seçin..."
+              className="text-sm"
+              classNamePrefix="select"
+              noOptionsMessage={() => "Durum bulunamadı"}
+              isClearable={true}
+              isSearchable={true}
+              styles={{
+                control: (provided, state) => ({
+                  ...provided,
+                  borderColor: state.isFocused ? '#3b82f6' : '#d1d5db',
+                  boxShadow: state.isFocused ? '0 0 0 1px #3b82f6' : 'none',
+                  '&:hover': {
+                    borderColor: '#3b82f6'
+                  }
+                }),
+                multiValue: (provided) => ({
+                  ...provided,
+                  backgroundColor: '#3b82f6',
+                  color: 'white'
+                }),
+                multiValueLabel: (provided) => ({
+                  ...provided,
+                  color: 'white'
+                }),
+                multiValueRemove: (provided) => ({
+                  ...provided,
+                  color: 'white',
+                  '&:hover': {
+                    backgroundColor: '#2563eb',
+                    color: 'white'
+                  }
+                })
+              }}
             />
           </div>
 
@@ -896,7 +971,7 @@ const EmployeeTeamAttendance = ({ user }) => {
         <div className="flex justify-between items-center mb-4">
                      <h2 className="text-xl">
              {userPermissions ? (
-               selectedDepartments.length > 0 || selectedRoles.length > 0 || searchTerm.trim()
+               selectedDepartments.length > 0 || selectedRoles.length > 0 || searchTerm.trim() || selectedWorkStatus.length > 0
                  ? 'Filtrelenmiş Takım Verileri'
                  : userPermissions.canViewAll ? 'Tüm Takım Verileri' :
                    userPermissions.canViewChild ? 'Alt Departman Takım Verileri' :
@@ -983,13 +1058,13 @@ const EmployeeTeamAttendance = ({ user }) => {
           <div className="text-gray-500 mb-4">
             <div className="text-4xl mb-2">🔍</div>
                          <div className="text-lg font-medium">
-               {selectedDepartments.length > 0 || selectedRoles.length > 0 || searchTerm.trim() 
+               {selectedDepartments.length > 0 || selectedRoles.length > 0 || searchTerm.trim() || selectedWorkStatus.length > 0
                  ? 'Filtreleme kriterlerine uygun kişi bulunamadı' 
                  : 'Veri yüklenmedi'
                }
              </div>
              <div className="text-sm">
-               {selectedDepartments.length > 0 || selectedRoles.length > 0 || searchTerm.trim()
+               {selectedDepartments.length > 0 || selectedRoles.length > 0 || searchTerm.trim() || selectedWorkStatus.length > 0
                  ? 'Farklı filtre seçenekleri deneyebilirsiniz.'
                  : 'Verileri Getir butonuna tıklayarak kullanıcıları görüntüleyebilirsiniz.'
                }

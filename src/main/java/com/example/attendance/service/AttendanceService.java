@@ -197,13 +197,14 @@ public class AttendanceService {
             Authentication authentication,
             String departmentId, 
             String roleId, 
-            String searchTerm
+            String searchTerm,
+            String workStatus
     ) {
         System.out.println("🔍 getTeamAttendanceWithFiltersAndPermissions called with:");
         System.out.println("  - keycloakId: " + keycloakId);
-        System.out.println("  - departmentId: " + departmentId);
         System.out.println("  - roleId: " + roleId);
         System.out.println("  - searchTerm: " + searchTerm);
+        System.out.println("  - workStatus: " + workStatus);
         
         // 1. Kullanıcıyı keycloakId'ye göre bul
         User currentUser = userRepo.findByKeycloakId(keycloakId).orElse(null);
@@ -301,6 +302,49 @@ public class AttendanceService {
                     return dto;
                 })
                 .collect(Collectors.toList());
+
+        // 7. WorkStatus filtresini uygula (eğer belirtilmişse)
+        if (workStatus != null && !workStatus.trim().isEmpty()) {
+            String[] statuses = workStatus.split(",");
+            System.out.println("🔍 Applying workStatus filter for: " + String.join(", ", statuses));
+            System.out.println("🔍 Total users before workStatus filtering: " + result.size());
+            
+            result = result.stream()
+                .filter(dto -> {
+                    if (dto.getAttendance() == null || dto.getAttendance().isEmpty()) {
+                        System.out.println("🔍 Filtering out user " + dto.getName() + " - no attendance data");
+                        return false;
+                    }
+                    
+                    System.out.println("🔍 Checking user " + dto.getName() + " with attendance: " + dto.getAttendance());
+                    
+                    // Kullanıcının hafta içinde en az bir gününde belirtilen durumda olup olmadığını kontrol et
+                    boolean hasMatchingStatus = false;
+                    for (Integer status : dto.getAttendance()) {
+                        if (status != null) { // 0 = veri yok, 1-5 = çeşitli durumlar
+                            for (String requestedStatus : statuses) {
+                                if (status.toString().equals(requestedStatus.trim())) {
+                                    System.out.println("🔍 User " + dto.getName() + " matches status " + status + " (requested: " + requestedStatus + ")");
+                                    hasMatchingStatus = true;
+                                    break;
+                                }
+                            }
+                            if (hasMatchingStatus) break;
+                        }
+                    }
+                    
+                    if (!hasMatchingStatus) {
+                        System.out.println("🔍 Filtering out user " + dto.getName() + " - no matching status. Attendance: " + dto.getAttendance());
+                    }
+                    
+                    return hasMatchingStatus;
+                })
+                .collect(Collectors.toList());
+            
+            System.out.println("🔍 Users after workStatus filtering: " + result.size());
+        } else {
+            System.out.println("🔍 No workStatus filter applied, showing all users");
+        }
                 
         System.out.println("✅ Returning " + result.size() + " team members with permissions");
         return result;
@@ -310,6 +354,10 @@ public class AttendanceService {
         LocalDate today = LocalDate.now();
         int dayOfWeek = today.getDayOfWeek().getValue(); // 1=Pazartesi, 7=Pazar
         int daysUntilNextMonday = (8 - dayOfWeek) % 7; // Bir sonraki pazartesiye kaç gün var
+        // Pazartesi günü isek (0 gün), frontend'in gösterdiği gibi daima bir SONRAKİ haftayı alalım
+        if (daysUntilNextMonday == 0) {
+            daysUntilNextMonday = 7;
+        }
         return today.plusDays(daysUntilNextMonday);
     }
 

@@ -187,11 +187,14 @@ public class AttendanceController {
             Principal principal,
             @RequestParam(required = false) String departmentId,
             @RequestParam(required = false) String roleId,
-            @RequestParam(required = false) String searchTerm
+            @RequestParam(required = false) String searchTerm,
+            @RequestParam(required = false) String workStatus
     ) {
         try {
             String keycloakId = principal.getName();
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            
+            System.out.println("🔍 Controller received workStatus: " + workStatus);
             
             // Yetki kontrolü - hangi kullanıcıları görebileceğini belirle
             List<TeamAttendanceDto> team = service.getTeamAttendanceWithFiltersAndPermissions(
@@ -199,7 +202,8 @@ public class AttendanceController {
                 authentication,
                 departmentId, 
                 roleId, 
-                searchTerm
+                searchTerm,
+                workStatus
             );
             return ResponseEntity.ok(team);
         } catch (Exception e) {
