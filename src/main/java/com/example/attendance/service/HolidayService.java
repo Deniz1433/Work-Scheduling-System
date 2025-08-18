@@ -60,4 +60,16 @@ public class HolidayService {
         return holidayRepository.findByCountryCodeAndDateBetween("TR", startDate, endDate);
     }
 
+    // Belirli bir tarih için tatil kontrolü
+    public List<Holiday> getHolidaysForDate(LocalDate date) {
+        // Hem date hem de endDate aralığında olan tatilleri bul
+        List<Holiday> holidays = holidayRepository.findByCountryCode("TR");
+        return holidays.stream()
+                .filter(holiday -> {
+                    LocalDate startDate = holiday.getDate();
+                    LocalDate endDate = holiday.getEndDate() != null ? holiday.getEndDate() : startDate;
+                    return !date.isBefore(startDate) && !date.isAfter(endDate);
+                })
+                .collect(Collectors.toList());
+    }
 } 

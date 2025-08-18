@@ -902,8 +902,45 @@ const EmployeeTeamAttendance = ({ user }) => {
                     </div>
 
                     {/* Durum Seçenekleri */}
-                    <div className="space-y-3">{
-                      tempAttendance[index] != 5 && (
+                    <div className="space-y-3">
+                      {tempAttendance[index] === 5 ? (
+                        // Tatil günü - seçenekleri göster (superadmin için)
+                        <div className="space-y-2">
+                          <div className="text-center mb-2">
+                            <div className="w-4 h-4 bg-orange-500 rounded-full mx-auto mb-1"></div>
+                            <span className="text-xs text-orange-700 font-medium">Resmi Tatil</span>
+                          </div>
+                          {[
+                            { value: 1, label: 'Ofiste', color: 'green' },
+                            { value: 2, label: 'Uzaktan', color: 'blue' },
+                          ].map((option) => (
+                            <label key={option.value} className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="radio"
+                                name={`attendance-${index}`}
+                                checked={tempAttendance[index] === option.value}
+                                onChange={() => handleTempAttendanceChange(index, option.value)}
+                                className="sr-only"
+                              />
+                              <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${tempAttendance[index] === option.value
+                                ? `bg-${option.color}-500 border-${option.color}-500`
+                                : `border-${option.color}-300 hover:border-${option.color}-400`
+                                }`}>
+                                {tempAttendance[index] === option.value && (
+                                  <div className="w-2 h-2 bg-white rounded-full"></div>
+                                )}
+                              </div>
+                              <span className={`text-xs ${tempAttendance[index] === option.value
+                                ? `text-${option.color}-700 font-medium`
+                                : 'text-gray-600'
+                                }`}>
+                                {option.label}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      ) : (
+                        // Normal gün - seçenekleri göster
                         [
                           { value: 1, label: 'Ofiste', color: 'green' },
                           { value: 2, label: 'Uzaktan', color: 'blue' },
@@ -931,7 +968,8 @@ const EmployeeTeamAttendance = ({ user }) => {
                               {option.label}
                             </span>
                           </label>
-                        )))}
+                        ))
+                      )}
                     </div>
                   </div>
                 ))}
@@ -1117,15 +1155,17 @@ const EmployeeTeamAttendance = ({ user }) => {
                   </td>
                   {member.attendance.map((status, dayIndex) => {
                     const style = getAttendanceStyle(status);
+                    const isHoliday = status === 5;
                     return (
                       <td key={dayIndex} className="p-3 border-r border-b text-center">
                         <div className="flex flex-col items-center gap-1">
-                          <div className={`w-6 h-6 rounded-full border-2 ${style.bg} ${style.border} flex items-center justify-center`}>
-
+                          <div 
+                            className={`w-6 h-6 rounded-full border-2 ${style.bg} ${style.border} flex items-center justify-center ${isHoliday ? 'cursor-help' : ''}`}
+                            title={isHoliday ? 'Resmi Tatil - Değiştirilemez' : ''}
+                          >
                             <div className={`w-3 h-3 ${style.inner} rounded-full`}></div>
-
                           </div>
-                          <div className="text-xs text-gray-500">
+                          <div className={`text-xs ${isHoliday ? 'text-orange-600 font-medium' : 'text-gray-500'}`}>
                             {getAttendanceLabel(status)}
                           </div>
                         </div>
@@ -1175,6 +1215,11 @@ const EmployeeTeamAttendance = ({ user }) => {
                        {(member.approved || member.isApproved) && (
                          <span className="px-3 py-1 text-xs bg-gray-200 text-gray-600 rounded">
                            Onaylandı
+                         </span>
+                       )}
+                       {member.attendance.some(status => status === 5) && (
+                         <span className="px-3 py-1 text-xs bg-orange-200 text-orange-600 rounded">
+                           Tatil Günleri
                          </span>
                        )}
                      </div>

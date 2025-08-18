@@ -56,4 +56,46 @@ public class HolidayController {
         holidayService.deleteHoliday(id);
         return ResponseEntity.noContent().build();
     }
+
+    // Belirli bir tarihin tatil olup olmadığını kontrol et
+    @GetMapping("/check")
+    public ResponseEntity<Object> checkHoliday(@RequestParam String date) {
+        try {
+            System.out.println("=== HOLIDAY CHECK DEBUG ===");
+            System.out.println("Requested date: " + date);
+            
+            java.time.LocalDate localDate = java.time.LocalDate.parse(date);
+            System.out.println("Parsed LocalDate: " + localDate);
+            
+            // Tüm tatilleri kontrol et
+            List<Holiday> allHolidays = holidayService.getAllHolidays();
+            System.out.println("Total holidays in database: " + allHolidays.size());
+            for (Holiday holiday : allHolidays) {
+                System.out.println("Holiday: " + holiday.getName() + " - " + holiday.getDate() + " to " + holiday.getEndDate());
+            }
+            
+            // Belirli tarih için tatil kontrolü
+            List<Holiday> holidaysForDate = holidayService.getHolidaysForDate(localDate);
+            System.out.println("Holidays for date " + localDate + ": " + holidaysForDate.size());
+            for (Holiday holiday : holidaysForDate) {
+                System.out.println("Found holiday: " + holiday.getName() + " - " + holiday.getDate() + " to " + holiday.getEndDate());
+            }
+            
+            boolean isHoliday = holidaysForDate.size() > 0;
+            System.out.println("Is holiday: " + isHoliday);
+            System.out.println("=== END HOLIDAY CHECK DEBUG ===");
+            
+            java.util.Map<String, Object> response = new java.util.HashMap<>();
+            response.put("isHoliday", isHoliday);
+            response.put("date", date);
+            response.put("totalHolidays", allHolidays.size());
+            response.put("holidaysForDate", holidaysForDate.size());
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            System.err.println("Holiday check error: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body("Geçersiz tarih formatı: " + e.getMessage());
+        }
+    }
 } 

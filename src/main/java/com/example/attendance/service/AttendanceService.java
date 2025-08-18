@@ -22,15 +22,17 @@ import java.util.stream.Collectors;
 @Service
 public class AttendanceService {
     private final AttendanceRepository repo;
-    private final ExcuseRepository excuseRepo;
     private final UserRepository userRepo;
+    private final ExcuseRepository excuseRepo;
     private final CustomAnnotationEvaluator permissionEvaluator;
+    private final HolidayService holidayService;
 
-    public AttendanceService(AttendanceRepository repo, UserRepository userRepo, ExcuseRepository excuseRepo, CustomAnnotationEvaluator permissionEvaluator) {
+    public AttendanceService(AttendanceRepository repo, UserRepository userRepo, ExcuseRepository excuseRepo, CustomAnnotationEvaluator permissionEvaluator, HolidayService holidayService) {
         this.repo = repo;
         this.userRepo = userRepo;
         this.excuseRepo = excuseRepo;
         this.permissionEvaluator = permissionEvaluator;
+        this.holidayService = holidayService;
     }
 
     
@@ -67,11 +69,16 @@ public class AttendanceService {
                         List<Integer> attendanceIntegers = attendance.getDates().stream()
                                 .map(day -> day) 
                                 .collect(Collectors.toList());
+                        // Tatil günlerini kontrol et ve güncelle
+                        attendanceIntegers = updateAttendanceWithHolidays(attendanceIntegers, nextWeekStart);
                         dto.setAttendance(attendanceIntegers);
                         dto.setApproved(attendance.isApproved());
                     } else {
                         // Attendance kaydı yoksa varsayılan değerler
-                        dto.setAttendance(List.of(0,0,0,0,0));
+                        List<Integer> defaultAttendance = List.of(0,0,0,0,0);
+                        // Tatil günlerini kontrol et ve güncelle
+                        defaultAttendance = updateAttendanceWithHolidays(defaultAttendance, nextWeekStart);
+                        dto.setAttendance(defaultAttendance);
                         dto.setApproved(false);
                     }
 
@@ -175,11 +182,16 @@ public class AttendanceService {
                         List<Integer> attendanceIntegers = attendance.getDates().stream()
                                 .map(day -> day) 
                                 .collect(Collectors.toList());
+                        // Tatil günlerini kontrol et ve güncelle
+                        attendanceIntegers = updateAttendanceWithHolidays(attendanceIntegers, nextWeekStart);
                         dto.setAttendance(attendanceIntegers);
                         dto.setApproved(attendance.isApproved());
                     } else {
                         // Attendance kaydı yoksa varsayılan değerler
-                        dto.setAttendance(List.of(0,0,0,0,0));
+                        List<Integer> defaultAttendance = List.of(0,0,0,0,0);
+                        // Tatil günlerini kontrol et ve güncelle
+                        defaultAttendance = updateAttendanceWithHolidays(defaultAttendance, nextWeekStart);
+                        dto.setAttendance(defaultAttendance);
                         dto.setApproved(false);
                     }
 
@@ -290,11 +302,16 @@ public class AttendanceService {
                         List<Integer> attendanceIntegers = attendance.getDates().stream()
                                 .map(day -> day) 
                                 .collect(Collectors.toList());
+                        // Tatil günlerini kontrol et ve güncelle
+                        attendanceIntegers = updateAttendanceWithHolidays(attendanceIntegers, nextWeekStart);
                         dto.setAttendance(attendanceIntegers);
                         dto.setApproved(attendance.isApproved());
                     } else {
                         // Attendance kaydı yoksa varsayılan değerler
-                        dto.setAttendance(List.of(0,0,0,0,0));
+                        List<Integer> defaultAttendance = List.of(0,0,0,0,0);
+                        // Tatil günlerini kontrol et ve güncelle
+                        defaultAttendance = updateAttendanceWithHolidays(defaultAttendance, nextWeekStart);
+                        dto.setAttendance(defaultAttendance);
                         dto.setApproved(false);
                     }
 
@@ -362,12 +379,41 @@ public class AttendanceService {
     }
 
     /**
+     * Belirli bir tarihin tatil olup olmadığını kontrol eder
+     */
+    private boolean isHoliday(LocalDate date) {
+        return holidayService.getHolidaysBetweenDates(date, date).size() > 0;
+    }
+
+    /**
+     * Hafta için tatil günlerini kontrol eder ve attendance listesini günceller
+     */
+    private List<Integer> updateAttendanceWithHolidays(List<Integer> attendance, LocalDate weekStart) {
+        List<Integer> updatedAttendance = new ArrayList<>(attendance);
+        
+        for (int i = 0; i < 5; i++) {
+            LocalDate currentDate = weekStart.plusDays(i);
+            if (isHoliday(currentDate)) {
+                updatedAttendance.set(i, 5); // 5 = Resmi Tatil
+            }
+        }
+        
+        return updatedAttendance;
+    }
+
+    /**
      * Overwrites this user's attendance for the current week (Mon–Fri)
      * by first deleting any existing rows in that range, then saving the new ones.
      */
     @Transactional    // ← ensure this method is transactional
     public void record(Long userId, LocalDate weekStart, List<Integer> dates) {
         System.out.println("Record method called with userId: " + userId + ", weekStart: " + weekStart + ", dates: " + dates);
+        
+        // Tatil günlerini otomatik olarak 5 yapma - superadmin değişiklik yapabilir
+        // List<Integer> datesWithHolidays = updateAttendanceWithHolidays(dates, weekStart);
+        List<Integer> datesWithHolidays = new ArrayList<>(dates);
+        System.out.println("Original dates: " + dates);
+        System.out.println("Dates with holidays: " + datesWithHolidays);
         
         // 1) Attendance verisi var ise al
         Attendance attendance = repo.findByUserIdAndWeekStart(userId, weekStart);
@@ -377,11 +423,11 @@ public class AttendanceService {
         if(attendance == null) {
             System.out.println("Creating new attendance record");
             Attendance newAttendance = new Attendance(userId, weekStart);
-            newAttendance.setMonday(dates.get(0));
-            newAttendance.setTuesday(dates.get(1));
-            newAttendance.setWednesday(dates.get(2));
-            newAttendance.setThursday(dates.get(3));
-            newAttendance.setFriday(dates.get(4));
+            newAttendance.setMonday(datesWithHolidays.get(0));
+            newAttendance.setTuesday(datesWithHolidays.get(1));
+            newAttendance.setWednesday(datesWithHolidays.get(2));
+            newAttendance.setThursday(datesWithHolidays.get(3));
+            newAttendance.setFriday(datesWithHolidays.get(4));
             newAttendance.setApproved(false);
             Attendance saved = repo.save(newAttendance);
             System.out.println("New attendance saved with ID: " + saved.getId());
@@ -389,11 +435,11 @@ public class AttendanceService {
         // Attendance kaydı var ise güncelle
         else{
             System.out.println("Updating existing attendance record with ID: " + attendance.getId());
-            attendance.setMonday(dates.get(0));
-            attendance.setTuesday(dates.get(1));
-            attendance.setWednesday(dates.get(2));
-            attendance.setThursday(dates.get(3));
-            attendance.setFriday(dates.get(4));
+            attendance.setMonday(datesWithHolidays.get(0));
+            attendance.setTuesday(datesWithHolidays.get(1));
+            attendance.setWednesday(datesWithHolidays.get(2));
+            attendance.setThursday(datesWithHolidays.get(3));
+            attendance.setFriday(datesWithHolidays.get(4));
             attendance.setApproved(false);
             Attendance saved = repo.save(attendance); // Bu satır eksikti!
             System.out.println("Attendance updated successfully with ID: " + saved.getId());
@@ -403,10 +449,14 @@ public class AttendanceService {
     public ArrayList<Object> fetch(Long userId, LocalDate weekStart) {
         Attendance attendance = repo.findByUserIdAndWeekStart(userId, weekStart);   
         if(attendance == null) {
-                return new ArrayList<>(List.of(List.of(0, 0, 0, 0, 0), false));
+            List<Integer> defaultAttendance = List.of(0, 0, 0, 0, 0);
+            // Tatil günlerini kontrol et ve güncelle
+            defaultAttendance = updateAttendanceWithHolidays(defaultAttendance, weekStart);
+            return new ArrayList<>(List.of(defaultAttendance, false));
         }
-        return new ArrayList<>(List.of(attendance.getDates(), attendance.isApproved()));
-
+        
+        List<Integer> attendanceWithHolidays = updateAttendanceWithHolidays(attendance.getDates(), weekStart);
+        return new ArrayList<>(List.of(attendanceWithHolidays, attendance.isApproved()));
     }
 
     public void approve(Long id, LocalDate weekStart) {

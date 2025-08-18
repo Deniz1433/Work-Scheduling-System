@@ -72,7 +72,8 @@ const EmployeeAttendanceRegistration = () => {
         { value: 1, label: 'Ofiste', color: 'text-green-600' },
         { value: 2, label: 'Uzaktan', color: 'text-blue-600' },
         { value: 3, label: 'İzinli', color: 'text-yellow-600' },
-        { value: 4, label: 'Mazeretli', color: 'text-purple-600' }
+        { value: 4, label: 'Mazeretli', color: 'text-purple-600' },
+        { value: 5, label: 'Resmi Tatil', color: 'text-orange-600' }
     ];
 
     const statusStyles = {
@@ -108,9 +109,65 @@ const EmployeeAttendanceRegistration = () => {
                 const attendanceResponse = await axios.get(`/api/attendance/${weekStart}`);
                 const attendanceData = attendanceResponse.data;
                 
+                console.log('weekStart:', weekStart);
+                console.log('weekDaysStrings:', weekDaysStrings);
+                console.log('attendanceData:', attendanceData);
+                
                 if (attendanceData && attendanceData.length === 2) {
-                    setWeeklyStatus(attendanceData[0]);
-                    setOriginalWeeklyStatus(attendanceData[0]);
+                    // Tatil günlerini kontrol et ve güncelle
+                    let updatedStatus = [...attendanceData[0]];
+                    console.log('Original status:', updatedStatus);
+                    
+                    for (let i = 0; i < 5; i++) {
+                        const currentDate = weekDaysStrings[i];
+                        console.log(`Checking holiday for date ${i}: ${currentDate}`);
+                        
+                        // Backend'den tatil kontrolü yap
+                        try {
+                            const holidayResponse = await axios.get(`/api/holidays/check?date=${currentDate}`);
+                            console.log(`Holiday response for ${currentDate}:`, holidayResponse.data);
+                            
+                            if (holidayResponse.data && holidayResponse.data.isHoliday) {
+                                console.log(`Date ${currentDate} is a holiday, setting status to 5`);
+                                updatedStatus[i] = 5; // 5 = Resmi Tatil
+                            } else {
+                                console.log(`Date ${currentDate} is NOT a holiday`);
+                            }
+                        } catch (error) {
+                            console.error(`Holiday check failed for date: ${currentDate}`, error);
+                        }
+                    }
+                    
+                    console.log('Updated status after holiday check:', updatedStatus);
+                    setWeeklyStatus(updatedStatus);
+                    setOriginalWeeklyStatus(updatedStatus);
+                } else {
+                    // Attendance kaydı yoksa tatil günlerini kontrol et
+                    let defaultStatus = [0, 0, 0, 0, 0];
+                    console.log('No attendance data, checking holidays for default status');
+                    
+                    for (let i = 0; i < 5; i++) {
+                        const currentDate = weekDaysStrings[i];
+                        console.log(`Checking holiday for default date ${i}: ${currentDate}`);
+                        
+                        try {
+                            const holidayResponse = await axios.get(`/api/holidays/check?date=${currentDate}`);
+                            console.log(`Holiday response for default ${currentDate}:`, holidayResponse.data);
+                            
+                            if (holidayResponse.data && holidayResponse.data.isHoliday) {
+                                console.log(`Default date ${currentDate} is a holiday, setting status to 5`);
+                                defaultStatus[i] = 5; // 5 = Resmi Tatil
+                            } else {
+                                console.log(`Default date ${currentDate} is NOT a holiday`);
+                            }
+                        } catch (error) {
+                            console.error(`Default holiday check failed for date: ${currentDate}`, error);
+                        }
+                    }
+                    
+                    console.log('Default status after holiday check:', defaultStatus);
+                    setWeeklyStatus(defaultStatus);
+                    setOriginalWeeklyStatus(defaultStatus);
                 }
                 console.log('Attendance data:', attendanceData);
                 
@@ -133,6 +190,17 @@ const EmployeeAttendanceRegistration = () => {
     }, [weekStart, user]);
 
     const handleStatusChange = async (dayIndex, newStatus) => {
+        // Tatil günü kontrolü
+        if (weeklyStatus[dayIndex] === 5) {
+            Swal.fire({
+                title: 'Uyarı',
+                text: 'Resmi tatil günlerinde değişiklik yapamazsınız.',
+                icon: 'warning',
+                confirmButtonText: 'Tamam'
+            });
+            return;
+        }
+
         const oldStatus = weeklyStatus[dayIndex];
         const newStatusInt = parseInt(newStatus);
         const excuseDate = weekDaysStrings[dayIndex];
