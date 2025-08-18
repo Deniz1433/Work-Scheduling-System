@@ -1,12 +1,6 @@
 import React, { useLayoutEffect, useEffect, useRef, useState } from 'react';
 import cytoscape from 'cytoscape';
 
-const GRID = 24; // px – tweak to taste
-const snap = (x) => Math.round(x / GRID) * GRID;
-const snapPos = (p) => ({ x: snap(p.x), y: snap(p.y) });
-
-
-
 const AdminDepartmentHierarchy = () => {
     const cyRef = useRef(null);
     const containerRef = useRef(null);
@@ -70,56 +64,14 @@ const AdminDepartmentHierarchy = () => {
         reloadHierarchy();
     }, []);
 
-    // Keep CSS grid in sync with graph coordinates (zoom/pan)
-    const applyGridTransform = () => {
-        const el = containerRef.current;
-        if (!el || !cyRef.current) return;
-
-        const cy = cyRef.current;
-        const z = cy.zoom();
-        const pan = cy.pan();
-
-        // Minor / Major spacing in *rendered* pixels
-        const minor = GRID * z;
-        const major = GRID * 4 * z;
-
-        // Offset so lines align with model coordinates (0,0) grid
-        const mod = (a, n) => ((a % n) + n) % n;
-        const offXminor = mod(pan.x, minor);
-        const offYminor = mod(pan.y, minor);
-        const offXmajor = mod(pan.x, major);
-        const offYmajor = mod(pan.y, major);
-
-        el.style.backgroundSize = `
-    ${minor}px ${minor}px,
-    ${minor}px ${minor}px,
-    ${major}px ${major}px,
-    ${major}px ${major}px
-  `;
-
-        el.style.backgroundPosition = `
-    ${offXminor}px ${offYminor}px,
-    ${offXminor}px ${offYminor}px,
-    ${offXmajor}px ${offYmajor}px,
-    ${offXmajor}px ${offYmajor}px
-  `;
-    };
-
-
     const addDepartment = (department) => {
         const cy = cyRef.current;
         if (!cy || cy.$id(department).length) return;
         const x = cy.width() / 2;
         const y = cy.height() / 2;
-        const pos = snapPos({ x, y });
-        cy.add({
-            group: 'nodes',
-            data: { id: department, label: department },
-            position: pos
-        });
+        cy.add({ group: 'nodes', data: { id: department, label: department }, position: { x, y } });
         setIsDirty(true);
     };
-
 
     const deleteHandler = (evt) => {
         cyRef.current.remove(evt.target);
@@ -209,33 +161,16 @@ const AdminDepartmentHierarchy = () => {
         });
 
         cyRef.current = cy;
-        applyGridTransform();
-        cy.on('viewport', () => {
-            // rAF keeps it smooth on continuous zoom/pan
-            requestAnimationFrame(applyGridTransform);
-        });
 
         // delegated events for all nodes, now and future:
         cy.on('add remove', 'edge', () => setIsDirty(true));
-        // after cy is createdaddDepartment
-        cy.on('dragfree', 'node', (evt) => {
-            const n = evt.target;
-            n.position(snapPos(n.position()));
-            setIsDirty(true);
-        });
+        cy.on('dragfree', 'node', () => setIsDirty(true));
 
         // default to move mode
         enableMove();
 
         return () => cy.destroy();
     }, []);
-
-    useEffect(() => {
-        const ro = new ResizeObserver(() => applyGridTransform());
-        if (containerRef.current) ro.observe(containerRef.current);
-        return () => ro.disconnect();
-    }, []);
-
 
     // 2) REDRAW whenever loadedData changes
     useLayoutEffect(() => {
@@ -246,13 +181,14 @@ const AdminDepartmentHierarchy = () => {
         // build elements…
         const elements = [];
         Object.entries(childrenMap).forEach(([p, kids]) => {
-            const posP = positionsMap[p] || { x: 0, y: 0 };
-            elements.push({ data: { id: p, label: p }, position: snapPos(posP) });
+            elements.push({
+                data: { id: p, label: p },
+                position: { x: positionsMap[p].x, y: positionsMap[p].y }
+            });
             kids.forEach(c => {
-                const posC = positionsMap[c] || { x: 0, y: 0 };
                 elements.push({
                     data: { id: c, label: c },
-                    position: snapPos(posC)
+                    position: { x: positionsMap[c].x, y: positionsMap[c].y }
                 });
                 elements.push({ data: { id: `${p}→${c}`, source: p, target: c } });
             });
@@ -337,7 +273,7 @@ const AdminDepartmentHierarchy = () => {
                             : 'bg-gray-300 text-black'
                     }`}
                 >
-                    Move Mode
+                    Hareket Modu
                 </button>
                 <button
                     onClick={enableArrow}
@@ -347,7 +283,7 @@ const AdminDepartmentHierarchy = () => {
                             : 'bg-gray-300 text-black'
                     }`}
                 >
-                    Arrow Mode
+                    Ok Modu
                 </button>
                 
                 {/* Save Button */}
@@ -355,19 +291,11 @@ const AdminDepartmentHierarchy = () => {
                     onClick={saveHierarchy}
                     className="block mb-2 p-2 w-full border-none rounded cursor-pointer font-bold bg-green-500 text-white hover:bg-green-600"
                 >
-                    Save Hierarchy
-                </button>
-
-                {/* Back Button */}
-                <button 
-                    onClick={goBack}
-                    className="block mb-2 p-2 w-full border-none rounded cursor-pointer font-bold bg-gray-600 text-white hover:bg-gray-500"
-                >
-                    Back
+                    Hiyerarşiyi Kaydet
                 </button>
 
                 {/* Departments List */}
-                <h2 className="text-lg font-bold mt-4 mb-2">Departments</h2>
+                <h2 className="text-lg font-bold mt-4 mb-2">Departmanlar</h2>
                 {departments.length === 0 ? (
                     <div className="text-gray-500">Loading...</div>
                 ) : (
@@ -384,36 +312,26 @@ const AdminDepartmentHierarchy = () => {
 
                 {/* Instructions */}
                 <hr className="my-4 border-gray-300" />
-                <p className="font-bold mb-2">Instructions:</p>
+                <p className="font-bold mb-2">Kullanım Talimatları:</p>
                 <ul className="text-sm space-y-1 list-disc list-inside">
-                    <li>Click a department to add it.</li>
+                    <li>Eklemek için bir departman seçiniz.</li>
                     <li>
-                        <strong>Move Mode:</strong> drag & drop; click a node to delete it.
+                        <strong>Hareket Modu:</strong> tutun & sürükleyin, bir düğmeye tıklayın veya silmek için sağ tıklayın.
                     </li>
                     <li>
-                        <strong>Arrow Mode:</strong> click source, then click target to connect.
+                        <strong>Ok Modu:</strong> Bağlantı için önce kaynağa daha sonra hedefe tıklayın.
                     </li>
                     <li>
-                        When finished, click "Save Hierarchy" to permanently save positions and links.
+                        Bitirildiğinde "Hiyerarşiyi Kaydet" butonuna tıklayın.
                     </li>
                 </ul>
             </div>
 
             {/* Cytoscape Container */}
-            <div
+            <div 
                 ref={containerRef}
                 className="flex-1 min-w-0 h-full overflow-hidden"
-                style={{
-                    backgroundImage: `
-      linear-gradient(to right, rgba(0,0,0,.06) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(0,0,0,.06) 1px, transparent 1px),
-      linear-gradient(to right, rgba(0,0,0,.10) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(0,0,0,.10) 1px, transparent 1px)
-    `
-                    // backgroundSize/backgroundPosition are set by applyGridTransform()
-                }}
             />
-
         </div>
     );
 };

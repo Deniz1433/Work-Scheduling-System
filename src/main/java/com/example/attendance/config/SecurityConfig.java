@@ -1,7 +1,6 @@
 package com.example.attendance.config;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 import org.keycloak.TokenVerifier;
 import org.keycloak.common.VerificationException;
@@ -23,6 +22,7 @@ import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.logout.LogoutSuccessHandler;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import com.example.attendance.security.CustomAnnotationEvaluator;
@@ -59,6 +59,7 @@ public class SecurityConfig {
                         .userInfoEndpoint(userInfo -> userInfo.oidcUserService(oidcUserServiceWithTokenVerifier()))
                 )
                 .logout(logout -> logout
+                        .logoutRequestMatcher(new AntPathRequestMatcher("/logout", "GET"))
                         .logoutSuccessHandler(keycloakLogoutSuccessHandler())
                         .invalidateHttpSession(true)
                         .clearAuthentication(true)
