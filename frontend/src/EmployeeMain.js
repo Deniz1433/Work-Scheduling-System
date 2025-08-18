@@ -163,7 +163,9 @@ const EmployeeMain = () => {
               </div>
               <div className="mt-auto">
                 <div className="font-medium text-sm">
-                  {user?.preferredUsername || user?.name || 'Kullanıcı'}
+                  {user
+                      ? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.username || 'Kullanıcı'
+                      : 'Kullanıcı'}
                 </div>
                 <div className="text-xs text-gray-400">
                   {user?.email || 'example@example.com'}
