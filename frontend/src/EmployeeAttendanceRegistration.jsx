@@ -341,11 +341,19 @@ const EmployeeAttendanceRegistration = () => {
         const hasChanges = JSON.stringify(weeklyStatus) !== JSON.stringify(originalWeeklyStatus);
         const needsApprovalWarning = isAttendanceApproved && hasChanges;
         
+        // Minimum gün kontrolü - zorunlu kontrol
+        if (officeDays < minDay) {
+            return Swal.fire({
+                title: 'Yetersiz Ofis Günü',
+                text: `Departmanınızın minimum ofis günü sayısı ${minDay}'dır. Şu anda sadece ${officeDays} gün ofiste seçtiniz. Lütfen en az ${minDay} gün "Ofiste" seçiniz.`,
+                icon: 'error',
+                confirmButtonText: 'Tamam'
+            });
+        }
+
         let warningText = '';
         if (needsApprovalWarning) {
             warningText = 'Onaylı attendance kaydınız değiştirildi. Kaydetmek onayınızı kaldıracaktır. Devam etmek istiyor musunuz?';
-        } else if (officeDays < minDay) {
-            warningText = `Ofise en az ${minDay} gün gelmeniz gerekmektedir. Yine de kaydetmek istiyor musunuz?`;
         } else {
             warningText = 'Seçiminiz kaydedilecektir.';
         }
@@ -715,7 +723,18 @@ const EmployeeAttendanceRegistration = () => {
 
     return (
         <div className="flex-1 p-6 bg-white">
-
+            {/* Minimum gün bilgilendirmesi */}
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    <span className="text-sm text-blue-700 font-medium">
+                        Departmanınız için minimum ofis günü sayısı: <strong>{minDay} gün</strong>
+                    </span>
+                </div>
+                <div className="mt-1 text-xs text-blue-600">
+                    Kayıt yapabilmek için en az {minDay} gün "Ofiste" seçmeniz gerekmektedir.
+                </div>
+            </div>
 
             <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold">
@@ -857,10 +876,28 @@ const EmployeeAttendanceRegistration = () => {
                 </div>
             )}
 
+            {/* Seçim özeti */}
+            <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-700">
+                        Seçilen Ofis Günü: <span className={officeDays >= minDay ? 'text-green-600' : 'text-red-600'}>{officeDays}</span> / {minDay}
+                    </span>
+                    {officeDays >= minDay ? (
+                        <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">✓ Gereksinim karşılandı</span>
+                    ) : (
+                        <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded">⚠ {minDay - officeDays} gün daha gerekli</span>
+                    )}
+                </div>
+            </div>
+
             <button
                 onClick={handleSave}
-                className="px-6 py-3 rounded-lg font-medium transition-all flex items-center gap-2 bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400"
-                disabled={weeklyStatus.includes(0)}
+                className={`px-6 py-3 rounded-lg font-medium transition-all flex items-center gap-2 ${
+                    weeklyStatus.includes(0) || officeDays < minDay
+                        ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
+                disabled={weeklyStatus.includes(0) || officeDays < minDay}
             >
                 <Save className="w-4 h-4" />
                 Kaydet

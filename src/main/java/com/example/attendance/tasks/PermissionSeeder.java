@@ -22,20 +22,20 @@ public class PermissionSeeder implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         // The full catalog your app uses in @PreAuthorize / CustomAnnotationEvaluator
         List<Permission> catalog = List.of(
-                p("ADMIN_ALL", "All admin permissions"),
-                p("VIEW_ROLES", "View roles"),
-                p("EDIT_ROLES", "Edit roles"),
-                p("CREATE_ROLE", "Create roles"),
-                p("VIEW_ALL_ATTENDANCE", "View everyone’s attendance"),
-                p("EDIT_ALL_ATTENDANCE", "Edit everyone’s attendance"),
-                p("VIEW_CHILD_ATTENDANCE", "View child departments"),
-                p("VIEW_DEPARTMENT_ATTENDANCE", "View own department"),
-                p("EDIT_CHILD_ATTENDANCE", "Edit child departments"),
-                p("EDIT_DEPARTMENT_ATTENDANCE", "Edit own department"),
-                p("VIEW_ALL_USERS", "View all users"),
-                p("VIEW_ALL_DEPARTMENTS", "View all departments"),
-                p("VIEW_HOLIDAYS", "View holidays"),
-                p("VIEW_DEPARTMENT_HIERARCHY", "View department hierarchy")
+                p("ADMIN_ALL", "Tüm yönetici yetkileri"),
+                p("VIEW_ROLES", "Rolleri görüntüleme"),
+                p("EDIT_ROLES", "Rolleri düzenleme"),
+                p("CREATE_ROLE", "Rol oluşturma"),
+                p("VIEW_ALL_ATTENDANCE", "Herkesin devam durumunu görüntüleme"),
+                p("EDIT_ALL_ATTENDANCE", "Herkesin devam durumunu düzenleme"),
+                p("VIEW_CHILD_ATTENDANCE", "Alt departmanları görüntüleme"),
+                p("VIEW_DEPARTMENT_ATTENDANCE", "Kendi departmanını görüntüleme"),
+                p("EDIT_CHILD_ATTENDANCE", "Alt departmanları düzenleme"),
+                p("EDIT_DEPARTMENT_ATTENDANCE", "Kendi departmanını düzenleme"),
+                p("VIEW_ALL_USERS", "Tüm kullanıcıları görüntüleme"),
+                p("VIEW_ALL_DEPARTMENTS", "Tüm departmanları görüntüleme"),
+                p("VIEW_HOLIDAYS", "Tatilleri görüntüleme"),
+                p("VIEW_DEPARTMENT_HIERARCHY", "Departman hiyerarşisini görüntüleme")
         );
 
         for (Permission target : catalog) {

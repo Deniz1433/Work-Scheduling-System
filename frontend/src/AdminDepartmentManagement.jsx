@@ -40,6 +40,12 @@ const DepartmentManagement = () => {
             return;
         }
 
+        const minDays = parseInt(newDepartment.minDays) || 0;
+        if (minDays < 0 || minDays > 5) {
+            setError('Minimum gün sayısı 0-5 arasında olmalıdır');
+            return;
+        }
+
         try {
             const response = await fetch('/api/departments', {
                 method: 'POST',
@@ -62,6 +68,17 @@ const DepartmentManagement = () => {
         e.preventDefault();
         setError(null);
         setSuccess(null);
+
+        if (!editingDepartment.name.trim()) {
+            setError('Departman adı gereklidir');
+            return;
+        }
+
+        const minDays = parseInt(editingDepartment.minDays) || 0;
+        if (minDays < 0 || minDays > 5) {
+            setError('Minimum gün sayısı 0-5 arasında olmalıdır');
+            return;
+        }
 
         try {
             const response = await fetch(`/api/departments/${editingDepartment.id}`, {
@@ -137,10 +154,12 @@ const DepartmentManagement = () => {
                                 />
                                 <input
                                     type="number"
-                                    placeholder="Departman Minimum Gün"
+                                    placeholder="Departman Minimum Gün (0-5)"
                                     value={newDepartment.minDays}
                                     onChange={e => setNewDepartment({...newDepartment, minDays: e.target.value})}
                                     className="border p-2 rounded focus:outline-blue-400"
+                                    min="0"
+                                    max="5"
                                 />
                                 <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700 transition-all">
                                     + Departman Ekle
@@ -158,12 +177,14 @@ const DepartmentManagement = () => {
                                     className="border p-2 rounded focus:outline-blue-400"
                                     required
                                 />
-                                <textarea
-                                    placeholder="Departman minimum gün"
+                                <input
+                                    type="number"
+                                    placeholder="Departman minimum gün (0-5)"
                                     value={editingDepartment.minDays}
                                     onChange={e => setEditingDepartment({...editingDepartment, minDays: e.target.value})}
-                                    className="border p-2 rounded focus:outline-blue-400 resize-none"
-                                    rows="3"
+                                    className="border p-2 rounded focus:outline-blue-400"
+                                    min="0"
+                                    max="5"
                                 />
                                 <div className="flex gap-2">
                                     <button type="submit" className="bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 transition-all flex-1">
