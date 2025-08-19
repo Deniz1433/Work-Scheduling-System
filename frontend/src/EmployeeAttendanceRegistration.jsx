@@ -324,8 +324,13 @@ const EmployeeAttendanceRegistration = () => {
     };
 
     // Ofiste olacak gün sayısını hesapla (status = 1)
-    // Ofis günü sayısını hesapla (sadece ofiste çalışma = 1)
     const officeDays = weeklyStatus.filter(status => status === 1).length;
+    // İzinli gün sayısını hesapla (status = 3)
+    const leaveDays = weeklyStatus.filter(status => status === 3).length;
+    // Resmi tatil günlerini hesapla (status = 5)
+    const holidayDays = weeklyStatus.filter(status => status === 5).length;
+    // Çalışma günlerini hesapla
+    const workingDays = 5 - leaveDays - holidayDays;
 
     const handleSave = async () => {
         if(weeklyStatus.includes(0)){
@@ -341,14 +346,25 @@ const EmployeeAttendanceRegistration = () => {
         const hasChanges = JSON.stringify(weeklyStatus) !== JSON.stringify(originalWeeklyStatus);
         const needsApprovalWarning = isAttendanceApproved && hasChanges;
         
-        // Minimum gün kontrolü - zorunlu kontrol
-        if (officeDays < minDay) {
-            return Swal.fire({
-                title: 'Yetersiz Ofis Günü',
-                text: `Departmanınızın minimum ofis günü sayısı ${minDay}'dır. Şu anda sadece ${officeDays} gün ofiste seçtiniz. Lütfen en az ${minDay} gün "Ofiste" seçiniz.`,
-                icon: 'error',
-                confirmButtonText: 'Tamam'
-            });
+        // Yeni minimum gün kontrolü mantığı
+        // Çalışma günlerini hesapla (5 - izinli günler - resmi tatil günler)
+        const holidayDays = weeklyStatus.filter(status => status === 5).length;
+        const workingDays = 5 - leaveDays - holidayDays;
+        
+        if (workingDays > 0) {
+            // Çalışma günü varsa minimum ofis günü kontrolü yap
+            if (officeDays < Math.min(minDay, workingDays)) {
+                const requiredOfficeDays = Math.min(minDay, workingDays);
+                return Swal.fire({
+                    title: 'Yetersiz Ofis Günü',
+                    text: `Çalışma günleriniz: ${workingDays} gün (${leaveDays} gün izinli, ${holidayDays} gün tatil). En az ${requiredOfficeDays} gün "Ofiste" olmanız gerekiyor. Şu anda ${officeDays} gün ofiste seçtiniz.`,
+                    icon: 'error',
+                    confirmButtonText: 'Tamam'
+                });
+            }
+        } else {
+            // Çalışma günü yoksa (tüm hafta izinli/tatil) direkt kaydet
+            console.log('Çalışma günü yok - minimum ofis günü kontrolü atlanıyor');
         }
 
         let warningText = '';
@@ -878,26 +894,39 @@ const EmployeeAttendanceRegistration = () => {
 
             {/* Seçim özeti */}
             <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-700">
-                        Seçilen Ofis Günü: <span className={officeDays >= minDay ? 'text-green-600' : 'text-red-600'}>{officeDays}</span> / {minDay}
-                    </span>
-                    {officeDays >= minDay ? (
-                        <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">✓ Gereksinim karşılandı</span>
-                    ) : (
-                        <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded">⚠ {minDay - officeDays} gün daha gerekli</span>
-                    )}
+                <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium text-gray-700">
+                            Çalışma Günü: <span className="text-blue-600">{workingDays}</span>
+                        </span>
+                        <span className="text-gray-600">İzinli: {leaveDays} gün</span>
+                        {holidayDays > 0 && <span className="text-gray-600">Tatil: {holidayDays} gün</span>}
+                    </div>
+                    <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-gray-700">
+                            Seçilen Ofis Günü: <span className={workingDays === 0 || officeDays >= Math.min(minDay, workingDays) ? 'text-green-600' : 'text-red-600'}>{officeDays}</span> / {workingDays > 0 ? Math.min(minDay, workingDays) : 0}
+                        </span>
+                    </div>
+                    <div className="flex justify-end">
+                        {workingDays === 0 ? (
+                            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">✓ Çalışma günü yok - ofis günü kontrolü yok</span>
+                        ) : officeDays >= Math.min(minDay, workingDays) ? (
+                            <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">✓ Minimum ofis günü karşılandı</span>
+                        ) : (
+                            <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded">⚠ {Math.min(minDay, workingDays) - officeDays} ofis günü daha gerekli</span>
+                        )}
+                    </div>
                 </div>
             </div>
 
             <button
                 onClick={handleSave}
                 className={`px-6 py-3 rounded-lg font-medium transition-all flex items-center gap-2 ${
-                    weeklyStatus.includes(0) || officeDays < minDay
+                    weeklyStatus.includes(0) || (workingDays > 0 && officeDays < Math.min(minDay, workingDays))
                         ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
                         : 'bg-blue-600 text-white hover:bg-blue-700'
                 }`}
-                disabled={weeklyStatus.includes(0) || officeDays < minDay}
+                disabled={weeklyStatus.includes(0) || (workingDays > 0 && officeDays < Math.min(minDay, workingDays))}
             >
                 <Save className="w-4 h-4" />
                 Kaydet
