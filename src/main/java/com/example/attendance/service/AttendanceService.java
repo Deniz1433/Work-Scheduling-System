@@ -210,13 +210,19 @@ public class AttendanceService {
             String departmentId, 
             String roleId, 
             String searchTerm,
-            String workStatus
+            String workStatus,
+            String startDate,
+            String endDate,
+            String weekStart
     ) {
         System.out.println("🔍 getTeamAttendanceWithFiltersAndPermissions called with:");
         System.out.println("  - keycloakId: " + keycloakId);
         System.out.println("  - roleId: " + roleId);
         System.out.println("  - searchTerm: " + searchTerm);
         System.out.println("  - workStatus: " + workStatus);
+        System.out.println("  - startDate: " + startDate);
+        System.out.println("  - endDate: " + endDate);
+        System.out.println("  - weekStart: " + weekStart);
         
         // 1. Kullanıcıyı keycloakId'ye göre bul
         User currentUser = userRepo.findByKeycloakId(keycloakId).orElse(null);
@@ -284,40 +290,26 @@ public class AttendanceService {
 
         System.out.println("🔍 Users after filtering: " + filteredUsers.size());
 
-        // 5. Gelecek haftanın başlangıç tarihini hesapla
-        LocalDate nextWeekStart = calculateNextWeekStart();
+        // 5. Hafta başlangıç tarihini hesapla (weekStart parametresi varsa onu kullan, yoksa gelecek hafta)
+        final LocalDate targetWeekStart;
+        if (weekStart != null && !weekStart.trim().isEmpty()) {
+            LocalDate parsedDate = null;
+            try {
+                parsedDate = LocalDate.parse(weekStart);
+                System.out.println("🔍 Using provided weekStart: " + parsedDate);
+            } catch (Exception e) {
+                System.out.println("⚠️ Invalid weekStart format: " + weekStart + ", falling back to next week");
+                parsedDate = calculateNextWeekStart();
+            }
+            targetWeekStart = parsedDate;
+        } else {
+            targetWeekStart = calculateNextWeekStart();
+            System.out.println("🔍 No weekStart provided, using next week: " + targetWeekStart);
+        }
 
         // 6. Her kullanıcı için attendance verilerini al ve DTO'ya dönüştür
         List<TeamAttendanceDto> result = filteredUsers.stream()
-                .map(user -> {
-                    TeamAttendanceDto dto = new TeamAttendanceDto();
-                    dto.setId(user.getId());
-                    dto.setName(user.getFirstName());
-                    dto.setSurname(user.getLastName());
-                    dto.setDepartment(user.getDepartment() != null ? user.getDepartment().getName() : "N/A");
-                    dto.setDepartmentId(user.getDepartment() != null ? user.getDepartment().getId() : null);
-
-                    Attendance attendance = repo.findByUserIdAndWeekStart(user.getId(), nextWeekStart);
-                    if (attendance != null) {
-                        List<Integer> attendanceIntegers = attendance.getDates().stream()
-                                .map(day -> day) 
-                                .collect(Collectors.toList());
-                        // Tatil günlerini kontrol et ve güncelle
-                        attendanceIntegers = updateAttendanceWithHolidays(attendanceIntegers, nextWeekStart);
-                        dto.setAttendance(attendanceIntegers);
-                        dto.setApproved(attendance.isApproved());
-                    } else {
-                        // Attendance kaydı yoksa varsayılan değerler
-                        List<Integer> defaultAttendance = List.of(0,0,0,0,0);
-                        // Tatil günlerini kontrol et ve güncelle
-                        defaultAttendance = updateAttendanceWithHolidays(defaultAttendance, nextWeekStart);
-                        dto.setAttendance(defaultAttendance);
-                        dto.setApproved(false);
-                    }
-
-                    dto.setEmployeeExcuse(null);
-                    return dto;
-                })
+                .map(user -> createTeamAttendanceDto(user, targetWeekStart))
                 .collect(Collectors.toList());
 
         // 7. WorkStatus filtresini uygula (eğer belirtilmişse)
@@ -327,40 +319,33 @@ public class AttendanceService {
             System.out.println("🔍 Total users before workStatus filtering: " + result.size());
             
             result = result.stream()
-                .filter(dto -> {
-                    if (dto.getAttendance() == null || dto.getAttendance().isEmpty()) {
-                        System.out.println("🔍 Filtering out user " + dto.getName() + " - no attendance data");
-                        return false;
-                    }
-                    
-                    System.out.println("🔍 Checking user " + dto.getName() + " with attendance: " + dto.getAttendance());
-                    
-                    // Kullanıcının hafta içinde en az bir gününde belirtilen durumda olup olmadığını kontrol et
-                    boolean hasMatchingStatus = false;
-                    for (Integer status : dto.getAttendance()) {
-                        if (status != null) { // 0 = veri yok, 1-5 = çeşitli durumlar
-                            for (String requestedStatus : statuses) {
-                                if (status.toString().equals(requestedStatus.trim())) {
-                                    System.out.println("🔍 User " + dto.getName() + " matches status " + status + " (requested: " + requestedStatus + ")");
-                                    hasMatchingStatus = true;
-                                    break;
-                                }
-                            }
-                            if (hasMatchingStatus) break;
-                        }
-                    }
-                    
-                    if (!hasMatchingStatus) {
-                        System.out.println("🔍 Filtering out user " + dto.getName() + " - no matching status. Attendance: " + dto.getAttendance());
-                    }
-                    
-                    return hasMatchingStatus;
-                })
+                .filter(dto -> hasMatchingWorkStatus(dto, statuses))
                 .collect(Collectors.toList());
             
             System.out.println("🔍 Users after workStatus filtering: " + result.size());
         } else {
             System.out.println("🔍 No workStatus filter applied, showing all users");
+        }
+
+        // 8. Date range filtresini uygula (eğer belirtilmişse)
+        if (startDate != null && endDate != null && !startDate.trim().isEmpty() && !endDate.trim().isEmpty()) {
+            try {
+                LocalDate start = LocalDate.parse(startDate);
+                LocalDate end = LocalDate.parse(endDate);
+                System.out.println("🔍 Applying date range filter from " + start + " to " + end);
+                System.out.println("🔍 Total users before date range filtering: " + result.size());
+                
+                result = result.stream()
+                    .filter(dto -> hasDataInDateRange(dto, targetWeekStart, start, end))
+                    .collect(Collectors.toList());
+                
+                System.out.println("🔍 Users after date range filtering: " + result.size());
+            } catch (Exception e) {
+                System.err.println("🔍 Error parsing date range: " + e.getMessage());
+                // Date parsing hatası durumunda filtreyi uygulama
+            }
+        } else {
+            System.out.println("🔍 No date range filter applied, showing all users");
         }
                 
         System.out.println("✅ Returning " + result.size() + " team members with permissions");
@@ -498,5 +483,89 @@ public class AttendanceService {
     
     public void saveAttendance(Attendance attendance) {
         repo.save(attendance);
+    }
+
+    // Helper method for creating TeamAttendanceDto
+    private TeamAttendanceDto createTeamAttendanceDto(User user, LocalDate weekStart) {
+        TeamAttendanceDto dto = new TeamAttendanceDto();
+        dto.setId(user.getId());
+        dto.setName(user.getFirstName());
+        dto.setSurname(user.getLastName());
+        dto.setDepartment(user.getDepartment() != null ? user.getDepartment().getName() : "N/A");
+        dto.setDepartmentId(user.getDepartment() != null ? user.getDepartment().getId() : null);
+
+        Attendance attendance = repo.findByUserIdAndWeekStart(user.getId(), weekStart);
+        if (attendance != null) {
+            List<Integer> attendanceIntegers = attendance.getDates().stream()
+                    .map(day -> day) 
+                    .collect(Collectors.toList());
+            // Tatil günlerini kontrol et ve güncelle
+            attendanceIntegers = updateAttendanceWithHolidays(attendanceIntegers, weekStart);
+            dto.setAttendance(attendanceIntegers);
+            dto.setApproved(attendance.isApproved());
+        } else {
+            // Attendance kaydı yoksa varsayılan değerler
+            List<Integer> defaultAttendance = List.of(0,0,0,0,0);
+            // Tatil günlerini kontrol et ve güncelle
+            defaultAttendance = updateAttendanceWithHolidays(defaultAttendance, weekStart);
+            dto.setAttendance(defaultAttendance);
+            dto.setApproved(false);
+        }
+
+        dto.setEmployeeExcuse(null);
+        return dto;
+    }
+
+    // Helper method for workStatus filtering
+    private boolean hasMatchingWorkStatus(TeamAttendanceDto dto, String[] statuses) {
+        if (dto.getAttendance() == null || dto.getAttendance().isEmpty()) {
+            System.out.println("🔍 Filtering out user " + dto.getName() + " - no attendance data");
+            return false;
+        }
+        
+        System.out.println("🔍 Checking user " + dto.getName() + " with attendance: " + dto.getAttendance());
+        
+        // Kullanıcının hafta içinde en az bir gününde belirtilen durumda olup olmadığını kontrol et
+        boolean hasMatchingStatus = false;
+        for (Integer status : dto.getAttendance()) {
+            if (status != null) { // 0 = veri yok, 1-5 = çeşitli durumlar
+                for (String requestedStatus : statuses) {
+                    if (status.toString().equals(requestedStatus.trim())) {
+                        System.out.println("🔍 User " + dto.getName() + " matches status " + status + " (requested: " + requestedStatus + ")");
+                        hasMatchingStatus = true;
+                        break;
+                    }
+                }
+                if (hasMatchingStatus) break;
+            }
+        }
+        
+        if (!hasMatchingStatus) {
+            System.out.println("🔍 Filtering out user " + dto.getName() + " - no matching status. Attendance: " + dto.getAttendance());
+        }
+        
+        return hasMatchingStatus;
+    }
+
+    // Helper method for date range filtering
+    private boolean hasDataInDateRange(TeamAttendanceDto dto, LocalDate weekStart, LocalDate start, LocalDate end) {
+        if (dto.getAttendance() == null || dto.getAttendance().isEmpty()) {
+            return false;
+        }
+        
+        // Kullanıcının seçilen tarih aralığında en az bir gününde veri olup olmadığını kontrol et
+        boolean hasDataInRange = false;
+        for (int i = 0; i < 5; i++) {
+            LocalDate currentDate = weekStart.plusDays(i);
+            if (currentDate.isAfter(start.minusDays(1)) && currentDate.isBefore(end.plusDays(1))) {
+                Integer status = dto.getAttendance().get(i);
+                if (status != null && status > 0) { // 0 = veri yok, 1-5 = çeşitli durumlar
+                    hasDataInRange = true;
+                    break;
+                }
+            }
+        }
+        
+        return hasDataInRange;
     }
 } 

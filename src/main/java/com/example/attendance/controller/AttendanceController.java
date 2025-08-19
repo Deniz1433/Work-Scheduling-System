@@ -188,7 +188,10 @@ public class AttendanceController {
             @RequestParam(required = false) String departmentId,
             @RequestParam(required = false) String roleId,
             @RequestParam(required = false) String searchTerm,
-            @RequestParam(required = false) String workStatus
+            @RequestParam(required = false) String workStatus,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate,
+            @RequestParam(required = false) String weekStart
     ) {
         try {
             String keycloakId = principal.getName();
@@ -203,7 +206,10 @@ public class AttendanceController {
                 departmentId, 
                 roleId, 
                 searchTerm,
-                workStatus
+                workStatus,
+                startDate,
+                endDate,
+                weekStart
             );
             return ResponseEntity.ok(team);
         } catch (Exception e) {

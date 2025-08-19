@@ -1,0 +1,10 @@
+[33mf8d21db[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mfinal[m[33m, [m[1;31morigin/final[m[33m)[m Add back changes undone by force push
+[33m99c4368[m Merge conflict çözüldü - tatil sistemi entegrasyonu tamamlandı
+[33mceb16df[m Kullanıcı attendance düzenleme özelliği eklendi ve sayfa DevExtreme'e geçildi
+[33me95de15[m Logout screen bypassed and Hierarchy Page translated to Turkish
+[33m65f87cc[m  modified:   frontend/src/AdminDepartmentHierarchy.jsx
+[33m0975abc[m Fix work status filter and week calculation in team attendance
+[33mbb6cd92[m Add grid and snapping to canvas
+[33mf307e1f[m Fix CSS
+[33m997f1c0[m Fix logged in users name + surname display
+[33mb1f952c[m Can't edit/approve own attendance

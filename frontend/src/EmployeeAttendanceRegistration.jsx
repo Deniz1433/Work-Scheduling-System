@@ -48,21 +48,28 @@ const EmployeeAttendanceRegistration = () => {
         }
     }, [user]);
 
-    // Next week's Monday→Friday
-    const weekDays = (() => {
+    // Hafta navigasyon state'i
+    const [currentWeekOffset, setCurrentWeekOffset] = useState(0); // Hafta offset'i (0 = bu hafta, 1 = gelecek hafta, -1 = geçen hafta)
+
+    // Hafta günlerini hesapla (offset'e göre)
+    const generateWeekDays = (weekOffset = 0) => {
         const today = getIstanbulNow();
         const day = today.getDay();
         const currentMonday = new Date(today);
         currentMonday.setDate(today.getDate() - day + (day === 0 ? -6 : 1));
-        const nextMonday = new Date(currentMonday);
-        nextMonday.setDate(currentMonday.getDate() + 7);
+        
+        // Offset'e göre haftayı hesapla
+        const targetMonday = new Date(currentMonday);
+        targetMonday.setDate(currentMonday.getDate() + (weekOffset * 7));
+        
         return Array.from({ length: 5 }, (_, i) => {
-            const d = new Date(nextMonday);
-            d.setDate(nextMonday.getDate() + i);
+            const d = new Date(targetMonday);
+            d.setDate(targetMonday.getDate() + i);
             return d;
         });
-    })();
-    
+    };
+
+    const weekDays = generateWeekDays(currentWeekOffset);
     const weekStart = weekDays[0].toISOString().split('T')[0];
     const weekDaysStrings = weekDays.map(d => d.toISOString().split('T')[0]);
 
@@ -72,8 +79,7 @@ const EmployeeAttendanceRegistration = () => {
         { value: 1, label: 'Ofiste', color: 'text-green-600' },
         { value: 2, label: 'Uzaktan', color: 'text-blue-600' },
         { value: 3, label: 'İzinli', color: 'text-yellow-600' },
-        { value: 4, label: 'Mazeretli', color: 'text-purple-600' },
-        { value: 5, label: 'Resmi Tatil', color: 'text-orange-600' }
+        { value: 4, label: 'Mazeretli', color: 'text-purple-600' }
     ];
 
     const statusStyles = {
@@ -85,15 +91,15 @@ const EmployeeAttendanceRegistration = () => {
         5: { bg: 'bg-orange-100', border: 'border-orange-300', text: 'text-orange-700' }
     };
 
-    useEffect(() => {
+    // Fetch attendance data fonksiyonu
+    const fetchData = async () => {
         // Check if user is available
         if (!user || !user.keycloakId) {
             console.log('User not available yet:', user);
             return;
         }
 
-        // Fetch attendance data
-        const fetchData = async () => {
+        try {
             try {
                 // First get user ID
                 const userIdResponse = await axios.get(`/api/userInfo/${user.keycloakId}`);
@@ -184,10 +190,35 @@ const EmployeeAttendanceRegistration = () => {
             } finally {
                 setLoading(false);
             }
-        };
+        } catch (error) {
+            console.error('Error fetching data:', error);
+            setLoading(false);
+        }
+    };
 
+    useEffect(() => {
         fetchData();
     }, [weekStart, user]);
+
+    // Hafta değiştiğinde verileri yeniden çek
+    useEffect(() => {
+        if (user && user.keycloakId) {
+            fetchData();
+        }
+    }, [currentWeekOffset]);
+
+    // Hafta navigasyon fonksiyonları
+    const goToPreviousWeek = () => {
+        setCurrentWeekOffset(prev => prev - 1);
+    };
+
+    const goToNextWeek = () => {
+        setCurrentWeekOffset(prev => prev + 1);
+    };
+
+    const goToCurrentWeek = () => {
+        setCurrentWeekOffset(0);
+    };
 
     const handleStatusChange = async (dayIndex, newStatus) => {
         // Tatil günü kontrolü
@@ -293,6 +324,7 @@ const EmployeeAttendanceRegistration = () => {
     };
 
     // Ofiste olacak gün sayısını hesapla (status = 1)
+    // Ofis günü sayısını hesapla (sadece ofiste çalışma = 1)
     const officeDays = weeklyStatus.filter(status => status === 1).length;
 
     const handleSave = async () => {
@@ -683,8 +715,14 @@ const EmployeeAttendanceRegistration = () => {
 
     return (
         <div className="flex-1 p-6 bg-white">
+
+
             <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">Bu Hafta - İş Günleri</h3>
+                <h3 className="text-lg font-semibold">
+                    {currentWeekOffset === 0 ? 'Bu Hafta' : 
+                     currentWeekOffset > 0 ? `${currentWeekOffset} Hafta Sonra` : 
+                     `${Math.abs(currentWeekOffset)} Hafta Önce`} - İş Günleri
+                </h3>
                 {isAttendanceApproved && (
                     <div className="flex items-center gap-2 px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">
                         <div className="w-2 h-2 bg-green-500 rounded-full"></div>

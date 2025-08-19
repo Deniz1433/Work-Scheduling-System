@@ -16,6 +16,9 @@ const EmployeeTeamAttendance = ({ user }) => {
   const [selectedRoles, setSelectedRoles] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedWorkStatus, setSelectedWorkStatus] = useState([]);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [currentWeekOffset, setCurrentWeekOffset] = useState(0); // Hafta offset'i (0 = bu hafta, 1 = gelecek hafta, -1 = geçen hafta)
   
   // Çalışma durumu seçenekleri
   const workStatusOptions = [
@@ -150,6 +153,18 @@ const EmployeeTeamAttendance = ({ user }) => {
         console.log('🔍 Adding workStatus filter:', workStatusIds);
         console.log('🔍 Selected work status options:', selectedWorkStatus);
       }
+      if (startDate) {
+        params.append('startDate', startDate);
+        console.log('🔍 Adding startDate filter:', startDate);
+      }
+      if (endDate) {
+        params.append('endDate', endDate);
+        console.log('🔍 Adding endDate filter:', endDate);
+      }
+      
+      // Hafta başlangıç tarihini de gönder
+      params.append('weekStart', weekStart);
+      console.log('🔍 Adding weekStart parameter:', weekStart);
 
       console.log('🔍 Fetching team data with params:', params.toString());
       const response = await fetch(`/api/attendance/team?${params.toString()}`);
@@ -199,12 +214,28 @@ const EmployeeTeamAttendance = ({ user }) => {
     }
   };
 
+  // Hafta navigasyon fonksiyonları
+  const goToPreviousWeek = () => {
+    setCurrentWeekOffset(prev => prev - 1);
+  };
+
+  const goToNextWeek = () => {
+    setCurrentWeekOffset(prev => prev + 1);
+  };
+
+  const goToCurrentWeek = () => {
+    setCurrentWeekOffset(0);
+  };
+
   // Filtreleri temizle
   const clearFilters = () => {
     setSelectedDepartments([]);
     setSelectedRoles([]);
     setSearchTerm('');
     setSelectedWorkStatus([]);
+    setStartDate('');
+    setEndDate('');
+    setCurrentWeekOffset(0); // Hafta offset'i de sıfırla
   };
 
   // Excel export fonksiyonu
@@ -232,13 +263,16 @@ const EmployeeTeamAttendance = ({ user }) => {
         return row;
       });
 
-      // Hafta bilgisi
-      const weekInfo = {
-        'Hafta Başlangıcı': weekDays[0].toLocaleDateString('tr-TR'),
-        'Hafta Bitişi': weekDays[4].toLocaleDateString('tr-TR'),
-        'Export Tarihi': new Date().toLocaleDateString('tr-TR'),
-        'Toplam Kişi': teamState.length
-      };
+             // Hafta bilgisi
+       const weekInfo = {
+         'Hafta Başlangıcı': weekDays[0].toLocaleDateString('tr-TR'),
+         'Hafta Bitişi': weekDays[4].toLocaleDateString('tr-TR'),
+         'Hafta Offset': currentWeekOffset === 0 ? 'Bu Hafta' : 
+                        currentWeekOffset > 0 ? `${currentWeekOffset} Hafta Sonra` : 
+                        `${Math.abs(currentWeekOffset)} Hafta Önce`,
+         'Export Tarihi': new Date().toLocaleDateString('tr-TR'),
+         'Toplam Kişi': teamState.length
+       };
 
              // Filtre bilgileri
        const filterInfo = {
@@ -251,7 +285,9 @@ const EmployeeTeamAttendance = ({ user }) => {
          'Arama Terimi': searchTerm || 'Yok',
          'Çalışma Durumu Filtresi': selectedWorkStatus.length > 0 
            ? selectedWorkStatus.map(s => s.label).join(', ') 
-           : 'Tüm Durumlar'
+           : 'Tüm Durumlar',
+         'Başlangıç Tarihi': startDate || 'Belirtilmedi',
+         'Bitiş Tarihi': endDate || 'Belirtilmedi'
        };
 
       // Workbook oluşturma
@@ -261,20 +297,21 @@ const EmployeeTeamAttendance = ({ user }) => {
       const ws = XLSX.utils.json_to_sheet(excelData);
       XLSX.utils.book_append_sheet(wb, ws, 'Takım Devam Durumu');
 
-      // Bilgi sayfası
-      const infoData = [
-        { 'Bilgi': 'Hafta Bilgileri', 'Değer': '' },
-        { 'Bilgi': 'Hafta Başlangıcı', 'Değer': weekInfo['Hafta Başlangıcı'] },
-        { 'Bilgi': 'Hafta Bitişi', 'Değer': weekInfo['Hafta Bitişi'] },
-        { 'Bilgi': 'Export Tarihi', 'Değer': weekInfo['Export Tarihi'] },
-        { 'Bilgi': 'Toplam Kişi', 'Değer': weekInfo['Toplam Kişi'] },
-        { 'Bilgi': '', 'Değer': '' },
-        { 'Bilgi': 'Filtre Bilgileri', 'Değer': '' },
-        { 'Bilgi': 'Departman Filtresi', 'Değer': filterInfo['Departman Filtresi'] },
-        { 'Bilgi': 'Rol Filtresi', 'Değer': filterInfo['Rol Filtresi'] },
-        { 'Bilgi': 'Arama Terimi', 'Değer': filterInfo['Arama Terimi'] },
-        { 'Bilgi': 'Çalışma Durumu Filtresi', 'Değer': filterInfo['Çalışma Durumu Filtresi'] }
-      ];
+             // Bilgi sayfası
+       const infoData = [
+         { 'Bilgi': 'Hafta Bilgileri', 'Değer': '' },
+         { 'Bilgi': 'Hafta Başlangıcı', 'Değer': weekInfo['Hafta Başlangıcı'] },
+         { 'Bilgi': 'Hafta Bitişi', 'Değer': weekInfo['Hafta Bitişi'] },
+         { 'Bilgi': 'Hafta Konumu', 'Değer': weekInfo['Hafta Offset'] },
+         { 'Bilgi': 'Export Tarihi', 'Değer': weekInfo['Export Tarihi'] },
+         { 'Bilgi': 'Toplam Kişi', 'Değer': weekInfo['Toplam Kişi'] },
+         { 'Bilgi': '', 'Değer': '' },
+         { 'Bilgi': 'Filtre Bilgileri', 'Değer': '' },
+         { 'Bilgi': 'Departman Filtresi', 'Değer': filterInfo['Departman Filtresi'] },
+         { 'Bilgi': 'Rol Filtresi', 'Değer': filterInfo['Rol Filtresi'] },
+         { 'Bilgi': 'Arama Terimi', 'Değer': filterInfo['Arama Terimi'] },
+         { 'Bilgi': 'Çalışma Durumu Filtresi', 'Değer': filterInfo['Çalışma Durumu Filtresi'] }
+       ];
       const wsInfo = XLSX.utils.json_to_sheet(infoData);
       XLSX.utils.book_append_sheet(wb, wsInfo, 'Bilgiler');
 
@@ -327,6 +364,13 @@ const EmployeeTeamAttendance = ({ user }) => {
     }
   }, [userPermissions]);
 
+  // Hafta değiştiğinde verileri yeniden çek
+  useEffect(() => {
+    if (userPermissions && teamState.length > 0) {
+      fetchTeamData();
+    }
+  }, [currentWeekOffset]);
+
   // helper: normalize id types
   const toNum = (v) => (v == null ? null : Number(v));
 
@@ -362,23 +406,26 @@ const EmployeeTeamAttendance = ({ user }) => {
   const [employeeExcuses, setEmployeeExcuses] = useState([]);
   const [isEditLoading, setIsEditLoading] = useState(false);
 
-  const generateWeekDays = () => {
+  const generateWeekDays = (weekOffset = 0) => {
     const today = new Date();
     const day = today.getDay();
     const currentMonday = new Date(today);
     currentMonday.setDate(today.getDate() - day + (day === 0 ? -6 : 1));
-    const nextMonday = new Date(currentMonday);
-    nextMonday.setDate(currentMonday.getDate() + 7);
+    
+    // Offset'e göre haftayı hesapla
+    const targetMonday = new Date(currentMonday);
+    targetMonday.setDate(currentMonday.getDate() + (weekOffset * 7));
+    
     const weekDays = [];
     for (let i = 0; i < 5; i++) {
-      const date = new Date(nextMonday);
-      date.setDate(nextMonday.getDate() + i);
+      const date = new Date(targetMonday);
+      date.setDate(targetMonday.getDate() + i);
       weekDays.push(date);
     }
     return weekDays;
   };
 
-  const weekDays = generateWeekDays();
+  const weekDays = generateWeekDays(currentWeekOffset);
   const weekStart = weekDays[0].toISOString().split('T')[0];
 
   // Devam durumu stillerini tanımlama
@@ -634,7 +681,7 @@ const EmployeeTeamAttendance = ({ user }) => {
       <div className="mb-6 bg-gray-50 p-4 rounded-lg border">
                  <h3 className="text-lg font-medium text-gray-800 mb-4">Sorgu Seçenekleri</h3>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 mb-4">
                      {/* Departman Filtresi */}
            <div>
              <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -795,6 +842,34 @@ const EmployeeTeamAttendance = ({ user }) => {
                   }
                 })
               }}
+            />
+          </div>
+
+          {/* Başlangıç Tarihi Filtresi */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Başlangıç Tarihi
+            </label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Başlangıç tarihi seçin..."
+            />
+          </div>
+
+          {/* Bitiş Tarihi Filtresi */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Bitiş Tarihi
+            </label>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Bitiş tarihi seçin..."
             />
           </div>
 
@@ -1005,19 +1080,78 @@ const EmployeeTeamAttendance = ({ user }) => {
         </div>
       )}
 
-      <div className="mb-6">
-        <div className="flex justify-between items-center mb-4">
-                     <h2 className="text-xl">
-             {userPermissions ? (
-               selectedDepartments.length > 0 || selectedRoles.length > 0 || searchTerm.trim() || selectedWorkStatus.length > 0
-                 ? 'Filtrelenmiş Takım Verileri'
-                 : userPermissions.canViewAll ? 'Tüm Takım Verileri' :
-                   userPermissions.canViewChild ? 'Alt Departman Takım Verileri' :
-                   userPermissions.canViewDepartment ? 'Departman Takım Verileri' :
-                   'Yetkiniz Yok'
-             ) : 'Yükleniyor...'
-             }
-           </h2>
+             <div className="mb-6">
+         {/* Hafta Navigasyonu */}
+         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200 shadow-sm">
+           <button
+             onClick={goToPreviousWeek}
+             disabled={currentWeekOffset <= -8} // En fazla 8 hafta geriye git
+             className={`px-2 sm:px-3 py-2 text-xs sm:text-sm rounded-lg transition-colors flex items-center gap-1 sm:gap-2 ${
+               currentWeekOffset <= -8
+                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                 : 'bg-blue-500 text-white hover:bg-blue-600'
+             }`}
+             title={currentWeekOffset <= -8 ? 'En fazla 8 hafta geriye gidebilirsiniz' : 'Önceki haftaya git'}
+           >
+             <span>←</span>
+             <span className="hidden sm:inline">Önceki Hafta</span>
+             <span className="sm:hidden">Önceki</span>
+           </button>
+           
+           <button
+             onClick={goToCurrentWeek}
+             className={`px-4 py-2 text-sm rounded-lg transition-colors ${
+               currentWeekOffset === 0 
+                 ? 'bg-green-500 text-white' 
+                 : 'bg-gray-500 text-white hover:bg-gray-600'
+             }`}
+           >
+             Bu Hafta
+           </button>
+           
+           <button
+             onClick={goToNextWeek}
+             disabled={currentWeekOffset >= 4} // En fazla 4 hafta ileriye git
+             className={`px-2 sm:px-3 py-2 text-xs sm:text-sm rounded-lg transition-colors flex items-center gap-1 sm:gap-2 ${
+               currentWeekOffset >= 4
+                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                 : 'bg-blue-500 text-white hover:bg-blue-600'
+             }`}
+             title={currentWeekOffset >= 4 ? 'En fazla 4 hafta ileriye gidebilirsiniz' : 'Sonraki haftaya git'}
+           >
+             <span className="hidden sm:inline">Sonraki Hafta</span>
+             <span className="sm:hidden">Sonraki</span>
+             <span>→</span>
+           </button>
+           
+           <div className="text-sm text-gray-600 font-medium text-center">
+             <div className="mb-1">
+               {weekDays[0].toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' })} - {weekDays[4].toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+             </div>
+             {currentWeekOffset !== 0 && (
+               <span className={`px-2 py-1 rounded text-xs ${
+                 currentWeekOffset > 0 
+                   ? 'bg-green-100 text-green-700' 
+                   : 'bg-orange-100 text-orange-700'
+               }`}>
+                 {currentWeekOffset > 0 ? `+${currentWeekOffset} hafta` : `${currentWeekOffset} hafta`}
+               </span>
+             )}
+           </div>
+         </div>
+
+         <div className="flex justify-between items-center mb-4">
+                      <h2 className="text-xl">
+              {userPermissions ? (
+                selectedDepartments.length > 0 || selectedRoles.length > 0 || searchTerm.trim() || selectedWorkStatus.length > 0 || startDate || endDate
+                  ? 'Filtrelenmiş Takım Verileri'
+                  : userPermissions.canViewAll ? 'Tüm Takım Verileri' :
+                    userPermissions.canViewChild ? 'Alt Departman Takım Verileri' :
+                    userPermissions.canViewDepartment ? 'Departman Takım Verileri' :
+                    'Yetkiniz Yok'
+              ) : 'Yükleniyor...'
+              }
+            </h2>
           <div className="flex items-center gap-4">
             <div className="text-sm text-gray-600">
               {teamState.length} kişi bulundu
@@ -1096,13 +1230,13 @@ const EmployeeTeamAttendance = ({ user }) => {
           <div className="text-gray-500 mb-4">
             <div className="text-4xl mb-2">🔍</div>
                          <div className="text-lg font-medium">
-               {selectedDepartments.length > 0 || selectedRoles.length > 0 || searchTerm.trim() || selectedWorkStatus.length > 0
+               {selectedDepartments.length > 0 || selectedRoles.length > 0 || searchTerm.trim() || selectedWorkStatus.length > 0 || startDate || endDate
                  ? 'Filtreleme kriterlerine uygun kişi bulunamadı' 
                  : 'Veri yüklenmedi'
                }
              </div>
              <div className="text-sm">
-               {selectedDepartments.length > 0 || selectedRoles.length > 0 || searchTerm.trim() || selectedWorkStatus.length > 0
+               {selectedDepartments.length > 0 || selectedRoles.length > 0 || searchTerm.trim() || selectedWorkStatus.length > 0 || startDate || endDate
                  ? 'Farklı filtre seçenekleri deneyebilirsiniz.'
                  : 'Verileri Getir butonuna tıklayarak kullanıcıları görüntüleyebilirsiniz.'
                }
