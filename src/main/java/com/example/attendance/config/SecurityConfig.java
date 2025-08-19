@@ -29,6 +29,7 @@ import com.example.attendance.security.CustomAnnotationEvaluator;
 
 @Configuration
 @EnableWebSecurity
+@SuppressWarnings("removal")
 @EnableMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
 
@@ -51,7 +52,15 @@ public class SecurityConfig {
                         "/api/userInfo/**"
                 ))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/static/**","/favicon.ico","/css/**","/js/**","/images/**").permitAll()
+                        .requestMatchers(
+                                "/manifest.json",
+                                "/favicon.ico",
+                                "/logo*.png",
+                                "/static/**",
+                                "/css/**",
+                                "/js/**",
+                                "/images/**"
+                        ).permitAll()
                         .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth -> oauth
@@ -59,11 +68,11 @@ public class SecurityConfig {
                         .userInfoEndpoint(userInfo -> userInfo.oidcUserService(oidcUserServiceWithTokenVerifier()))
                 )
                 .logout(logout -> logout
-                        .logoutRequestMatcher(new AntPathRequestMatcher("/logout", "GET"))
-                        .logoutSuccessHandler(keycloakLogoutSuccessHandler())
-                        .invalidateHttpSession(true)
-                        .clearAuthentication(true)
-                        .deleteCookies("JSESSIONID")
+                        .logoutRequestMatcher(new AntPathRequestMatcher("/logout", "GET")) // Özel matcher
+                        .logoutSuccessHandler(keycloakLogoutSuccessHandler())              // Keycloak yönlendirmesi
+                        .invalidateHttpSession(true)                                       // Oturumu sonlandır
+                        .clearAuthentication(true)                                         // Kimliği temizle
+                        .deleteCookies("JSESSIONID")                                       // Cookie temizle
                 );
 
         return http.build();

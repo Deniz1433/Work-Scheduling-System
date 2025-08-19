@@ -103,21 +103,6 @@ public class AdminService {
         log.info("User created in Postgres: {}", user.getUsername());
     }
 
-    public void createUser(CreateUserDto dto) {
-        String keycloakId = keycloakAdminService.createKeycloakUser(dto);
-        User user = new User();
-        user.setKeycloakId(keycloakId);
-        user.setUsername(dto.getUsername());
-        user.setEmail(dto.getEmail());
-        user.setFirstName(dto.getFirstName());
-        user.setLastName(dto.getLastName());
-        user.setIsActive(true);
-        user.setPassword(dto.getPassword());
-        user.setRole(roleRepository.findById(dto.getRoleId()).orElseThrow());
-        user.setDepartment(departmentRepository.findById(dto.getDepartmentId()).orElseThrow());
-        userRepository.save(user);
-    }
-
     @Transactional
     public void updateUserRole(Long userId, Long roleId) {
         User u = userRepository.findById(userId).orElseThrow();
@@ -217,5 +202,33 @@ public class AdminService {
         dto.setDepartmentId(dbUser.getDepartment() != null ? dbUser.getDepartment().getId() : null);
         dto.setRoleId(dbUser.getRole() != null ? dbUser.getRole().getId() : null);
         return dto;
+    }
+    public UserDto createUser(CreateUserDto dto) {
+        // 1. Veritabanında var mı kontrolü
+        if (userRepository.findByUsername(dto.getUsername()).isPresent()) {
+            throw new IllegalArgumentException("Bu kullanıcı adı zaten kullanılıyor.");
+        }
+
+        if (userRepository.findByEmail(dto.getEmail()).isPresent()) {
+            throw new IllegalArgumentException("Bu e-posta zaten kullanılıyor.");
+        }
+
+        // 2. Keycloak'ta oluştur
+        String keycloakId = keycloakAdminService.createKeycloakUser(dto);
+
+        // 3. PostgreSQL'e kaydet
+        User user = new User();
+        user.setKeycloakId(keycloakId);
+        user.setUsername(dto.getUsername());
+        user.setEmail(dto.getEmail());
+        user.setFirstName(dto.getFirstName());
+        user.setLastName(dto.getLastName());
+        user.setIsActive(true);
+        user.setPassword(dto.getPassword());
+        user.setRole(roleRepository.findById(dto.getRoleId()).orElseThrow(() -> new IllegalArgumentException("Geçersiz rol ID")));
+        user.setDepartment(departmentRepository.findById(dto.getDepartmentId()).orElseThrow(() -> new IllegalArgumentException("Geçersiz departman ID")));
+
+        userRepository.save(user);
+        return toDto(user); // geri dön
     }
 }

@@ -3,11 +3,13 @@ package com.example.attendance.controller;
 import com.example.attendance.dto.CreateUserDto;
 import com.example.attendance.dto.UserDto;
 import com.example.attendance.service.AdminService;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin")
@@ -32,14 +34,16 @@ public class AdminController {
     }
     @PreAuthorize("@CustomAnnotationEvaluator.hasAnyPermission(authentication, null, {'ADMIN_ALL', 'CREATE_USER'})")
     @PostMapping("/users")
-    public ResponseEntity<String> createUser(@RequestBody CreateUserDto dto) {
+    public ResponseEntity<?> createUser(@RequestBody CreateUserDto dto) {
         try {
             System.out.println("Gelen kullanıcı DTO: " + dto);
-            adminService.createUser(dto);
-            return ResponseEntity.ok("Kullanıcı başarıyla oluşturuldu.");
+            UserDto createdUser = adminService.createUser(dto);
+            return ResponseEntity.ok(createdUser);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
-            e.printStackTrace(); // Konsola full hata stack'ini basar
-            return ResponseEntity.badRequest().body("Kullanıcı oluşturulamadı: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body(Map.of("error", "Kullanıcı oluşturulamadı: " + e.getMessage()));
         }
     }
     @PreAuthorize("@CustomAnnotationEvaluator.hasAnyPermission(authentication, null, {'ADMIN_ALL', 'EDIT_USER_INFO'})")

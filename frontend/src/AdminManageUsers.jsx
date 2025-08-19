@@ -23,6 +23,14 @@ const attendanceMap = {
     5: 'Resmi Tatil'
 };
 
+function getCurrentMondayDate() {
+    const today = new Date();
+    const day = today.getDay(); // 0: Pazar, 1: Pazartesi ...
+    const mondayOffset = day === 0 ? -6 : 1 - day;
+    const monday = new Date(today.setDate(today.getDate() + mondayOffset));
+    return monday.toISOString().split('T')[0]; // 'YYYY-MM-DD'
+}
+
 const AdminManageUsers = () => {
     const [users, setUsers] = useState([]);
     const [roles, setRoles] = useState([]);
@@ -126,24 +134,100 @@ const AdminManageUsers = () => {
         }
     };
 
-    const handleAddUserWithAttendance = () => {
-        fetch('/api/admin/users', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(newUser)
-        })
-            .then(res => res.json())
-            .then(async createdUser => {
-                await fetch('/api/attendance', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId: createdUser.id })
-                });
-                fetchUsers();
-                setNewUser({ firstName: '', lastName: '', email: '', username: '', password: '', roleId: null, departmentId: null });
-            });
-    };
+    const handleAddUserWithAttendance = async () => {
+        // 🔐 1. Input validation – boş alan veya eksik seçim varsa uyarı
+        if (
+            !newUser.firstName?.trim() ||
+            !newUser.lastName?.trim() ||
+            !newUser.email?.trim() ||
+            !newUser.username?.trim() ||
+            !newUser.password?.trim() ||
+            !newUser.roleId ||
+            !newUser.departmentId
+        ) {
+            Swal.fire("Eksik Bilgi", "Lütfen tüm alanları doldurun ve seçimleri yapın.", "warning");
+            return;
+        }
 
+        // ✉️ 2. E-posta geçerlilik kontrolü
+        if (!newUser.email.includes("@")) {
+            Swal.fire("Geçersiz E-posta", "Lütfen geçerli bir e-posta adresi girin.", "warning");
+            return;
+        }
+
+        try {
+            // 👤 3. Kullanıcı oluşturma isteği
+            const res = await fetch('/api/admin/users', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newUser)
+            });
+
+            const resultText = await res.text();
+
+            if (!res.ok) {
+                try {
+                    const parsed = JSON.parse(resultText);
+                    throw new Error(parsed.error || "Kullanıcı oluşturulamadı.");
+                } catch (e) {
+                    throw new Error(resultText);
+                }
+            }
+
+            const createdUser = JSON.parse(resultText);
+
+            // 📅 4. Attendance verisi gönderme
+            const weekStart = getCurrentMondayDate();
+            const dates = [0, 0, 0, 0, 0];
+
+            const attendanceRes = await fetch(`/api/attendance/${createdUser.id}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId: createdUser.id,
+                    weekStart,
+                    dates,
+                    explanation: "Yeni kullanıcı için varsayılan attendance oluşturuldu"
+                })
+            });
+
+            if (!attendanceRes.ok) {
+                if (attendanceRes.status === 403) {
+                    const selfRes = await fetch('/api/attendance', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ weekStart, dates })
+                    });
+
+                    if (!selfRes.ok) {
+                        const err = await selfRes.text();
+                        throw new Error("Attendance eklenemedi (kendi adına): " + err);
+                    }
+                } else {
+                    const err = await attendanceRes.text();
+                    throw new Error("Attendance eklenemedi (admin olarak): " + err);
+                }
+            }
+
+            // 🎉 5. Başarılıysa alert ve alanları sıfırla
+            Swal.fire('Başarılı', 'Kullanıcı ve attendance başarıyla eklendi', 'success').then(() => {
+                setNewUser({
+                    firstName: '',
+                    lastName: '',
+                    email: '',
+                    username: '',
+                    password: '',
+                    roleId: null,
+                    departmentId: null
+                });
+                fetchUsers(); // sayfayı otomatik yenile
+            });
+
+        } catch (err) {
+            console.error("Kullanıcı ekleme hatası:", err);
+            Swal.fire('Hata', err.message || 'Kullanıcı oluşturulamadı', 'error');
+        }
+    };
     const handleAttendanceChange = (index, field, value) => {
         const updated = [...editingAttendanceData];
         updated[index][field] = parseInt(value);
