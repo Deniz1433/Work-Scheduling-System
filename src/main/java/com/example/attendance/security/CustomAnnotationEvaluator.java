@@ -134,6 +134,9 @@ public class CustomAnnotationEvaluator implements PermissionEvaluator {
 
             // Child / Department checks (DB-driven context)
             if (hasAnyPermission(authentication, null, List.of("VIEW_CHILD_ATTENDANCE"))) {
+                  System.out.println("🔍 canViewAttendance: User has VIEW_CHILD_ATTENDANCE permission");
+                  System.out.println("🔍 canViewAttendance: Viewer: " + viewer.getUsername() + " (dept: " + (viewer.getDepartment() != null ? viewer.getDepartment().getName() : "null") + ")");
+                  System.out.println("🔍 canViewAttendance: Target: " + targetUser.getUsername() + " (dept: " + (targetUser.getDepartment() != null ? targetUser.getDepartment().getName() : "null") + ")");
                   return isInChildDepartments(viewer.getDepartment(), targetUser.getDepartment());
             }
             if (hasAnyPermission(authentication, null, List.of("VIEW_DEPARTMENT_ATTENDANCE"))) {
@@ -187,12 +190,35 @@ public class CustomAnnotationEvaluator implements PermissionEvaluator {
       }
 
       private boolean isInChildDepartments(Department parentDepartment, Department childDepartment) {
-            if (parentDepartment == null || childDepartment == null) return false;
-            if (parentDepartment.getId().equals(childDepartment.getId())) return true;
+            if (parentDepartment == null || childDepartment == null) {
+                  System.out.println("🔍 isInChildDepartments: null departments - parent: " + parentDepartment + ", child: " + childDepartment);
+                  return false;
+            }
+            
+            // Same department = can view
+            if (Objects.equals(parentDepartment.getId(), childDepartment.getId())) {
+                  System.out.println("🔍 isInChildDepartments: same department - " + parentDepartment.getName());
+                  return true;
+            }
+            
             try {
+                  System.out.println("🔍 isInChildDepartments: checking hierarchy for parent: " + parentDepartment.getName() + " (id:" + parentDepartment.getId() + ")");
                   Set<Department> childDepartments = departmentHierarchyService.findAllDescendants(parentDepartment);
-                  return childDepartments.contains(childDepartment);
+                  System.out.println("🔍 isInChildDepartments: found " + childDepartments.size() + " child departments");
+                  
+                  for (Department dept : childDepartments) {
+                        System.out.println("🔍   - Child: " + dept.getName() + " (id:" + dept.getId() + ")");
+                  }
+                  
+                  // Check by ID instead of contains() to be extra sure
+                  boolean result = childDepartments.stream()
+                        .anyMatch(dept -> Objects.equals(dept.getId(), childDepartment.getId()));
+                  
+                  System.out.println("🔍 isInChildDepartments: target department " + childDepartment.getName() + " (id:" + childDepartment.getId() + ") is child: " + result);
+                  return result;
             } catch (Exception e) {
+                  System.out.println("❌ isInChildDepartments: exception - " + e.getMessage());
+                  e.printStackTrace();
                   return false;
             }
       }

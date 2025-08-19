@@ -48,8 +48,10 @@ const EmployeeTeamAttendance = ({ user }) => {
       
       setUserPermissions(permissions);
       setEditPermissions(editPerms);
-      console.log('User permissions:', permissions);
-      console.log('Edit permissions:', editPerms);
+      console.log('🔍 User permissions:', permissions);
+      console.log('🔍 Edit permissions:', editPerms);
+      console.log('🔍 canViewDepartment:', permissions.canViewDepartment);
+      console.log('🔍 userDepartmentId:', permissions.userDepartmentId);
     } catch (err) {
       console.error('Kullanıcı yetkileri yüklenemedi:', err);
     }
@@ -111,6 +113,7 @@ const EmployeeTeamAttendance = ({ user }) => {
           }
         } else {
           // Hiçbir yetki yoksa boş liste
+          console.warn('Hiçbir departman görüntüleme yetkisi yok!');
           filteredDepts = [];
         }
       }
