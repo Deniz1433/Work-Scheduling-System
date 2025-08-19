@@ -1,6 +1,10 @@
 import React, { useLayoutEffect, useEffect, useRef, useState } from 'react';
 import cytoscape from 'cytoscape';
 
+const GRID = 24; // px – tweak to taste
+const snap = (x) => Math.round(x / GRID) * GRID;
+const snapPos = (p) => ({ x: snap(p.x), y: snap(p.y) });
+
 const AdminDepartmentHierarchy = () => {
     const cyRef = useRef(null);
     const containerRef = useRef(null);
@@ -64,12 +68,47 @@ const AdminDepartmentHierarchy = () => {
         reloadHierarchy();
     }, []);
 
+    // Keep CSS grid in sync with graph coordinates (zoom/pan)
+    const applyGridTransform = () => {
+        const el = containerRef.current;
+        if (!el || !cyRef.current) return;
+        const cy = cyRef.current;
+        const z = cy.zoom();
+        const pan = cy.pan();
+        // Minor / Major spacing in *rendered* pixels
+        const minor = GRID * z;
+        const major = GRID * 4 * z;
+        // Offset so lines align with model coordinates (0,0) grid
+        const mod = (a, n) => ((a % n) + n) % n;
+        const offXminor = mod(pan.x, minor);
+        const offYminor = mod(pan.y, minor);
+        const offXmajor = mod(pan.x, major);
+        const offYmajor = mod(pan.y, major);
+        el.style.backgroundSize = `
+    ${minor}px ${minor}px,
+    ${minor}px ${minor}px,
+    ${major}px ${major}px,
+    ${major}px ${major}px
+  `;
+        el.style.backgroundPosition = `
+    ${offXminor}px ${offYminor}px,
+    ${offXminor}px ${offYminor}px,
+    ${offXmajor}px ${offYmajor}px,
+    ${offXmajor}px ${offYmajor}px
+  `;
+    };
+
     const addDepartment = (department) => {
         const cy = cyRef.current;
         if (!cy || cy.$id(department).length) return;
         const x = cy.width() / 2;
         const y = cy.height() / 2;
-        cy.add({ group: 'nodes', data: { id: department, label: department }, position: { x, y } });
+        const pos = snapPos({ x, y });
+        cy.add({
+            group: 'nodes',
+            data: { id: department, label: department },
+            position: pos
+        });
         setIsDirty(true);
     };
 
@@ -161,15 +200,31 @@ const AdminDepartmentHierarchy = () => {
         });
 
         cyRef.current = cy;
+        applyGridTransform();
+        cy.on('viewport', () => {
+            // rAF keeps it smooth on continuous zoom/pan
+            requestAnimationFrame(applyGridTransform);
+        });
 
         // delegated events for all nodes, now and future:
         cy.on('add remove', 'edge', () => setIsDirty(true));
-        cy.on('dragfree', 'node', () => setIsDirty(true));
+        // after cy is createdaddDepartment
+        cy.on('dragfree', 'node', (evt) => {
+            const n = evt.target;
+            n.position(snapPos(n.position()));
+            setIsDirty(true);
+        });
 
         // default to move mode
         enableMove();
 
         return () => cy.destroy();
+    }, []);
+
+    useEffect(() => {
+        const ro = new ResizeObserver(() => applyGridTransform());
+        if (containerRef.current) ro.observe(containerRef.current);
+        return () => ro.disconnect();
     }, []);
 
     // 2) REDRAW whenever loadedData changes
@@ -181,14 +236,13 @@ const AdminDepartmentHierarchy = () => {
         // build elements…
         const elements = [];
         Object.entries(childrenMap).forEach(([p, kids]) => {
-            elements.push({
-                data: { id: p, label: p },
-                position: { x: positionsMap[p].x, y: positionsMap[p].y }
-            });
+            const posP = positionsMap[p] || { x: 0, y: 0 };
+            elements.push({ data: { id: p, label: p }, position: snapPos(posP) });
             kids.forEach(c => {
+                const posC = positionsMap[c] || { x: 0, y: 0 };
                 elements.push({
                     data: { id: c, label: c },
-                    position: { x: positionsMap[c].x, y: positionsMap[c].y }
+                    position: snapPos(posC)
                 });
                 elements.push({ data: { id: `${p}→${c}`, source: p, target: c } });
             });
@@ -328,10 +382,20 @@ const AdminDepartmentHierarchy = () => {
             </div>
 
             {/* Cytoscape Container */}
-            <div 
+            <div
                 ref={containerRef}
                 className="flex-1 min-w-0 h-full overflow-hidden"
+                style={{
+                    backgroundImage: `
+      linear-gradient(to right, rgba(0,0,0,.06) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(0,0,0,.06) 1px, transparent 1px),
+      linear-gradient(to right, rgba(0,0,0,.10) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(0,0,0,.10) 1px, transparent 1px)
+    `
+                    // backgroundSize/backgroundPosition are set by applyGridTransform()
+                }}
             />
+
         </div>
     );
 };
