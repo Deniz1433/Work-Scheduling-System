@@ -9,6 +9,9 @@ import AdminDepartmentManagement from './AdminDepartmentManagement';
 import AdminRoleManagement from './AdminRoleManagement';
 import AdminHolidayRegistration from './AdminHolidayRegistration';
 import AdminDepartmentHierarchy from './AdminDepartmentHierarchy';
+import SurveyAdmin from './SurveyAdmin';
+import SurveyTake from './SurveyTake';
+
 
 const EmployeeMain = () => {
   const {user} = useUser();
@@ -66,7 +69,30 @@ const EmployeeMain = () => {
       icon: Building,
       component: AdminDepartmentHierarchy,
       requiredPermission: 'canViewDepartmentHierarchy'
-    }
+    },
+     {
+            id: 'survey',
+            label: 'Anket Düzenle',
+            icon: FileText,
+            component: SurveyAdmin,
+            requiredPermission: 'canViewHolidays' // Şimdilik kondu Yetkisi düzenlenmeli
+     },
+
+     {
+              id: 'surveyTake',
+              label: 'Anketler Görüntüle',
+              icon: FileText,
+              component: SurveyTake,
+              requiredPermission: null // İsteyen herkes görebilsin
+     }
+
+
+
+
+
+
+
+
   ];
 
   // Kullanıcı yetkilerini getir

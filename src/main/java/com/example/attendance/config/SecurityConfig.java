@@ -49,7 +49,8 @@ public class SecurityConfig {
                         "/api/role-permissions/**",
                         "/api/holidays/**",
                         "/api/user/**",
-                        "/api/userInfo/**"
+                        "/api/userInfo/**",
+                        "/api/surveys/**"
                 ))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
