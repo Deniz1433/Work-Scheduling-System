@@ -53,9 +53,11 @@ services:
       - keycloak
     ports:
       - "8080:8080"
+      - "5005:5005"
     environment:
       SPRING_PROFILES_ACTIVE: default
-
+      JAVA_TOOL_OPTIONS: >-
+        -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
       # Database
       SPRING_DATASOURCE_URL:      jdbc:postgresql://postgres:5432/attendance-db
       SPRING_DATASOURCE_USERNAME: admin

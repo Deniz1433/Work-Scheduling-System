@@ -6,7 +6,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 @Getter @Setter
-@Entity @Table(name = "survey_answer")
+@Entity @Table(name = "survey_answer",uniqueConstraints = {@UniqueConstraint(columnNames = {"survey_id", "user_id"})})
 public class SurveyAnswer {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -23,4 +23,7 @@ public class SurveyAnswer {
 
     @Column(name = "user_id", length = 64)
     private String userId; // Keycloak sub/username koyabilirsin (opsiyonel)
+
+    @Column(name = "user_email", length = 255)
+    private String userEmail;
 }

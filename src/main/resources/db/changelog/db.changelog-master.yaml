@@ -594,5 +594,3 @@ databaseChangeLog:
             tableName: department_node_position
             columnNames: id
             constraintName: pk_department_node_position_id
-
- 

@@ -7,10 +7,8 @@ import com.example.attendance.service.SurveyService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.access.prepost.PreAuthorize;
 
-
+import java.net.URI;
 import java.security.Principal;
 import java.util.List;
 
@@ -22,34 +20,34 @@ public class SurveyController {
 
     private final SurveyService surveyService;
 
-    @GetMapping
-    public ResponseEntity<List<SurveyDto>> list() {
-        return ResponseEntity.ok(surveyService.findAll());
-    }
-
     @GetMapping("/{id}")
     public ResponseEntity<SurveyDto> get(@PathVariable Long id) {
         return ResponseEntity.ok(surveyService.findById(id));
     }
-
-    @GetMapping("/latest")
-    public ResponseEntity<SurveyDto> latest() {
-        return ResponseEntity.ok(surveyService.findLatest());
+    @GetMapping
+    public ResponseEntity<List<SurveyDto>> list(Principal principal) {
+        String userId = (principal != null ? principal.getName() : null);
+        List<SurveyDto> out = (userId == null || userId.isBlank())
+                ? surveyService.findAll()
+                : surveyService.findAllWithStatus(userId);
+        return ResponseEntity.ok(out);
     }
-
     //@PreAuthorize("@CustomAnnotationEvaluator.hasAnyPermission(authentication, null, {'ADMIN_ALL')")
     @PostMapping
-    public ResponseEntity<SurveyDto> create(@RequestBody SurveyDto dto) {
-        return ResponseEntity.ok(surveyService.create(dto));
+    public ResponseEntity<SurveyDto> create(@RequestBody /*@Valid*/ SurveyDto dto) {
+        SurveyDto created = surveyService.create(dto);
+        // 201 Created + Location header
+        return ResponseEntity
+                .created(URI.create("/api/surveys/" + created.getId()))
+                .body(created);
     }
 
     @PostMapping("/{surveyId}/submit")
     public ResponseEntity<Void> submit(@PathVariable Long surveyId,
                                        @RequestBody SurveyAnswerDto dto,
                                        Principal principal) {
-        // Keycloak varsa principal.getName() kullan; yoksa null geç
-        String userId = principal != null ? principal.getName() : null;
-        surveyService.submitAnswers(surveyId, dto, userId);
+        String userId = (principal != null ? principal.getName() : null); // UUID (sub)
+        surveyService.submitAnswers(surveyId, dto, userId, principal);    // 👈 principal parametresi
         return ResponseEntity.noContent().build();
     }
 
@@ -58,6 +56,4 @@ public class SurveyController {
         surveyService.delete(id);
         return ResponseEntity.noContent().build();
     }
-
-
 }
