@@ -18,7 +18,7 @@ const EmployeeTeamAttendance = ({ user }) => {
   const [selectedWorkStatus, setSelectedWorkStatus] = useState([]);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [currentWeekOffset, setCurrentWeekOffset] = useState(0); // Hafta offset'i (0 = bu hafta, 1 = gelecek hafta, -1 = geçen hafta)
+  const [currentWeekOffset, setCurrentWeekOffset] = useState(1); // Hafta offset'i (0 = bu hafta, 1 = gelecek hafta, -1 = geçen hafta)
   
   // Çalışma durumu seçenekleri
   const workStatusOptions = [
@@ -373,6 +373,14 @@ const EmployeeTeamAttendance = ({ user }) => {
       fetchTeamData();
     }
   }, [currentWeekOffset]);
+
+  // Add this useEffect after your existing useEffects
+  useEffect(() => {
+    // Auto-fetch data when component mounts and userPermissions are available
+    if (userPermissions) {
+      fetchTeamData();
+    }
+  }, [userPermissions]);
 
   // helper: normalize id types
   const toNum = (v) => (v == null ? null : Number(v));
@@ -892,7 +900,7 @@ const EmployeeTeamAttendance = ({ user }) => {
               fetchTeamData();
             }}
             className={`px-4 py-2 text-sm rounded-lg transition-colors bg-blue-500 text-white hover:bg-blue-600`}>
-            Verileri Getir
+            Ara
           </button>
         </div>
       </div>

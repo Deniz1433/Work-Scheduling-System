@@ -80,7 +80,7 @@ const EmployeeMain = () => {
 
      {
               id: 'surveyTake',
-              label: 'Anketler Görüntüle',
+              label: 'Anketleri Görüntüle',
               icon: FileText,
               component: SurveyTake,
               requiredPermission: null // İsteyen herkes görebilsin

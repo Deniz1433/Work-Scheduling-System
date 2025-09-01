@@ -49,7 +49,7 @@ const EmployeeAttendanceRegistration = () => {
     }, [user]);
 
     // Hafta navigasyon state'i
-    const [currentWeekOffset, setCurrentWeekOffset] = useState(0); // Hafta offset'i (0 = bu hafta, 1 = gelecek hafta, -1 = geçen hafta)
+    const [currentWeekOffset, setCurrentWeekOffset] = useState(1); // Hafta offset'i (0 = bu hafta, 1 = gelecek hafta, -1 = geçen hafta)
 
     // Hafta günlerini hesapla (offset'e göre)
     const generateWeekDays = (weekOffset = 0) => {
