@@ -1,3 +1,4 @@
+// src/main/java/com/example/attendance/config/SecurityConfig.java
 package com.example.attendance.config;
 
 import com.example.attendance.security.CustomAnnotationEvaluator;
@@ -24,15 +25,15 @@ import org.springframework.security.web.servlet.util.matcher.PathPatternRequestM
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity()
+@EnableMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
 
     private final CustomAnnotationEvaluator customAnnotationEvaluator;
 
-    // Use constructor injection instead of field injection
     public SecurityConfig(CustomAnnotationEvaluator customAnnotationEvaluator) {
         this.customAnnotationEvaluator = customAnnotationEvaluator;
     }
@@ -66,11 +67,10 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth -> oauth
-                        .defaultSuccessUrl("/") // Remove redundant default parameter
+                        .defaultSuccessUrl("/")
                         .userInfoEndpoint(userInfo -> userInfo.oidcUserService(oidcUserServiceWithTokenVerifier()))
                 )
                 .logout(logout -> logout
-                        // Replace deprecated AntPathRequestMatcher with modern equivalent
                         .logoutRequestMatcher(PathPatternRequestMatcher.withDefaults().matcher("/logout"))
                         .logoutSuccessHandler(keycloakLogoutSuccessHandler())
                         .invalidateHttpSession(true)
@@ -82,11 +82,17 @@ public class SecurityConfig {
     }
 
     /**
-     * Maps Keycloak roles/claims to Spring authorities:
-     * - Realm roles -> ROLE_realm_{role}
-     * - Client roles (attendance-client) -> ROLE_attendance_client_{role}
-     * - Optional custom claim 'permissions' -> PERM_{PermissionName}
-     * - If client/realm role 'superadmin' present -> grant a bundle of PERM_* (ADMIN_ALL, VIEW_ROLES, EDIT_ROLES, etc.)
+     * OIDC user service that:
+     * 1) Reads Keycloak access token
+     * 2) Maps realm roles -> ROLE_realm_*
+     * 3) Maps attendance-client roles -> ROLE_attendance_client_*
+     * 4) Maps custom "permissions" claim -> PERM_*
+     * 5) Bridges PERM_* and relevant roles to app-level authorities used by @PreAuthorize:
+     *    - PERM_ADMIN_ALL or superadmin role -> VIEW_SURVEYS + MANAGE_SURVEYS
+     *    - PERM_VIEW_SURVEYS -> VIEW_SURVEYS
+     *    - PERM_MANAGE_SURVEYS -> MANAGE_SURVEYS
+     *    - ROLE_attendance_client_view_surveys OR ROLE_realm_view_surveys -> VIEW_SURVEYS
+     *    - ROLE_attendance_client_manage_surveys OR ROLE_realm_manage_surveys -> MANAGE_SURVEYS
      */
     private OAuth2UserService<OidcUserRequest, OidcUser> oidcUserServiceWithTokenVerifier() {
         OidcUserService delegate = new OidcUserService();
@@ -94,58 +100,87 @@ public class SecurityConfig {
             String tokenString = userRequest.getAccessToken().getTokenValue();
             Set<GrantedAuthority> mapped = new HashSet<>();
 
+            // --- Parse Keycloak access token and collect roles/perms ---
+            Set<String> realmRoles = new HashSet<>();
+            Set<String> clientRoles = new HashSet<>();
+            Set<String> permClaims = new HashSet<>();
+            boolean superadmin = false;
+
             try {
-                AccessToken kcToken = TokenVerifier.create(tokenString, AccessToken.class).getToken();
+                AccessToken kc = TokenVerifier.create(tokenString, AccessToken.class).getToken();
 
-                // Realm roles -> authorities
-                if (kcToken.getRealmAccess() != null) {
-                    kcToken.getRealmAccess().getRoles().forEach(
-                            r -> mapped.add(new SimpleGrantedAuthority("ROLE_realm_" + r))
-                    );
+                if (kc.getRealmAccess() != null) {
+                    realmRoles.addAll(kc.getRealmAccess().getRoles());
                 }
 
-                // Client roles (attendance-client) -> authorities
-                Map<String, AccessToken.Access> resources = kcToken.getResourceAccess();
-                boolean isSuperadmin = false;
-                if (resources != null && resources.containsKey("attendance-client")) {
-                    var clientRoles = resources.get("attendance-client").getRoles();
-                    for (String r : clientRoles) {
-                        String norm = r.replace('-', '_');
-                        mapped.add(new SimpleGrantedAuthority("ROLE_attendance_client_" + norm));
-                        if ("superadmin".equalsIgnoreCase(r)) {
-                            isSuperadmin = true;
-                        }
-                    }
+                Map<String, AccessToken.Access> res = kc.getResourceAccess();
+                if (res != null && res.containsKey("attendance-client")) {
+                    clientRoles.addAll(res.get("attendance-client").getRoles());
                 }
 
-                // Optional: read custom claim "permissions" (add a protocol mapper in Keycloak!)
-                Object rawPerms = kcToken.getOtherClaims().get("permissions");
-                if (rawPerms instanceof Collection<?> perms) {
-                    for (Object p : perms) {
+                Object rawPerms = kc.getOtherClaims().get("permissions");
+                if (rawPerms instanceof Collection<?> col) {
+                    for (Object p : col) {
                         String name = String.valueOf(p).trim();
-                        if (!name.isEmpty()) {
-                            mapped.add(new SimpleGrantedAuthority("PERM_" + name));
-                        }
+                        if (!name.isEmpty()) permClaims.add(name);
                     }
-                }
-
-                // If they have 'superadmin' client/realm role, grant a bundle of permissions
-                if (isSuperadmin
-                        || mapped.stream().anyMatch(a -> a.getAuthority().equalsIgnoreCase("ROLE_realm_superadmin"))) {
-                    grantSuperadminPermissions(mapped);
                 }
 
             } catch (VerificationException ignored) {
-                // Log this exception in a real application
+                // Consider logging in production
             }
 
-            OidcUser userInfo = delegate.loadUser(userRequest);
-            return new DefaultOidcUser(mapped, userInfo.getIdToken(), userInfo.getUserInfo());
+            // --- Convert roles/claims to GrantedAuthority baseline ---
+            for (String r : realmRoles) {
+                mapped.add(new SimpleGrantedAuthority("ROLE_realm_" + r));
+            }
+            for (String r : clientRoles) {
+                String norm = r.replace('-', '_');
+                mapped.add(new SimpleGrantedAuthority("ROLE_attendance_client_" + norm));
+                if ("superadmin".equalsIgnoreCase(r)) superadmin = true;
+            }
+            for (String p : permClaims) {
+                mapped.add(new SimpleGrantedAuthority("PERM_" + p));
+            }
+
+            // Superadmin (client or realm) -> grant bundle of PERM_* (includes survey perms)
+            if (superadmin || realmRoles.contains("superadmin")) {
+                grantSuperadminPermissions(mapped);
+            }
+
+            // --- BRIDGE to app-level authorities used by @PreAuthorize ---
+            Set<String> auths = mapped.stream().map(GrantedAuthority::getAuthority).collect(Collectors.toSet());
+
+            boolean hasAdminAll = auths.contains("PERM_ADMIN_ALL")
+                    || auths.contains("ROLE_attendance_client_superadmin")
+                    || realmRoles.contains("superadmin");
+
+            boolean hasViewPerm   = auths.contains("PERM_VIEW_SURVEYS");
+            boolean hasManagePerm = auths.contains("PERM_MANAGE_SURVEYS");
+
+            boolean hasViewRoleRealm   = auths.contains("ROLE_realm_view_surveys");
+            boolean hasViewRoleClient  = auths.contains("ROLE_attendance_client_view_surveys");
+            boolean hasManageRoleRealm = auths.contains("ROLE_realm_manage_surveys");
+            boolean hasManageRoleClient= auths.contains("ROLE_attendance_client_manage_surveys");
+
+            if (hasAdminAll) {
+                mapped.add(new SimpleGrantedAuthority("VIEW_SURVEYS"));
+                mapped.add(new SimpleGrantedAuthority("MANAGE_SURVEYS"));
+            }
+            if (hasViewPerm || hasViewRoleRealm || hasViewRoleClient) {
+                mapped.add(new SimpleGrantedAuthority("VIEW_SURVEYS"));
+            }
+            if (hasManagePerm || hasManageRoleRealm || hasManageRoleClient) {
+                mapped.add(new SimpleGrantedAuthority("MANAGE_SURVEYS"));
+            }
+
+            // Finally return the OIDC user with our mapped authorities
+            OidcUser base = delegate.loadUser(userRequest);
+            return new DefaultOidcUser(mapped, base.getIdToken(), base.getUserInfo());
         };
     }
 
     private void grantSuperadminPermissions(Set<GrantedAuthority> mapped) {
-        // Grant whatever your app needs to pass the @PreAuthorize checks
         List<String> perms = List.of(
                 "ADMIN_ALL",
                 "VIEW_ROLES",
@@ -156,7 +191,10 @@ public class SecurityConfig {
                 "VIEW_ALL_USERS",
                 "VIEW_ALL_DEPARTMENTS",
                 "VIEW_HOLIDAYS",
-                "VIEW_DEPARTMENT_HIERARCHY"
+                "VIEW_DEPARTMENT_HIERARCHY",
+                // explicitly include survey perms
+                "VIEW_SURVEYS",
+                "MANAGE_SURVEYS"
         );
         perms.forEach(p -> mapped.add(new SimpleGrantedAuthority("PERM_" + p)));
     }
@@ -170,7 +208,6 @@ public class SecurityConfig {
                 idTokenHint = u.getIdToken().getTokenValue();
             }
 
-            // Replace deprecated fromHttpUrl with fromUriString
             String logoutUrl = UriComponentsBuilder
                     .fromUriString("http://localhost:8081/realms/attendance-realm/protocol/openid-connect/logout")
                     .queryParam("id_token_hint", idTokenHint)

@@ -255,19 +255,22 @@ public class AttendanceController {
             boolean canViewRoles = permissionEvaluator.hasAnyPermission(authentication, null, new String[]{"ADMIN_ALL", "VIEW_ROLES"});
             boolean canViewHolidays = permissionEvaluator.hasAnyPermission(authentication, null, new String[]{"ADMIN_ALL", "VIEW_HOLIDAYS"});
             boolean canViewDepartmentHierarchy = permissionEvaluator.hasAnyPermission(authentication, null, new String[]{"ADMIN_ALL", "VIEW_DEPARTMENT_HIERARCHY"});
+            boolean canViewSurveys = permissionEvaluator.hasAnyPermission(authentication, null, new String[]{"ADMIN_ALL", "VIEW_SURVEYS"});
+            boolean canManageSurveys = permissionEvaluator.hasAnyPermission(authentication, null, new String[]{"ADMIN_ALL", "MANAGE_SURVEYS"});
 
-            Map<String, Object> permissions = Map.of(
-                    "canViewAll", canViewAll,
-                    "canViewChild", canViewChild,
-                    "canViewDepartment", canViewDepartment,
-                    "userDepartmentId", user.getDepartment() != null ? user.getDepartment().getId() : "",
-                    "userDepartmentName", user.getDepartment() != null ? user.getDepartment().getName() : "",
-                    "canViewAllUsers", canViewAllUsers,
-                    "canViewAllDepartments", canViewAllDepartments,
-                    "canViewRoles", canViewRoles,
-                    "canViewHolidays", canViewHolidays,
-                    "canViewDepartmentHierarchy", canViewDepartmentHierarchy
-            );
+            Map<String, Object> permissions = new HashMap<>();
+            permissions.put("canViewAll", canViewAll);
+            permissions.put("canViewChild", canViewChild);
+            permissions.put("canViewDepartment", canViewDepartment);
+            permissions.put("userDepartmentId", user.getDepartment() != null ? user.getDepartment().getId() : "");
+            permissions.put("userDepartmentName", user.getDepartment() != null ? user.getDepartment().getName() : "");
+            permissions.put("canViewAllUsers", canViewAllUsers);
+            permissions.put("canViewAllDepartments", canViewAllDepartments);
+            permissions.put("canViewRoles", canViewRoles);
+            permissions.put("canViewHolidays", canViewHolidays);
+            permissions.put("canViewDepartmentHierarchy", canViewDepartmentHierarchy);
+            permissions.put("canViewSurveys", canViewSurveys);
+            permissions.put("canManageSurveys", canManageSurveys);
 
             return ResponseEntity.ok(permissions);
         } catch (Exception e) {

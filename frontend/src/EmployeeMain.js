@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Users, FileText, Calendar1, UserPlus, UserCog, LogOut, Building } from 'lucide-react';
+import { User, FileText, Calendar1, UserCog, LogOut, Building } from 'lucide-react';
 import AttendanceRegistration from './EmployeeAttendanceRegistration';
 import TeamAttendance from './EmployeeTeamAttendance';
 import logo from './assets/logo.png';
@@ -75,7 +75,7 @@ const EmployeeMain = () => {
             label: 'Anket Düzenle',
             icon: FileText,
             component: SurveyAdmin,
-            requiredPermission: 'canViewHolidays' // Şimdilik kondu Yetkisi düzenlenmeli
+            requiredPermission: 'canManageSurveys'
      },
 
      {
@@ -83,7 +83,7 @@ const EmployeeMain = () => {
               label: 'Anketleri Görüntüle',
               icon: FileText,
               component: SurveyTake,
-              requiredPermission: null // İsteyen herkes görebilsin
+              requiredPermission: 'canViewSurveys'
      }
 
 

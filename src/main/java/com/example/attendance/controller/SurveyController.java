@@ -20,11 +20,15 @@ public class SurveyController {
 
     private final SurveyService surveyService;
 
+    // VIEW_SURVEYS -> via CustomAnnotationEvaluator (JWT PERM_ or DB role-permission)
     @GetMapping("/{id}")
+    @org.springframework.security.access.prepost.PreAuthorize("@CustomAnnotationEvaluator.hasPermission(authentication, null, 'VIEW_SURVEYS')")
     public ResponseEntity<SurveyDto> get(@PathVariable Long id) {
         return ResponseEntity.ok(surveyService.findById(id));
     }
+
     @GetMapping
+    @org.springframework.security.access.prepost.PreAuthorize("@CustomAnnotationEvaluator.hasPermission(authentication, null, 'VIEW_SURVEYS')")
     public ResponseEntity<List<SurveyDto>> list(Principal principal) {
         String userId = (principal != null ? principal.getName() : null);
         List<SurveyDto> out = (userId == null || userId.isBlank())
@@ -32,26 +36,29 @@ public class SurveyController {
                 : surveyService.findAllWithStatus(userId);
         return ResponseEntity.ok(out);
     }
-    //@PreAuthorize("@CustomAnnotationEvaluator.hasAnyPermission(authentication, null, {'ADMIN_ALL')")
+
+    // MANAGE_SURVEYS -> via CustomAnnotationEvaluator
     @PostMapping
-    public ResponseEntity<SurveyDto> create(@RequestBody /*@Valid*/ SurveyDto dto) {
+    @org.springframework.security.access.prepost.PreAuthorize("@CustomAnnotationEvaluator.hasPermission(authentication, null, 'MANAGE_SURVEYS')")
+    public ResponseEntity<SurveyDto> create(@RequestBody SurveyDto dto) {
         SurveyDto created = surveyService.create(dto);
-        // 201 Created + Location header
         return ResponseEntity
                 .created(URI.create("/api/surveys/" + created.getId()))
                 .body(created);
     }
 
     @PostMapping("/{surveyId}/submit")
+    @org.springframework.security.access.prepost.PreAuthorize("@CustomAnnotationEvaluator.hasPermission(authentication, null, 'VIEW_SURVEYS')")
     public ResponseEntity<Void> submit(@PathVariable Long surveyId,
                                        @RequestBody SurveyAnswerDto dto,
                                        Principal principal) {
-        String userId = (principal != null ? principal.getName() : null); // UUID (sub)
-        surveyService.submitAnswers(surveyId, dto, userId, principal);    // 👈 principal parametresi
+        String userId = (principal != null ? principal.getName() : null);
+        surveyService.submitAnswers(surveyId, dto, userId, principal);
         return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping("/{id}")
+    @org.springframework.security.access.prepost.PreAuthorize("@CustomAnnotationEvaluator.hasPermission(authentication, null, 'MANAGE_SURVEYS')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         surveyService.delete(id);
         return ResponseEntity.noContent().build();

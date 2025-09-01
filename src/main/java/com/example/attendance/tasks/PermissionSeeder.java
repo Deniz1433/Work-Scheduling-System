@@ -35,7 +35,9 @@ public class PermissionSeeder implements ApplicationRunner {
                 p("VIEW_ALL_USERS", "Tüm kullanıcıları görüntüleme"),
                 p("VIEW_ALL_DEPARTMENTS", "Tüm departmanları görüntüleme"),
                 p("VIEW_HOLIDAYS", "Tatilleri görüntüleme"),
-                p("VIEW_DEPARTMENT_HIERARCHY", "Departman hiyerarşisini görüntüleme")
+                p("VIEW_DEPARTMENT_HIERARCHY", "Departman hiyerarşisini görüntüleme"),
+                p("MANAGE_SURVEYS", "Anketleri yönetme"),
+                p("VIEW_SURVEYS", "Anketleri görüntüleme")
         );
 
         for (Permission target : catalog) {
