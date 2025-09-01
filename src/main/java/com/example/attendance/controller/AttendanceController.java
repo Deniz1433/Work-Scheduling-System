@@ -11,8 +11,8 @@ import com.example.attendance.service.AttendanceService;
 import com.example.attendance.service.EmailService;
 import com.example.attendance.security.CustomAnnotationEvaluator;
 
-import jakarta.ws.rs.Path;
-
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -31,15 +31,23 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/attendance")
 public class AttendanceController {
-    @Autowired
-    private AttendanceService service;
-    @Autowired
-    private UserRepository userRepository;
-    @Autowired
-    private EmailService emailService;
-    @Autowired
-    private CustomAnnotationEvaluator permissionEvaluator;
+    private static final Logger logger = LoggerFactory.getLogger(AttendanceController.class);
 
+    private final AttendanceService service;
+    private final UserRepository userRepository;
+    private final EmailService emailService;
+    private final CustomAnnotationEvaluator permissionEvaluator;
+
+    @Autowired
+    public AttendanceController(AttendanceService service,
+                                UserRepository userRepository,
+                                EmailService emailService,
+                                CustomAnnotationEvaluator permissionEvaluator) {
+        this.service = service;
+        this.userRepository = userRepository;
+        this.emailService = emailService;
+        this.permissionEvaluator = permissionEvaluator;
+    }
 
     private Long getUserIdFromPrincipal(Principal principal) {
         String keycloakId = principal.getName();
@@ -48,31 +56,34 @@ public class AttendanceController {
         return user.getId();
     }
 
-    //herkese açık
-    //kendi attendance'ını kaydetme 
+    // Public endpoint - user records their own attendance
     @PostMapping
     public ResponseEntity<?> submit(
             @RequestBody AttendanceRequest req,
             Principal principal
     ) {
-        Long userId = getUserIdFromPrincipal(principal);
-        service.record(userId, LocalDate.parse(req.getWeekStart()), req.getDates());
-        return ResponseEntity.ok().build();
+        try {
+            Long userId = getUserIdFromPrincipal(principal);
+            service.record(userId, LocalDate.parse(req.getWeekStart()), req.getDates());
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            logger.error("Error submitting attendance", e);
+            return ResponseEntity.internalServerError().body("Error submitting attendance");
+        }
     }
 
-    //başka birinin attendance bilgisini düzenleme
+    // Edit another user's attendance (requires permissions)
     @PreAuthorize("@CustomAnnotationEvaluator.hasAnyPermission(authentication, null, {'ADMIN_ALL', 'EDIT_CHILD_ATTENDANCE', 'EDIT_ALL_ATTENDANCE', 'EDIT_DEPARTMENT_ATTENDANCE'})")
     @PostMapping("/{id}")
     public ResponseEntity<?> submit(@PathVariable Long id, @RequestBody AttendanceRequest req, Principal principal) {
-        System.out.println("Controller received request - ID: " + id + ", Principal: " + principal.getName());
-        System.out.println("Request body - weekStart: " + req.getWeekStart() + ", dates: " + req.getDates());
-    
+        logger.info("Controller received request - ID: {}, Principal: {}", id, principal.getName());
+        logger.info("Request body - weekStart: {}, dates: {}", req.getWeekStart(), req.getDates());
+
         try {
-            // Yetki kontrolü yap
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             Long targetUserId = Long.parseLong(req.getUserId());
 
-            // ❌ Team view üzerinden kendini düzenleme yasak
+            // Prevent self-editing from team view
             Long currentUserId = getUserIdFromPrincipal(principal);
             if (currentUserId.equals(targetUserId)) {
                 return ResponseEntity.status(403).body(Map.of("error", "You cannot edit your own attendance from the team view"));
@@ -82,46 +93,41 @@ public class AttendanceController {
                 return ResponseEntity.status(403).body(Map.of("error", "Insufficient permissions to edit this user's attendance"));
             }
 
+            service.record(targetUserId, LocalDate.parse(req.getWeekStart()), req.getDates());
+            logger.info("Service call completed successfully");
 
-            // Frontend'den gelen userId'yi kullan, principal.getName() değil
-            service.record(Long.parseLong(req.getUserId()), LocalDate.parse(req.getWeekStart()), req.getDates());
-            System.out.println("Service call completed successfully");
-            
-            // E-posta gönderme işlemi (eğer explanation varsa)
+            // Send email notification if explanation is provided
             if (req.getExplanation() != null && !req.getExplanation().trim().isEmpty()) {
                 try {
                     User targetUser = userRepository.findById(targetUserId).orElse(null);
                     User editor = userRepository.findByKeycloakId(principal.getName()).orElse(null);
-                    
+
                     if (targetUser != null && editor != null) {
                         String body = "Ofis günleriniz " + editor.getFirstName() + " " + editor.getLastName() + " tarafından düzenlenmiştir. \nAçıklama: " + req.getExplanation() + "\nLütfen kontrol ediniz.";
                         emailService.sendEmail(targetUser.getEmail(), "Ofis günleriniz düzenlendi", body);
-                        System.out.println("Email sent successfully to: " + targetUser.getEmail());
+                        logger.info("Email sent successfully to: {}", targetUser.getEmail());
                     }
                 } catch (Exception emailError) {
-                    System.err.println("Error sending email: " + emailError.getMessage());
-                    // E-posta hatası attendance güncellemesini etkilemesin
+                    logger.error("Error sending email", emailError);
+                    // Email error shouldn't affect attendance update
                 }
             }
-            
+
             return ResponseEntity.ok(Map.of("message", "Attendance updated successfully", "userId", id));
         } catch (Exception e) {
-            System.err.println("Error in controller: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Error in controller", e);
             return ResponseEntity.internalServerError().body("Error processing request: " + e.getMessage());
         }
     }
 
-
-    
     @PostMapping("/{userId}/{weekStart}/approve")
-    public ResponseEntity<?> approve(@PathVariable Long userId,@PathVariable String weekStart, Principal principal) {
-        System.out.println("✅ Attendance approval request by user: " + principal.getName());
-        
+    public ResponseEntity<?> approve(@PathVariable Long userId, @PathVariable String weekStart, Principal principal) {
+        logger.info("Attendance approval request by user: {}", principal.getName());
+
         try {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
-            // ❌ Team view üzerinden kendi attendance'ını onaylama yasak
+            // Prevent self-approval from team view
             Long currentUserId = getUserIdFromPrincipal(principal);
             if (currentUserId.equals(userId)) {
                 return ResponseEntity.status(403).body(Map.of("error", "You cannot approve your own attendance from the team view"));
@@ -131,13 +137,11 @@ public class AttendanceController {
                 return ResponseEntity.status(403).body(Map.of("error", "Insufficient permissions to approve this user's attendance"));
             }
 
-
             service.approve(userId, LocalDate.parse(weekStart));
-            System.out.println("✅ Attendance approved successfully!");
+            logger.info("Attendance approved successfully!");
             return ResponseEntity.ok().build();
         } catch (Exception e) {
-            System.err.println("Error in approve: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Error in approve", e);
             return ResponseEntity.internalServerError().body("Error processing approval: " + e.getMessage());
         }
     }
@@ -145,7 +149,6 @@ public class AttendanceController {
     @PostMapping("/excuse/{id}/approve")
     public ResponseEntity<?> approveExcuse(@PathVariable Long id, Principal principal) {
         try {
-            // Önce excuse'ı bul ve hangi kullanıcıya ait olduğunu öğren
             Excuse excuse = service.getExcuseById(id);
             if (excuse == null) {
                 return ResponseEntity.notFound().build();
@@ -153,7 +156,7 @@ public class AttendanceController {
 
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
-            // ❌ Team view üzerinden kendi mazeretini onaylama yasak
+            // Prevent self-approval of excuses from team view
             Long currentUserId = getUserIdFromPrincipal(principal);
             if (currentUserId.equals(excuse.getUserId())) {
                 return ResponseEntity.status(403).body(Map.of("error", "You cannot approve your own excuse from the team view"));
@@ -163,23 +166,25 @@ public class AttendanceController {
                 return ResponseEntity.status(403).body(Map.of("error", "Insufficient permissions to approve this user's excuse"));
             }
 
-
-            Long userId = getUserIdFromPrincipal(principal);
-            service.approveExcuse(id, userId.toString());
+            service.approveExcuse(id, currentUserId.toString());
             return ResponseEntity.ok().build();
         } catch (Exception e) {
-            System.err.println("Error in approveExcuse: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Error in approveExcuse", e);
             return ResponseEntity.internalServerError().body("Error processing excuse approval: " + e.getMessage());
         }
     }
 
-    //herkese açık
+    // Public endpoint
     @GetMapping("/{weekStart}")
     public ResponseEntity<ArrayList<Object>> getAttendanceData(Principal principal, @PathVariable String weekStart) {
-        Long userId = getUserIdFromPrincipal(principal);
-        ArrayList<Object> attendanceResponse = service.fetch(userId, LocalDate.parse(weekStart));
-        return ResponseEntity.ok(attendanceResponse);
+        try {
+            Long userId = getUserIdFromPrincipal(principal);
+            ArrayList<Object> attendanceResponse = service.fetch(userId, LocalDate.parse(weekStart));
+            return ResponseEntity.ok(attendanceResponse);
+        } catch (Exception e) {
+            logger.error("Error getting attendance data", e);
+            return ResponseEntity.internalServerError().build();
+        }
     }
 
     @GetMapping("/team")
@@ -194,81 +199,79 @@ public class AttendanceController {
             @RequestParam(required = false) String weekStart
     ) {
         try {
-            String keycloakId = principal.getName();
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            
-            System.out.println("🔍 Controller received workStatus: " + workStatus);
-            
-            // Yetki kontrolü - hangi kullanıcıları görebileceğini belirle
+
+            logger.info("Controller received workStatus: {}", workStatus);
+
             List<TeamAttendanceDto> team = service.getTeamAttendanceWithFiltersAndPermissions(
-                keycloakId,
-                authentication,
-                departmentId, 
-                roleId, 
-                searchTerm,
-                workStatus,
-                startDate,
-                endDate,
-                weekStart
+                    principal.getName(),
+                    authentication,
+                    departmentId,
+                    roleId,
+                    searchTerm,
+                    workStatus,
+                    startDate,
+                    endDate,
+                    weekStart
             );
             return ResponseEntity.ok(team);
         } catch (Exception e) {
-            System.err.println("Error in getTeamAttendance: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Error in getTeamAttendance", e);
             return ResponseEntity.internalServerError().build();
         }
     }
 
     @GetMapping("/excuse/{id}")
     public ResponseEntity<List<ExcuseDto>> getExcuse(Principal principal, @PathVariable Long id) {
-        Long userId = getUserIdFromPrincipal(principal);
-        List<Excuse> excuses = service.getExcuse(userId, id);
-        List<ExcuseDto> excuseDtos = excuses.stream()
-            .map(e -> new ExcuseDto(e.getId(), e.getUserId(), e.getExcuseDate().toString(), e.getExcuseType(), e.getDescription(), e.getIsApproved()))
-            .collect(Collectors.toList());
-        return ResponseEntity.ok(excuseDtos);
+        try {
+            Long userId = getUserIdFromPrincipal(principal);
+            List<Excuse> excuses = service.getExcuse(userId, id);
+            List<ExcuseDto> excuseDtos = excuses.stream()
+                    .map(e -> new ExcuseDto(e.getId(), e.getUserId(), e.getExcuseDate().toString(), e.getExcuseType(), e.getDescription(), e.getIsApproved()))
+                    .collect(Collectors.toList());
+            return ResponseEntity.ok(excuseDtos);
+        } catch (Exception e) {
+            logger.error("Error getting excuses", e);
+            return ResponseEntity.internalServerError().build();
+        }
     }
 
     @GetMapping("/user-permissions")
     public ResponseEntity<Map<String, Object>> getUserPermissions(Principal principal) {
         try {
-            String keycloakId = principal.getName();
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            
-            // Kullanıcıyı bul
-            User user = userRepository.findByKeycloakId(keycloakId).orElse(null);
+
+            User user = userRepository.findByKeycloakId(principal.getName()).orElse(null);
             if (user == null) {
                 return ResponseEntity.notFound().build();
             }
-            
-            // Attendance görüntüleme yetkileri
+
             boolean canViewAll = permissionEvaluator.hasAnyPermission(authentication, null, new String[]{"ADMIN_ALL", "VIEW_ALL_ATTENDANCE"});
             boolean canViewChild = permissionEvaluator.hasAnyPermission(authentication, null, new String[]{"ADMIN_ALL", "VIEW_CHILD_ATTENDANCE"});
             boolean canViewDepartment = permissionEvaluator.hasAnyPermission(authentication, null, new String[]{"ADMIN_ALL", "VIEW_DEPARTMENT_ATTENDANCE"});
-            
-            // Navigasyon yetkileri
+
             boolean canViewAllUsers = permissionEvaluator.hasAnyPermission(authentication, null, new String[]{"ADMIN_ALL", "VIEW_ALL_USERS"});
             boolean canViewAllDepartments = permissionEvaluator.hasAnyPermission(authentication, null, new String[]{"ADMIN_ALL", "VIEW_ALL_DEPARTMENTS"});
             boolean canViewRoles = permissionEvaluator.hasAnyPermission(authentication, null, new String[]{"ADMIN_ALL", "VIEW_ROLES"});
             boolean canViewHolidays = permissionEvaluator.hasAnyPermission(authentication, null, new String[]{"ADMIN_ALL", "VIEW_HOLIDAYS"});
             boolean canViewDepartmentHierarchy = permissionEvaluator.hasAnyPermission(authentication, null, new String[]{"ADMIN_ALL", "VIEW_DEPARTMENT_HIERARCHY"});
-            
+
             Map<String, Object> permissions = Map.of(
-                "canViewAll", canViewAll,
-                "canViewChild", canViewChild,
-                "canViewDepartment", canViewDepartment,
-                "userDepartmentId", user.getDepartment() != null ? user.getDepartment().getId() : null,
-                "userDepartmentName", user.getDepartment() != null ? user.getDepartment().getName() : null,
-                "canViewAllUsers", canViewAllUsers,
-                "canViewAllDepartments", canViewAllDepartments,
-                "canViewRoles", canViewRoles,
-                "canViewHolidays", canViewHolidays,
-                "canViewDepartmentHierarchy", canViewDepartmentHierarchy
+                    "canViewAll", canViewAll,
+                    "canViewChild", canViewChild,
+                    "canViewDepartment", canViewDepartment,
+                    "userDepartmentId", user.getDepartment() != null ? user.getDepartment().getId() : "",
+                    "userDepartmentName", user.getDepartment() != null ? user.getDepartment().getName() : "",
+                    "canViewAllUsers", canViewAllUsers,
+                    "canViewAllDepartments", canViewAllDepartments,
+                    "canViewRoles", canViewRoles,
+                    "canViewHolidays", canViewHolidays,
+                    "canViewDepartmentHierarchy", canViewDepartmentHierarchy
             );
-            
+
             return ResponseEntity.ok(permissions);
         } catch (Exception e) {
-            System.err.println("Error getting user permissions: " + e.getMessage());
+            logger.error("Error getting user permissions", e);
             return ResponseEntity.internalServerError().build();
         }
     }
@@ -276,94 +279,88 @@ public class AttendanceController {
     @GetMapping("/edit-permissions")
     public ResponseEntity<Map<String, Boolean>> getEditPermissions(Principal principal) {
         try {
-            String keycloakId = principal.getName();
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            
-            // Kullanıcıyı bul
-            User user = userRepository.findByKeycloakId(keycloakId).orElse(null);
+
+            User user = userRepository.findByKeycloakId(principal.getName()).orElse(null);
             if (user == null) {
                 return ResponseEntity.notFound().build();
             }
-            
-            // Edit yetkilerini kontrol et
+
             boolean canEditAll = permissionEvaluator.hasAnyPermission(authentication, null, new String[]{"ADMIN_ALL", "EDIT_ALL_ATTENDANCE"});
             boolean canEditChild = permissionEvaluator.hasAnyPermission(authentication, null, new String[]{"ADMIN_ALL", "EDIT_CHILD_ATTENDANCE"});
             boolean canEditDepartment = permissionEvaluator.hasAnyPermission(authentication, null, new String[]{"ADMIN_ALL", "EDIT_DEPARTMENT_ATTENDANCE"});
-            
+
             Map<String, Boolean> editPermissions = Map.of(
-                "canEditAll", canEditAll,
-                "canEditChild", canEditChild,
-                "canEditDepartment", canEditDepartment
+                    "canEditAll", canEditAll,
+                    "canEditChild", canEditChild,
+                    "canEditDepartment", canEditDepartment
             );
-            
+
             return ResponseEntity.ok(editPermissions);
         } catch (Exception e) {
-            System.err.println("Error getting edit permissions: " + e.getMessage());
+            logger.error("Error getting edit permissions", e);
             return ResponseEntity.internalServerError().build();
         }
     }
 
     @PostMapping("/check-edit-permissions")
     public ResponseEntity<Map<String, Boolean>> checkEditPermissionsForUsers(
-            Principal principal, 
             @RequestBody List<Long> userIds
     ) {
         try {
-            String keycloakId = principal.getName();
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            
+
             Map<String, Boolean> permissions = new HashMap<>();
-            
+
             for (Long userId : userIds) {
                 boolean canEdit = permissionEvaluator.canEditAttendance(authentication, userId);
                 permissions.put(userId.toString(), canEdit);
             }
-            
+
             return ResponseEntity.ok(permissions);
         } catch (Exception e) {
-            System.err.println("Error checking edit permissions: " + e.getMessage());
+            logger.error("Error checking edit permissions", e);
             return ResponseEntity.internalServerError().build();
         }
     }
+
     @GetMapping("/user/{userId}")
     public ResponseEntity<?> getUserAttendance(@PathVariable Long userId) {
         try {
-            // Kullanıcının tüm attendance kayıtlarını getir
             List<Attendance> attendances = service.getAttendanceByUserId(userId);
-            
-            // DTO formatına dönüştür
+
             List<Map<String, Object>> attendanceRecords = attendances.stream()
-                .map(attendance -> {
-                    Map<String, Object> record = new HashMap<>();
-                    record.put("weekStart", attendance.getWeekStart().toString());
-                    record.put("monday", attendance.getMonday());
-                    record.put("tuesday", attendance.getTuesday());
-                    record.put("wednesday", attendance.getWednesday());
-                    record.put("thursday", attendance.getThursday());
-                    record.put("friday", attendance.getFriday());
-                    record.put("isApproved", attendance.isApproved());
-                    return record;
-                })
-                .collect(Collectors.toList());
-            
+                    .map(attendance -> {
+                        Map<String, Object> record = new HashMap<>();
+                        record.put("weekStart", attendance.getWeekStart().toString());
+                        record.put("monday", attendance.getMonday());
+                        record.put("tuesday", attendance.getTuesday());
+                        record.put("wednesday", attendance.getWednesday());
+                        record.put("thursday", attendance.getThursday());
+                        record.put("friday", attendance.getFriday());
+                        record.put("isApproved", attendance.isApproved());
+                        return record;
+                    })
+                    .collect(Collectors.toList());
+
             Map<String, Object> response = new HashMap<>();
             Map<String, Object> data = new HashMap<>();
             data.put("attendanceRecords", attendanceRecords);
             response.put("data", data);
-            
+
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            System.err.println("Error getting user attendance: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Error getting user attendance", e);
             return ResponseEntity.internalServerError().body("Error getting attendance data");
         }
     }
+
     @PutMapping("/user/{userId}")
     public ResponseEntity<?> updateUserAttendance(@PathVariable Long userId, @RequestBody Map<String, Object> request) {
         try {
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> attendanceRecords = (List<Map<String, Object>>) request.get("attendanceRecords");
-            
+
             for (Map<String, Object> record : attendanceRecords) {
                 String weekStart = (String) record.get("weekStart");
                 int monday = (Integer) record.get("monday");
@@ -371,15 +368,14 @@ public class AttendanceController {
                 int wednesday = (Integer) record.get("wednesday");
                 int thursday = (Integer) record.get("thursday");
                 int friday = (Integer) record.get("friday");
-                
+
                 List<Integer> dates = List.of(monday, tuesday, wednesday, thursday, friday);
                 service.record(userId, LocalDate.parse(weekStart), dates);
             }
-            
+
             return ResponseEntity.ok("Attendance records updated successfully");
         } catch (Exception e) {
-            System.err.println("Error updating user attendance: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Error updating user attendance", e);
             return ResponseEntity.internalServerError().body("Error updating attendance data");
         }
     }
