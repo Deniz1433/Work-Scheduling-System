@@ -3,8 +3,10 @@ package com.example.attendance.controller;
 
 import com.example.attendance.dto.SurveyAnswerDto;
 import com.example.attendance.dto.SurveyDto;
+import com.example.attendance.dto.SurveyResultsDto;
 import com.example.attendance.service.SurveyService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,6 +26,7 @@ public class SurveyController {
     public ResponseEntity<SurveyDto> get(@PathVariable Long id) {
         return ResponseEntity.ok(surveyService.findById(id));
     }
+
     @GetMapping
     public ResponseEntity<List<SurveyDto>> list(Principal principal) {
         String userId = (principal != null ? principal.getName() : null);
@@ -32,11 +35,10 @@ public class SurveyController {
                 : surveyService.findAllWithStatus(userId);
         return ResponseEntity.ok(out);
     }
-    //@PreAuthorize("@CustomAnnotationEvaluator.hasAnyPermission(authentication, null, {'ADMIN_ALL')")
+
     @PostMapping
     public ResponseEntity<SurveyDto> create(@RequestBody /*@Valid*/ SurveyDto dto) {
         SurveyDto created = surveyService.create(dto);
-        // 201 Created + Location header
         return ResponseEntity
                 .created(URI.create("/api/surveys/" + created.getId()))
                 .body(created);
@@ -46,14 +48,25 @@ public class SurveyController {
     public ResponseEntity<Void> submit(@PathVariable Long surveyId,
                                        @RequestBody SurveyAnswerDto dto,
                                        Principal principal) {
-        String userId = (principal != null ? principal.getName() : null); // UUID (sub)
-        surveyService.submitAnswers(surveyId, dto, userId, principal);    // 👈 principal parametresi
+        String userId = (principal != null ? principal.getName() : null); // Keycloak sub (UUID)
+        surveyService.submitAnswers(surveyId, dto, userId);               // principal artık geçilmiyor
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{id}/results")
+    public ResponseEntity<SurveyResultsDto> results(@PathVariable Long id) {
+        return ResponseEntity.ok(surveyService.getResults(id));
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         surveyService.delete(id);
         return ResponseEntity.noContent().build();
+    }
+
+    // Opsiyonel: Unique ihlali → 409 Conflict (ör. aynı kullanıcı tekrar cevaplamaya çalışırsa)
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<Void> handleIntegrityViolation(DataIntegrityViolationException ex) {
+        return ResponseEntity.status(409).build();
     }
 }

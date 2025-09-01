@@ -4,6 +4,7 @@ package com.example.attendance.service;
 import com.example.attendance.dto.SurveyAnswerDto;
 import com.example.attendance.dto.SurveyDto;
 import com.example.attendance.dto.SurveyQuestionDto;
+import com.example.attendance.dto.SurveyResultsDto;
 import com.example.attendance.model.Survey;
 import com.example.attendance.model.SurveyAnswer;
 import com.example.attendance.model.SurveyQuestion;
@@ -17,13 +18,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.security.Principal;
 import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
-
-import static org.springframework.http.HttpStatus.BAD_REQUEST;
 
 @Service
 @RequiredArgsConstructor
@@ -33,30 +30,40 @@ public class SurveyService {
     private final SurveyAnswerRepository answerRepository;
     private final UserRepository userRepository;
 
+    /* =========================
+       Query (list/get)
+       ========================= */
+    @Transactional(readOnly = true)
     public List<SurveyDto> findAll() {
-        return surveyRepository.findAll().stream().map(this::toDto).toList();
+        return surveyRepository.findAll(Sort.by(Sort.Direction.DESC, "id"))
+                .stream().map(this::toDto).toList();
     }
 
+    @Transactional(readOnly = true)
     public SurveyDto findById(Long id) {
-        return surveyRepository.findById(id).map(this::toDto)
+        return surveyRepository.findById(id)
+                .map(this::toDto)
                 .orElseThrow(() -> new IllegalArgumentException("Survey not found"));
     }
 
+    /* =========================
+       Create / Delete
+       ========================= */
     @Transactional
     public SurveyDto create(SurveyDto dto) {
         Survey survey = new Survey();
         survey.setTitle(dto.getTitle());
         survey.setDescription(dto.getDescription());
         survey.setAnonymous(dto.isAnonymous());
-        survey.setDeadline(dto.getDeadline());
+        survey.setDeadline(dto.getDeadline()); // LocalDateTime
 
         List<SurveyQuestion> qs = (dto.getQuestions() == null ? List.<SurveyQuestionDto>of() : dto.getQuestions())
                 .stream()
                 .map(q -> {
                     SurveyQuestion sq = new SurveyQuestion();
                     sq.setQuestionText(q.getQuestionText());
-                    sq.setType(q.getType());
-                    sq.setOptions(q.getOptions());
+                    sq.setType(q.getType());        // "text" | "choice"
+                    sq.setOptions(q.getOptions());  // JSON/string list (sen nasıl tutuyorsan)
                     sq.setSurvey(survey);
                     return sq;
                 })
@@ -67,69 +74,51 @@ public class SurveyService {
     }
 
     @Transactional
-    public void submitAnswers(Long surveyId, SurveyAnswerDto answersDto, String userId, Principal principal) {
-        Survey survey = surveyRepository.findById(surveyId)
-                .orElseThrow(() -> new IllegalArgumentException("Survey not found"));
-
-        LocalDateTime dl = survey.getDeadline();
-        if (dl != null && LocalDateTime.now().isAfter(dl)) {
-            throw new ResponseStatusException(BAD_REQUEST, "Anketin son giriş tarihi geçti");
-        }
-        if (survey.getDeadline() != null && LocalDateTime.now().isAfter(survey.getDeadline())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Survey deadline passed");
-        }
-        // anonim değilse: users tablosundan e-mail’i çek
-        final String userEmail = (!survey.isAnonymous() && userId != null)
-                ? userRepository.findByKeycloakId(userId).map(u -> u.getEmail()).orElse(null)
-                : null;
-
-        answersDto.getAnswers().forEach((qId, ans) -> {
-            SurveyAnswer sa = new SurveyAnswer();
-            sa.setSurvey(survey);
-            sa.setQuestionId(qId);
-            sa.setAnswer(ans);
-            sa.setUserId(userId);       // UUID (sub)
-            sa.setUserEmail(userEmail); // anonim değilse e-mail; anonimse null
-            answerRepository.save(sa);
-        });
-    }
-
-    // --- mapping ---
-    private SurveyDto toDto(Survey s) {
-        SurveyDto dto = new SurveyDto();
-        dto.setId(s.getId());
-        dto.setTitle(s.getTitle());
-        dto.setDescription(s.getDescription());
-        dto.setDeadline(s.getDeadline());
-        dto.setAnonymous(s.isAnonymous());
-
-        if (s.getQuestions() != null) {
-            dto.setQuestions(s.getQuestions().stream().map(this::toDto).toList());
-        }
-        return dto;
-    }
-
-    private SurveyQuestionDto toDto(SurveyQuestion q) {
-        SurveyQuestionDto dto = new SurveyQuestionDto();
-        dto.setId(q.getId());
-        dto.setQuestionText(q.getQuestionText());
-        dto.setType(q.getType());
-        dto.setOptions(q.getOptions());
-        return dto;
-    }
-
-    @Transactional
     public void delete(Long id) {
         Survey survey = surveyRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Survey not found"));
         surveyRepository.delete(survey);
     }
 
+    /* =========================
+       Submit (tek kullanıcı = tek anket cevabı kuralı DB’de unique ile garanti)
+       ========================= */
+    @Transactional
+    public void submitAnswers(Long surveyId, SurveyAnswerDto answersDto, String userId) {
+        Survey survey = surveyRepository.findById(surveyId)
+                .orElseThrow(() -> new IllegalArgumentException("Survey not found"));
+
+        LocalDateTime dl = survey.getDeadline();
+        if (dl != null && LocalDateTime.now().isAfter(dl)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Survey deadline passed");
+        }
+
+        // anonim değilse users tablosundan e-mail çek; anonimse/null ise email yazma
+        final String userEmail = (!survey.isAnonymous() && userId != null)
+                ? userRepository.findByKeycloakId(userId).map(u -> u.getEmail()).orElse(null)
+                : null;
+
+        // Not: (survey_id, user_id[, question_id]) unique constraint'in varsa
+        // ikinci gönderimde DataIntegrityViolationException -> 409'a map edebilirsin (Controller advice ile).
+        answersDto.getAnswers().forEach((qId, ans) -> {
+            SurveyAnswer sa = new SurveyAnswer();
+            sa.setSurvey(survey);
+            sa.setQuestionId(qId);
+            sa.setAnswer(ans);
+            sa.setUserId(userId);       // Keycloak sub (UUID) veya null
+            sa.setUserEmail(userEmail); // anonim değilse e-mail; aksi halde null
+            answerRepository.save(sa);
+        });
+    }
+
+    /* =========================
+       “Hepsi” ekranı (cevaplananlar üstte/alta değil — ihtiyaç olursa sıralama eklenir)
+       Kullanıcıya göre alreadyAnswered + myAnswers doldurur.
+       ========================= */
+    @Transactional(readOnly = true)
     public List<SurveyDto> findAllWithStatus(String userId) {
-        // 1) Tüm anketler (id DESC)
         List<Survey> surveys = surveyRepository.findAll(Sort.by(Sort.Direction.DESC, "id"));
 
-        // 2) Kullanıcının yanıtladıkları ve tüm yanıtları tek seferde topla (effectively final)
         final Set<Long> answeredIds =
                 (userId != null && !userId.isBlank())
                         ? new HashSet<>(answerRepository.findAnsweredSurveyIds(userId))
@@ -143,12 +132,11 @@ public class SurveyService {
                                 Collectors.toMap(
                                         SurveyAnswer::getQuestionId,
                                         SurveyAnswer::getAnswer,
-                                        (a, b) -> a   // aynı question_id için ilkini al
+                                        (a, b) -> a // aynı question_id’de ilkini al
                                 )
                         ))
                         : Collections.emptyMap();
 
-        // 3) DTO'ya map et + alreadyAnswered/myAnswers doldur; 4) stream içinde sırala
         return surveys.stream()
                 .map(s -> {
                     SurveyDto dto = toDto(s);
@@ -159,9 +147,133 @@ public class SurveyService {
                     }
                     return dto;
                 })
-                .sorted(Comparator
-                        .comparing(SurveyDto::isAlreadyAnswered)                 // false (cevaplanmamış) üstte
-                        .thenComparing(SurveyDto::getId, Comparator.reverseOrder())) // sonra id DESC
+                // İstersen cevaplanmamışları üste almak için aç:
+                // .sorted(Comparator
+                //    .comparing(SurveyDto::isAlreadyAnswered)
+                //    .thenComparing(SurveyDto::getId, Comparator.reverseOrder()))
                 .toList();
+    }
+
+    /* =========================
+       Sonuçlar (Yol B): Tek endpoint’te gösterime hazır payload
+       ========================= */
+    @Transactional(readOnly = true)
+    public SurveyResultsDto getResults(Long surveyId) {
+        Survey s = surveyRepository.findById(surveyId)
+                .orElseThrow(() -> new IllegalArgumentException("Survey not found"));
+
+        boolean anonymous = s.isAnonymous();
+
+        // 1) Çoktan seçmeli sayımlar (tek SQL ile; varsa)
+        Map<Long, Map<String, Long>> choiceCountsByQ =
+                answerRepository.countByQuestionAndAnswer(surveyId).stream()
+                        .collect(Collectors.groupingBy(
+                                SurveyAnswerRepository.ChoiceAgg::getQuestionId,
+                                Collectors.toMap(
+                                        SurveyAnswerRepository.ChoiceAgg::getAnswer,
+                                        SurveyAnswerRepository.ChoiceAgg::getCnt
+                                )
+                        ));
+
+        // 2) Tüm cevaplar (hem text’ler, hem de voters listesi için)
+        List<SurveyAnswer> allAnswers = answerRepository.findAllBySurveyId(surveyId);
+
+        // 3) DTO doldur
+        SurveyResultsDto out = new SurveyResultsDto();
+        out.setId(s.getId());
+        out.setTitle(s.getTitle());
+        out.setDescription(s.getDescription());
+        out.setAnonymous(anonymous);
+        out.setDeadline(s.getDeadline());
+
+        List<SurveyResultsDto.QuestionResult> qResults = s.getQuestions().stream().map(q -> {
+            SurveyResultsDto.QuestionResult qr = new SurveyResultsDto.QuestionResult();
+            qr.setId(q.getId());
+            qr.setQuestionText(q.getQuestionText());
+            qr.setType(q.getType());
+
+            // Bu soruya ait tüm cevapları çıkar (tek yerde filtreleyelim)
+            List<SurveyAnswer> answersForQ = allAnswers.stream()
+                    .filter(a -> Objects.equals(a.getQuestionId(), q.getId()))
+                    .toList();
+
+            if ("choice".equalsIgnoreCase(q.getType())) {
+                // counts: seçenek -> adet (hazır SQL sonucundan ya da lokalde hesap)
+                Map<String, Long> counts = choiceCountsByQ.get(q.getId());
+                if (counts == null) {
+                    counts = answersForQ.stream()
+                            .collect(Collectors.groupingBy(
+                                    SurveyAnswer::getAnswer,
+                                    Collectors.counting()
+                            ));
+                }
+                qr.setCounts(counts);
+
+                // choiceVoters: seçenek -> email listesi (anonimde boş bırak)
+                if (!anonymous) {
+                    Map<String, List<String>> voters = answersForQ.stream()
+                            .filter(a -> a.getUserEmail() != null && !a.getUserEmail().isBlank())
+                            .collect(Collectors.groupingBy(
+                                    SurveyAnswer::getAnswer,
+                                    Collectors.mapping(SurveyAnswer::getUserEmail,
+                                            Collectors.collectingAndThen(Collectors.toList(), SurveyService::distinctPreserveOrder))
+                            ));
+                    qr.setChoiceVoters(voters.isEmpty() ? null : voters);
+                } else {
+                    qr.setChoiceVoters(null);
+                }
+
+                // totalCount: toplam oy sayısı
+                long total = (counts != null)
+                        ? counts.values().stream().mapToLong(Long::longValue).sum()
+                        : answersForQ.size();
+                qr.setTotalCount(total);
+
+            } else {
+                // TEXT: metin yanıtları
+                List<SurveyResultsDto.TextAnswer> texts = answersForQ.stream()
+                        .map(a -> {
+                            SurveyResultsDto.TextAnswer t = new SurveyResultsDto.TextAnswer();
+                            t.setAnswer(a.getAnswer());
+                            t.setUserEmail(anonymous ? null : a.getUserEmail());
+                            return t;
+                        })
+                        .toList();
+                qr.setTexts(texts);
+                qr.setTotalCount((long) texts.size());
+            }
+
+            return qr;
+        }).toList();
+
+        out.setQuestions(qResults);
+        return out;
+    }
+    private static <T> List<T> distinctPreserveOrder(List<T> in) {
+        return new ArrayList<>(new LinkedHashSet<>(in));
+    }
+    /* =========================
+       Mapping helpers (Entity -> DTO)
+       ========================= */
+    private SurveyDto toDto(Survey s) {
+        SurveyDto dto = new SurveyDto();
+        dto.setId(s.getId());
+        dto.setTitle(s.getTitle());
+        dto.setDescription(s.getDescription());
+        dto.setAnonymous(s.isAnonymous());
+        dto.setDeadline(s.getDeadline());
+        if (s.getQuestions() != null) {
+            dto.setQuestions(s.getQuestions().stream().map(this::toDto).toList());
+        }
+        return dto;
+    }
+
+    private SurveyQuestionDto toDto(SurveyQuestion q) {
+        SurveyQuestionDto dto = new SurveyQuestionDto();
+        dto.setId(q.getId());
+        dto.setQuestionText(q.getQuestionText());
+        dto.setType(q.getType());
+        dto.setOptions(q.getOptions());
+        return dto;
     }
 }
