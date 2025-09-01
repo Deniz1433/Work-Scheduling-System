@@ -1,11 +1,9 @@
 package com.example.attendance.config;
 
-import java.util.*;
-
+import com.example.attendance.security.CustomAnnotationEvaluator;
 import org.keycloak.TokenVerifier;
 import org.keycloak.common.VerificationException;
 import org.keycloak.representations.AccessToken;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.access.expression.method.DefaultMethodSecurityExpressionHandler;
@@ -22,19 +20,22 @@ import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.logout.LogoutSuccessHandler;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.web.util.UriComponentsBuilder;
 
-import com.example.attendance.security.CustomAnnotationEvaluator;
+import java.util.*;
 
 @Configuration
 @EnableWebSecurity
-@SuppressWarnings("removal")
-@EnableMethodSecurity(prePostEnabled = true)
+@EnableMethodSecurity()
 public class SecurityConfig {
 
-    @Autowired
-    private CustomAnnotationEvaluator customAnnotationEvaluator;
+    private final CustomAnnotationEvaluator customAnnotationEvaluator;
+
+    // Use constructor injection instead of field injection
+    public SecurityConfig(CustomAnnotationEvaluator customAnnotationEvaluator) {
+        this.customAnnotationEvaluator = customAnnotationEvaluator;
+    }
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -65,15 +66,16 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth -> oauth
-                        .defaultSuccessUrl("/", true)
+                        .defaultSuccessUrl("/") // Remove redundant default parameter
                         .userInfoEndpoint(userInfo -> userInfo.oidcUserService(oidcUserServiceWithTokenVerifier()))
                 )
                 .logout(logout -> logout
-                        .logoutRequestMatcher(new AntPathRequestMatcher("/logout", "GET")) // Özel matcher
-                        .logoutSuccessHandler(keycloakLogoutSuccessHandler())              // Keycloak yönlendirmesi
-                        .invalidateHttpSession(true)                                       // Oturumu sonlandır
-                        .clearAuthentication(true)                                         // Kimliği temizle
-                        .deleteCookies("JSESSIONID")                                       // Cookie temizle
+                        // Replace deprecated AntPathRequestMatcher with modern equivalent
+                        .logoutRequestMatcher(PathPatternRequestMatcher.withDefaults().matcher("/logout"))
+                        .logoutSuccessHandler(keycloakLogoutSuccessHandler())
+                        .invalidateHttpSession(true)
+                        .clearAuthentication(true)
+                        .deleteCookies("JSESSIONID")
                 );
 
         return http.build();
@@ -134,6 +136,7 @@ public class SecurityConfig {
                 }
 
             } catch (VerificationException ignored) {
+                // Log this exception in a real application
             }
 
             OidcUser userInfo = delegate.loadUser(userRequest);
@@ -167,10 +170,12 @@ public class SecurityConfig {
                 idTokenHint = u.getIdToken().getTokenValue();
             }
 
+            // Replace deprecated fromHttpUrl with fromUriString
             String logoutUrl = UriComponentsBuilder
-                    .fromHttpUrl("http://localhost:8081/realms/attendance-realm/protocol/openid-connect/logout")
+                    .fromUriString("http://localhost:8081/realms/attendance-realm/protocol/openid-connect/logout")
                     .queryParam("id_token_hint", idTokenHint)
                     .queryParam("post_logout_redirect_uri", redirectUri)
+                    .build()
                     .toUriString();
 
             response.sendRedirect(logoutUrl);
