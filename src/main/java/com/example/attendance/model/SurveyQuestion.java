@@ -1,4 +1,3 @@
-// src/main/java/com/example/attendance/model/SurveyQuestion.java
 package com.example.attendance.model;
 
 import jakarta.persistence.*;
@@ -6,17 +5,21 @@ import lombok.Getter;
 import lombok.Setter;
 import java.util.List;
 
-@Getter @Setter
-@Entity @Table(name = "survey_question")
+@Getter
+@Setter
+@Entity
+@Table(name = "survey_question")
 public class SurveyQuestion {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @Column(name = "question_text", nullable = false, length = 500)
-    private String questionText;           // örn: “Bu haftaki planlama nasıldı?”
+    private String questionText; // e.g. “Bu haftaki planlama nasıldı?”
 
     @Column(nullable = false, length = 50)
-    private String type;                   // "text" | "choice"
+    private String type; // "text" | "choice"
 
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(
@@ -24,7 +27,10 @@ public class SurveyQuestion {
             joinColumns = @JoinColumn(name = "survey_question_id")
     )
     @Column(name = "option_value", length = 255)
-    private List<String> options;          // type=choice ise doldurulur
+    private List<String> options; // type=choice -> filled
+
+    @Column(name = "multiple", nullable = false)
+    private boolean multiple = false; // NEW: false = radio (single), true = checkboxes (multi)
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "survey_id", nullable = false)

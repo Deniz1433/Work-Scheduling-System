@@ -8,6 +8,7 @@ import com.example.attendance.dto.SurveyResultsDto;
 import com.example.attendance.model.Survey;
 import com.example.attendance.model.SurveyAnswer;
 import com.example.attendance.model.SurveyQuestion;
+import com.example.attendance.model.User;
 import com.example.attendance.repository.SurveyAnswerRepository;
 import com.example.attendance.repository.SurveyRepository;
 import com.example.attendance.repository.UserRepository;
@@ -62,8 +63,9 @@ public class SurveyService {
                 .map(q -> {
                     SurveyQuestion sq = new SurveyQuestion();
                     sq.setQuestionText(q.getQuestionText());
-                    sq.setType(q.getType());        // "text" | "choice"
-                    sq.setOptions(q.getOptions());  // JSON/string list (sen nasıl tutuyorsan)
+                    sq.setType(q.getType());          // "text" | "choice"
+                    sq.setOptions(q.getOptions());    // element collection
+                    sq.setMultiple(q.isMultiple());   // <<< IMPORTANT: carry multiple flag
                     sq.setSurvey(survey);
                     return sq;
                 })
@@ -95,19 +97,58 @@ public class SurveyService {
 
         // anonim değilse users tablosundan e-mail çek; anonimse/null ise email yazma
         final String userEmail = (!survey.isAnonymous() && userId != null)
-                ? userRepository.findByKeycloakId(userId).map(u -> u.getEmail()).orElse(null)
+                ? userRepository.findByKeycloakId(userId).map(User::getEmail).orElse(null)
                 : null;
 
         // Not: (survey_id, user_id[, question_id]) unique constraint'in varsa
         // ikinci gönderimde DataIntegrityViolationException -> 409'a map edebilirsin (Controller advice ile).
-        answersDto.getAnswers().forEach((qId, ans) -> {
-            SurveyAnswer sa = new SurveyAnswer();
-            sa.setSurvey(survey);
-            sa.setQuestionId(qId);
-            sa.setAnswer(ans);
-            sa.setUserId(userId);       // Keycloak sub (UUID) veya null
-            sa.setUserEmail(userEmail); // anonim değilse e-mail; aksi halde null
-            answerRepository.save(sa);
+        answersDto.getAnswers().forEach((qId, list) -> {
+            var qOpt = survey.getQuestions().stream()
+                    .filter(q -> Objects.equals(q.getId(), qId))
+                    .findFirst();
+            if (qOpt.isEmpty()) return;
+            var q = qOpt.get();
+
+            List<String> values = Optional.ofNullable(list).orElse(List.of());
+
+            if ("text".equalsIgnoreCase(q.getType())) {
+                String only = values.stream().findFirst().orElse("");
+                if (only.isBlank()) return;
+                SurveyAnswer sa = new SurveyAnswer();
+                sa.setSurvey(survey);
+                sa.setQuestionId(qId);
+                sa.setAnswer(only);
+                sa.setUserId(userId);
+                sa.setUserEmail(userEmail);
+                answerRepository.save(sa);
+            } else {
+                if (!q.isMultiple()) {
+                    String only = values.stream().findFirst().orElse(null);
+                    if (only == null) return;
+                    SurveyAnswer sa = new SurveyAnswer();
+                    sa.setSurvey(survey);
+                    sa.setQuestionId(qId);
+                    sa.setAnswer(only);
+                    sa.setUserId(userId);
+                    sa.setUserEmail(userEmail);
+                    answerRepository.save(sa);
+                } else {
+                    values.stream()
+                            .filter(Objects::nonNull)
+                            .map(String::trim)
+                            .filter(sv -> !sv.isEmpty())
+                            .distinct()
+                            .forEach(choice -> {
+                                SurveyAnswer sa = new SurveyAnswer();
+                                sa.setSurvey(survey);
+                                sa.setQuestionId(qId);
+                                sa.setAnswer(choice);
+                                sa.setUserId(userId);
+                                sa.setUserEmail(userEmail);
+                                answerRepository.save(sa);
+                            });
+                }
+            }
         });
     }
 
@@ -124,15 +165,20 @@ public class SurveyService {
                         ? new HashSet<>(answerRepository.findAnsweredSurveyIds(userId))
                         : Collections.emptySet();
 
-        final Map<Long, Map<Long, String>> myAnswersBySurvey =
+        final Map<Long, Map<Long, List<String>>> myAnswersBySurvey =
                 (userId != null && !userId.isBlank())
                         ? answerRepository.findAllByUserId(userId).stream()
                         .collect(Collectors.groupingBy(
                                 a -> a.getSurvey().getId(),
-                                Collectors.toMap(
+                                Collectors.groupingBy(
                                         SurveyAnswer::getQuestionId,
-                                        SurveyAnswer::getAnswer,
-                                        (a, b) -> a // aynı question_id’de ilkini al
+                                        Collectors.mapping(
+                                                SurveyAnswer::getAnswer,
+                                                Collectors.collectingAndThen(
+                                                        Collectors.toList(),
+                                                        SurveyService::distinctPreserveOrder // keeps first-seen order & unique
+                                                )
+                                        )
                                 )
                         ))
                         : Collections.emptyMap();
@@ -274,6 +320,7 @@ public class SurveyService {
         dto.setQuestionText(q.getQuestionText());
         dto.setType(q.getType());
         dto.setOptions(q.getOptions());
+        dto.setMultiple(q.isMultiple());
         return dto;
     }
 }

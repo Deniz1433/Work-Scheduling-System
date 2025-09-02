@@ -1,11 +1,15 @@
-// src/main/java/com/example/attendance/dto/SurveyAnswerDto.java
 package com.example.attendance.dto;
 
-import lombok.Getter; import lombok.Setter;
+import lombok.Getter;
+import lombok.Setter;
+import java.util.List;
 import java.util.Map;
 
-@Getter @Setter
+@Getter
+@Setter
 public class SurveyAnswerDto {
-    // questionId -> answer
-    private Map<Long, String> answers;
+    // questionId -> answers
+    // For text and single-choice: single-item list
+    // For multi-choice: list of items
+    private Map<Long, List<String>> answers;
 }

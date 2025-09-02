@@ -618,6 +618,7 @@ databaseChangeLog:
               - column: { name: survey_id, type: BIGINT, constraints: { nullable: false } }
               - column: { name: question_text, type: VARCHAR(500), constraints: { nullable: false } }
               - column: { name: type, type: VARCHAR(50), constraints: { nullable: false } }   # "text" | "choice"
+              - column: { name: multiple, type: BOOLEAN, defaultValueBoolean: false, constraints: { nullable: false } }  # NEW
         - addForeignKeyConstraint:
             baseTableName: survey_question
             baseColumnNames: survey_id
@@ -644,7 +645,7 @@ databaseChangeLog:
             columnNames: survey_question_id, option_value
             constraintName: pk_survey_question_options
 
-        # survey_answer  (DÜZELTİLMİŞ UNIQUE!)
+        # survey_answer  (UPDATED UNIQUE includes 'answer' for multi-select)
         - createTable:
             tableName: survey_answer
             columns:
@@ -669,13 +670,13 @@ databaseChangeLog:
             referencedColumnNames: id
             onDelete: CASCADE
 
-        # kullanıcı aynı ankette aynı soruya en fazla 1 kez cevap verebilir
+        # kullanıcı aynı ankette aynı soruda aynı CEVABI en fazla 1 kez işaretleyebilir
         - addUniqueConstraint:
             tableName: survey_answer
-            columnNames: survey_id,user_id,question_id
-            constraintName: uq_survey_user_question
+            columnNames: survey_id,user_id,question_id,answer
+            constraintName: uq_survey_user_question_answer   # UPDATED
 
-        # performans indeksleri (öneri)
+        # performans indeksleri (opsiyonel)
         - createIndex:
             indexName: idx_survey_answer_survey_user
             tableName: survey_answer

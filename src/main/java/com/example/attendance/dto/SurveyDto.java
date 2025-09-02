@@ -15,7 +15,8 @@ public class SurveyDto {
     private List<SurveyQuestionDto> questions;
 
     private boolean alreadyAnswered;
-    private Map<Long,String> myAnswers;
+    private Map<Long, List<String>> myAnswers;
+
 
     private LocalDateTime deadline;
     private boolean anonymous;

@@ -1,16 +1,16 @@
-// src/main/java/com/example/attendance/model/SurveyAnswer.java
 package com.example.attendance.model;
 
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
-@Getter @Setter
+@Getter
+@Setter
 @Entity
 @Table(
         name = "survey_answer",
         uniqueConstraints = {
-                @UniqueConstraint(columnNames = {"survey_id", "user_id", "question_id"})
+                @UniqueConstraint(columnNames = {"survey_id", "user_id", "question_id", "answer"})
         }
 )
 public class SurveyAnswer {
@@ -18,7 +18,7 @@ public class SurveyAnswer {
     private Long id;
 
     @Column(name = "question_id", nullable = false)
-    private Long questionId;   // şimdilik bırakıyoruz (hızlı düzeltme)
+    private Long questionId;
 
     @Column(name = "answer", nullable = false, length = 1000)
     private String answer;

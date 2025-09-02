@@ -25,18 +25,22 @@ const SurveyTake = () => {
     setErrors({});
     setInfos({});
     try {
-      const res = await api.get("/api/surveys");   // 🔹 TÜM anketler
+      const res = await api.get("/api/surveys");
       const list = res.data || [];
       setSurveys(list);
 
-      // Her anket için cevap state’ini hazırla (myAnswers varsa doldur)
       const init = {};
       list.forEach(s => {
         const a = {};
         (s.questions || []).forEach(q => {
-          a[q.id] = s.alreadyAnswered && s.myAnswers
-              ? (s.myAnswers[q.id] ?? "")
-              : "";
+          const mine = s.alreadyAnswered && s.myAnswers ? s.myAnswers[q.id] : undefined;
+          if (q.type === "choice" && q.multiple) {
+            // Multi-choice → always array
+            a[q.id] = Array.isArray(mine) ? mine : [];
+          } else {
+            // Text or single-choice → string (first item if backend sent a list)
+            a[q.id] = Array.isArray(mine) ? (mine[0] ?? "") : (mine ?? "");
+          }
         });
         init[s.id] = a;
       });
@@ -48,6 +52,7 @@ const SurveyTake = () => {
     }
   };
 
+
   useEffect(() => { load(); }, []);
 
   const canSubmit = (s) => {
@@ -57,9 +62,13 @@ const SurveyTake = () => {
     const a = answers[s.id] || {};
     return s.questions.every(q => {
       const v = a[q.id];
+      if (q.type === "choice" && q.multiple) {
+        return Array.isArray(v) && v.length > 0;
+      }
       return typeof v === "string" ? v.trim() !== "" : v != null;
     });
   };
+
 
   const handleChange = (surveyId, qId, value) => {
     setAnswers(prev => ({
@@ -83,7 +92,16 @@ const SurveyTake = () => {
     setErrors(prev => ({ ...prev, [s.id]: null }));
     setInfos(prev  => ({ ...prev, [s.id]: null }));
     try {
-      await api.post(`/api/surveys/${s.id}/submit`, { answers: answers[s.id] });
+      const normalized = {};
+      (s.questions || []).forEach(q => {
+        const v = (answers[s.id] || {})[q.id];
+        if (q.type === "choice" && q.multiple) {
+          normalized[q.id] = Array.isArray(v) ? v : [];
+        } else {
+          normalized[q.id] = [typeof v === "string" ? v : ""];
+        }
+      });
+      await api.post(`/api/surveys/${s.id}/submit`, { answers: normalized });
       setInfos(prev => ({ ...prev, [s.id]: "Teşekkürler! Cevabınız kaydedildi." }));
       // UI'da kilitle:
       setSurveys(prev => prev.map(it => it.id === s.id ? { ...it, alreadyAnswered: true } : it));
@@ -178,7 +196,7 @@ const SurveyTake = () => {
                             />
                         )}
 
-                        {q.type === "choice" && (
+                        {q.type === "choice" && !q.multiple && (
                             <div className={`grid gap-2 ${disabled ? "opacity-80" : ""}`}>
                               {(q.options || []).map((opt, oIdx) => (
                                   <label key={oIdx} className="inline-flex items-center gap-2">
@@ -193,6 +211,30 @@ const SurveyTake = () => {
                                     <span>{opt}</span>
                                   </label>
                               ))}
+                            </div>
+                        )}
+                        {q.type === "choice" && q.multiple && (
+                            <div className={`grid gap-2 ${disabled ? "opacity-80" : ""}`}>
+                              {(q.options || []).map((opt, oIdx) => {
+                                const arr = Array.isArray(answers[s.id]?.[q.id]) ? answers[s.id][q.id] : [];
+                                const checked = arr.includes(opt);
+                                return (
+                                    <label key={oIdx} className="inline-flex items-center gap-2">
+                                      <input
+                                          type="checkbox"
+                                          value={opt}
+                                          checked={checked}
+                                          disabled={disabled}
+                                          onChange={(e) => {
+                                            const next = new Set(arr);
+                                            if (e.target.checked) next.add(opt); else next.delete(opt);
+                                            handleChange(s.id, q.id, Array.from(next));
+                                          }}
+                                      />
+                                      <span>{opt}</span>
+                                    </label>
+                                );
+                              })}
                             </div>
                         )}
                       </div>

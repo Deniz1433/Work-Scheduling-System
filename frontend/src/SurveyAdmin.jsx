@@ -10,7 +10,7 @@ const api = axios.create({
 });
 
 /* -------------- Yardımcı Fonksiyonlar -------------- */
-const emptyQuestion = () => ({ questionText: "", type: "text", options: [] });
+const emptyQuestion = () => ({ questionText: "", type: "text", options: [], multiple: false });
 
 const toIso = (v) => {
   if (!v) return null;
@@ -187,6 +187,8 @@ export default function SurveyAdmin() {
   };
   const addQuestion       = () => setQuestions(p => [...p, emptyQuestion()]);
   const removeQuestion    = (idx) => setQuestions(p => p.filter((_, i) => i !== idx));
+  const updateQuestion = (idx, next) =>
+      setQuestions(p => p.map((q, i) => (i === idx ? { ...q, ...next } : q)));
   const changeQuestionFld = (idx, field, value) =>
       setQuestions(p => p.map((q, i) => (i === idx ? { ...q, [field]: value } : q)));
   const addOption         = (qIdx) => setQuestions(p =>
@@ -239,6 +241,7 @@ export default function SurveyAdmin() {
           questionText: q.questionText.trim(),
           type: q.type,
           options: q.type === "choice" ? q.options.filter(o => o.trim()) : [],
+          multiple: q.type === "choice" ? !!q.multiple : false,
         })),
       };
       const { data } = await api.post("/api/surveys", payload);
@@ -481,11 +484,39 @@ export default function SurveyAdmin() {
                           <select
                               className="border rounded-lg p-2"
                               value={q.type}
-                              onChange={(e) => changeQuestionFld(idx, "type", e.target.value)}
+                              onChange={(e) => {
+                                const nextType = e.target.value;
+                                if (nextType === "choice") {
+                                  // enable options + keep multiple (default false if unset)
+                                  updateQuestion(idx, {
+                                    type: "choice",
+                                    multiple: q.multiple ?? false,
+                                    options: Array.isArray(q.options) ? q.options : ["", ""],
+                                  });
+                                } else {
+                                  // reset extras when switching back to text
+                                  updateQuestion(idx, {
+                                    type: "text",
+                                    multiple: false,
+                                    options: [],
+                                  });
+                                }
+                              }}
                           >
                             <option value="text">Metin</option>
                             <option value="choice">Seçim (çoktan seçmeli)</option>
                           </select>
+                          {q.type === "choice" && (
+                              <label className="inline-flex items-center gap-2 ml-1">
+                                <input
+                                    type="checkbox"
+                                    checked={!!q.multiple}
+                                    onChange={(e) => updateQuestion(idx, { multiple: e.target.checked })}
+                                />
+                                <span>Birden fazla seçeneğin seçilmesine izin ver</span>
+                              </label>
+                          )}
+
                         </div>
 
                         {q.type === "choice" && (
