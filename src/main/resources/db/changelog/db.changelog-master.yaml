@@ -594,3 +594,96 @@ databaseChangeLog:
             tableName: department_node_position
             columnNames: id
             constraintName: pk_department_node_position_id
+
+  # === SURVEY: tables, FK, constraints ===
+  - changeSet:
+      id: create-survey-tables
+      author: emir
+      changes:
+        # survey
+        - createTable:
+            tableName: survey
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true } }
+              - column: { name: title, type: VARCHAR(200), constraints: { nullable: false } }
+              - column: { name: description, type: TEXT }
+              - column: { name: deadline, type: TIMESTAMP }      # LocalDateTime
+              - column: { name: anonymous, type: BOOLEAN, defaultValueBoolean: false, constraints: { nullable: false } }
+
+        # survey_question
+        - createTable:
+            tableName: survey_question
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true } }
+              - column: { name: survey_id, type: BIGINT, constraints: { nullable: false } }
+              - column: { name: question_text, type: VARCHAR(500), constraints: { nullable: false } }
+              - column: { name: type, type: VARCHAR(50), constraints: { nullable: false } }   # "text" | "choice"
+        - addForeignKeyConstraint:
+            baseTableName: survey_question
+            baseColumnNames: survey_id
+            constraintName: fk_survey_question_survey
+            referencedTableName: survey
+            referencedColumnNames: id
+            onDelete: CASCADE
+
+        # survey_question_options (ElementCollection)
+        - createTable:
+            tableName: survey_question_options
+            columns:
+              - column: { name: survey_question_id, type: BIGINT, constraints: { nullable: false } }
+              - column: { name: option_value, type: VARCHAR(255), constraints: { nullable: false } }
+        - addForeignKeyConstraint:
+            baseTableName: survey_question_options
+            baseColumnNames: survey_question_id
+            constraintName: fk_sq_options_question
+            referencedTableName: survey_question
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - addPrimaryKey:
+            tableName: survey_question_options
+            columnNames: survey_question_id, option_value
+            constraintName: pk_survey_question_options
+
+        # survey_answer  (DÜZELTİLMİŞ UNIQUE!)
+        - createTable:
+            tableName: survey_answer
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true } }
+              - column: { name: survey_id, type: BIGINT, constraints: { nullable: false } }
+              - column: { name: question_id, type: BIGINT, constraints: { nullable: false } }  # hızlı çözüm
+              - column: { name: answer, type: VARCHAR(1000), constraints: { nullable: false } }
+              - column: { name: user_id, type: VARCHAR(64) }       # anonimse NULL kalabilir
+              - column: { name: user_email, type: VARCHAR(255) }
+        - addForeignKeyConstraint:
+            baseTableName: survey_answer
+            baseColumnNames: survey_id
+            constraintName: fk_survey_answer_survey
+            referencedTableName: survey
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            baseTableName: survey_answer
+            baseColumnNames: question_id
+            constraintName: fk_survey_answer_question
+            referencedTableName: survey_question
+            referencedColumnNames: id
+            onDelete: CASCADE
+
+        # kullanıcı aynı ankette aynı soruya en fazla 1 kez cevap verebilir
+        - addUniqueConstraint:
+            tableName: survey_answer
+            columnNames: survey_id,user_id,question_id
+            constraintName: uq_survey_user_question
+
+        # performans indeksleri (öneri)
+        - createIndex:
+            indexName: idx_survey_answer_survey_user
+            tableName: survey_answer
+            columns:
+              - column: { name: survey_id }
+              - column: { name: user_id }
+        - createIndex:
+            indexName: idx_survey_question_survey
+            tableName: survey_question
+            columns:
+              - column: { name: survey_id }
