@@ -33,11 +33,14 @@ public class SurveyController {
     // READ LIST: VIEW_SURVEYS
     @PreAuthorize("@CustomAnnotationEvaluator.hasPermission(authentication, null, 'VIEW_SURVEYS')")
     @GetMapping
-    public ResponseEntity<List<SurveyDto>> list(Principal principal) {
+    public ResponseEntity<List<SurveyDto>> list(
+            Principal principal,
+            @RequestParam(name = "includeExpired", defaultValue = "false") boolean includeExpired
+    ) {
         String userId = (principal != null ? principal.getName() : null);
         List<SurveyDto> out = (userId == null || userId.isBlank())
-                ? surveyService.findAll()
-                : surveyService.findAllWithStatus(userId);
+                ? surveyService.findAll(includeExpired)                         // 👈 güncellendi
+                : surveyService.findAllWithStatus(userId, includeExpired);      // 👈 güncellendi
         return ResponseEntity.ok(out);
     }
 

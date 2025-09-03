@@ -35,9 +35,13 @@ public class SurveyService {
        Query (list/get)
        ========================= */
     @Transactional(readOnly = true)
-    public List<SurveyDto> findAll() {
+    public List<SurveyDto> findAll(boolean includeExpired) {
+        LocalDateTime cutoff = LocalDateTime.now().minusDays(1);
         return surveyRepository.findAll(Sort.by(Sort.Direction.DESC, "id"))
-                .stream().map(this::toDto).toList();
+                .stream()
+                .filter(s -> includeExpired || s.getDeadline() == null || !s.getDeadline().isBefore(cutoff))
+                .map(this::toDto)
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -52,28 +56,81 @@ public class SurveyService {
        ========================= */
     @Transactional
     public SurveyDto create(SurveyDto dto) {
+        // --- Survey alanları + temel validasyonlar ---
+        if (dto.getTitle() == null || dto.getTitle().trim().isEmpty()) {
+            throw new IllegalArgumentException("Anket başlığı zorunludur");
+        }
+
         Survey survey = new Survey();
-        survey.setTitle(dto.getTitle());
+        survey.setTitle(dto.getTitle().trim());
         survey.setDescription(dto.getDescription());
         survey.setAnonymous(dto.isAnonymous());
-        survey.setDeadline(dto.getDeadline()); // LocalDateTime
 
-        List<SurveyQuestion> qs = (dto.getQuestions() == null ? List.<SurveyQuestionDto>of() : dto.getQuestions())
-                .stream()
+        // deadline & hideAfter: ikisi de opsiyonel
+        survey.setDeadline(dto.getDeadline());     // null olabilir
+        survey.setHideAfter(dto.getHideAfter());   // null olabilir
+
+        // İsteğe bağlı kural: hideAfter < deadline ise uyar
+        if (survey.getHideAfter() != null && survey.getDeadline() != null
+                && survey.getHideAfter().isBefore(survey.getDeadline())) {
+            throw new IllegalArgumentException("Gizleme tarihi (hideAfter), son tarihten (deadline) önce olamaz");
+        }
+
+        // createdAt: entity'de @PrePersist veya burada set edebilirsin
+        // Eğer entity'nde yoksa:
+        // survey.setCreatedAt(LocalDateTime.now()); // sistem yerel saati
+
+        // --- Sorular ---
+        List<SurveyQuestionDto> qDtos = (dto.getQuestions() == null)
+                ? List.of()
+                : dto.getQuestions();
+
+        List<SurveyQuestion> qs = qDtos.stream()
                 .map(q -> {
+                    // ortak kontroller
+                    if (q.getQuestionText() == null || q.getQuestionText().trim().isEmpty()) {
+                        throw new IllegalArgumentException("Soru metni zorunludur");
+                    }
+                    if (q.getType() == null) {
+                        throw new IllegalArgumentException("Soru türü zorunludur");
+                    }
+
+                    String type = q.getType().trim().toLowerCase(Locale.ROOT);
+
                     SurveyQuestion sq = new SurveyQuestion();
-                    sq.setQuestionText(q.getQuestionText());
-                    sq.setType(q.getType());          // "text" | "choice"
-                    sq.setOptions(q.getOptions());    // element collection
-                    sq.setMultiple(q.isMultiple());   // <<< IMPORTANT: carry multiple flag
+                    sq.setQuestionText(q.getQuestionText().trim());
+                    sq.setType(type);               // "text" | "choice"
+                    sq.setMultiple(q.isMultiple()); // multiple bayrağını taşı
                     sq.setSurvey(survey);
+
+                    if ("choice".equals(type)) {
+                        List<String> opts = Optional.ofNullable(q.getOptions())
+                                .orElseGet(List::of)
+                                .stream()
+                                .map(opt -> opt == null ? "" : opt.trim())
+                                .filter(opt -> !opt.isEmpty())
+                                .distinct()
+                                .toList();
+
+                        if (opts.size() < 2) {
+                            throw new IllegalArgumentException("Çoktan seçmeli soru için en az 2 seçenek gerekir");
+                        }
+                        sq.setOptions(opts);
+                    } else {
+                        sq.setOptions(List.of());
+                        sq.setMultiple(false); // text için anlamsız
+                    }
+
                     return sq;
                 })
                 .toList();
 
         survey.setQuestions(qs);
-        return toDto(surveyRepository.save(survey));
+
+        Survey saved = surveyRepository.save(survey);
+        return toDto(saved);
     }
+
 
     @Transactional
     public void delete(Long id) {
@@ -157,8 +214,12 @@ public class SurveyService {
        Kullanıcıya göre alreadyAnswered + myAnswers doldurur.
        ========================= */
     @Transactional(readOnly = true)
-    public List<SurveyDto> findAllWithStatus(String userId) {
-        List<Survey> surveys = surveyRepository.findAll(Sort.by(Sort.Direction.DESC, "id"));
+    public List<SurveyDto> findAllWithStatus(String userId, boolean includeExpired) {
+        LocalDateTime cutoff = LocalDateTime.now().minusDays(1);
+        List<Survey> surveys = surveyRepository.findAll(Sort.by(Sort.Direction.DESC, "id"))
+                .stream()
+                .filter(s -> includeExpired || s.getDeadline() == null || !s.getDeadline().isBefore(cutoff))
+                .toList();
 
         final Set<Long> answeredIds =
                 (userId != null && !userId.isBlank())
@@ -172,13 +233,7 @@ public class SurveyService {
                                 a -> a.getSurvey().getId(),
                                 Collectors.groupingBy(
                                         SurveyAnswer::getQuestionId,
-                                        Collectors.mapping(
-                                                SurveyAnswer::getAnswer,
-                                                Collectors.collectingAndThen(
-                                                        Collectors.toList(),
-                                                        SurveyService::distinctPreserveOrder // keeps first-seen order & unique
-                                                )
-                                        )
+                                        Collectors.mapping(SurveyAnswer::getAnswer, Collectors.toList())
                                 )
                         ))
                         : Collections.emptyMap();
@@ -193,10 +248,6 @@ public class SurveyService {
                     }
                     return dto;
                 })
-                // İstersen cevaplanmamışları üste almak için aç:
-                // .sorted(Comparator
-                //    .comparing(SurveyDto::isAlreadyAnswered)
-                //    .thenComparing(SurveyDto::getId, Comparator.reverseOrder()))
                 .toList();
     }
 

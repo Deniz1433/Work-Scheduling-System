@@ -20,4 +20,5 @@ public class SurveyDto {
 
     private LocalDateTime deadline;
     private boolean anonymous;
+    private LocalDateTime hideAfter;
 }

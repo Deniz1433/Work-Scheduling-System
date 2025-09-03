@@ -1,4 +1,3 @@
-
 // src/SurveyAdmin.jsx
 import React, { useEffect, useState } from "react";
 import axios from "axios";
@@ -8,16 +7,20 @@ const api = axios.create({
   baseURL: "",            // aynı origin/proxy
   withCredentials: true,  // auth cookie/Keycloak
 });
+const toLocalLdt = (v) => {
+  if (!v) return null;
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(v)) return v + ":00";
 
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(v)) return v;
+
+  const d = new Date(v);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+};
 /* -------------- Yardımcı Fonksiyonlar -------------- */
 const emptyQuestion = () => ({ questionText: "", type: "text", options: [], multiple: false });
 
-const toIso = (v) => {
-  if (!v) return null;
-  const dt = new Date(v);
-  // 'YYYY-MM-DDTHH:mm:ss' (LocalDateTime için TZ eklemiyoruz)
-  return dt.toISOString().slice(0, 19);
-};
+const toIso = (v) => (v ? `${v}:00` : null);
 
 // Küçük rozet
 const Badge = ({ children, color = "slate" }) => {
@@ -82,17 +85,6 @@ const ColumnChart = ({ data, onBarClick }) => {
   );
 };
 
-/* ---------- Results payload’ını normalize et ---------- */
-/*
-  Desteklenen 2 şekil:
-  A) { survey, aggregates }
-     - aggregates: [{ questionId, questionText, choiceCounts: [{answer,count}], choiceVoters?: { [answer]: string[] } }]
-     - text sorular için ayrı alan yoksa, survey.questions[].texts kullanılabilir.
-  B) survey (doğrudan)
-     - survey.questions[].counts (choice için)
-     - survey.questions[].choiceVoters? (opsiyonel)
-     - survey.questions[].texts  (text için {answer, userEmail})
-*/
 function normalizeResultsPayload(raw) {
   let survey, aggregates;
 
@@ -136,6 +128,7 @@ function normalizeResultsPayload(raw) {
             choiceCounts,
             choiceVoters:
                 q.choiceVoters && typeof q.choiceVoters === "object" ? q.choiceVoters : undefined,
+            multiple: !!q.multiple,
           };
         });
   }
@@ -158,9 +151,10 @@ export default function SurveyAdmin() {
   // Create form state
   const [title, setTitle]             = useState("");
   const [description, setDescription] = useState("");
-  const [anonymous, setAnonymous]     = useState(false);
-  const [deadline, setDeadline]       = useState(""); // datetime-local
+  const [anonymous, setAnonymous]     = useState(false);// datetime-local (zorunlu)
   const [questions, setQuestions]     = useState([emptyQuestion()]);
+  const [deadline, setDeadline]       = useState("");
+  const [hideAfter, setHideAfter]     = useState("");
 
   // Results state
   const [surveys, setSurveys] = useState([]);
@@ -183,6 +177,7 @@ export default function SurveyAdmin() {
     setDescription("");
     setAnonymous(false);
     setDeadline("");
+    setHideAfter("");
     setQuestions([emptyQuestion()]);
   };
   const addQuestion       = () => setQuestions(p => [...p, emptyQuestion()]);
@@ -210,6 +205,7 @@ export default function SurveyAdmin() {
 
   const validate = () => {
     if (!title.trim()) return "Anket başlığı zorunludur.";
+    if (!deadline) return "Son tarih zorunludur.";
     if (questions.length === 0) return "En az bir soru ekleyin.";
     for (let i = 0; i < questions.length; i++) {
       const q = questions[i];
@@ -235,8 +231,9 @@ export default function SurveyAdmin() {
       const payload = {
         title: title.trim(),
         description: description.trim() || null,
-        anonymous,
-        deadline: deadline ? toIso(deadline) : null,
+        anonymous, // zorunlu
+        deadline: deadline ? toLocalLdt(deadline) : null,
+        hideAfter: toLocalLdt(hideAfter),
         questions: questions.map(q => ({
           questionText: q.questionText.trim(),
           type: q.type,
@@ -301,19 +298,18 @@ export default function SurveyAdmin() {
   // Drill-down: bir bar’a tıklanınca
   const openVoters = async ({ questionId, questionText }, answerLabel) => {
     if (!resultsData) return;
-    if (resultsData.survey.anonymous) {
-      setVoterError("Anonim anketlerde katılımcı listesi gösterilmez.");
-      setVoterList([]);
-      setVoterMeta({ questionText, answerLabel });
-      setVoterOpen(true);
-      return;
-    }
-
     setVoterOpen(true);
     setVoterLoading(true);
     setVoterError(null);
     setVoterList([]);
     setVoterMeta({ questionText, answerLabel });
+
+    // anonim ise direkt uyar
+    if (resultsData.survey.anonymous) {
+      setVoterError("Anonim anketlerde katılımcı listesi gösterilmez.");
+      setVoterLoading(false);
+      return;
+    }
 
     // 1) Payload içinde choiceVoters varsa doğrudan kullan
     const agg = (resultsData.aggregates || []).find(a => a.questionId === questionId);
@@ -445,15 +441,29 @@ export default function SurveyAdmin() {
                     />
                     <span>Anonim anket (cevaplarda mail saklanmaz)</span>
                   </label>
+                  <div className="grid sm:grid-cols-3 gap-4">
+                    <div className="border rounded-lg p-3">
+                      <label className="block text-sm text-slate-600 mb-1">Son Tarih (opsiyonel)</label>
+                      <input
+                          type="datetime-local"
+                          className="border rounded-lg p-2 w-full"
+                          value={deadline}
+                          onChange={(e) => setDeadline(e.target.value)}
+                      />
+                    </div>
 
-                  <div className="border rounded-lg p-3">
-                    <label className="block text-sm text-slate-600 mb-1">Son Tarih (opsiyonel)</label>
-                    <input
-                        type="datetime-local"
-                        className="border rounded-lg p-2 w-full"
-                        value={deadline}
-                        onChange={(e) => setDeadline(e.target.value)}
-                    />
+                    <div className="border rounded-lg p-3">
+                      <label className="block text-sm text-slate-600 mb-1">Kaybolma Tarihi (opsiyonel)</label>
+                      <input
+                          type="datetime-local"
+                          className="border rounded-lg p-2 w-full"
+                          value={hideAfter}
+                          onChange={(e) => setHideAfter(e.target.value)}
+                      />
+                      <p className="text-xs text-slate-500 mt-1">
+                        Bu tarih geçince anket kullanıcı listesinde görünmez.
+                      </p>
+                    </div>
                   </div>
                 </div>
 
@@ -491,7 +501,9 @@ export default function SurveyAdmin() {
                                   updateQuestion(idx, {
                                     type: "choice",
                                     multiple: q.multiple ?? false,
-                                    options: Array.isArray(q.options) ? q.options : ["", ""],
+                                    options: Array.isArray(q.options) && q.options.length >= 2
+                                        ? q.options
+                                        : ["", ""],
                                   });
                                 } else {
                                   // reset extras when switching back to text
@@ -516,7 +528,6 @@ export default function SurveyAdmin() {
                                 <span>Birden fazla seçeneğin seçilmesine izin ver</span>
                               </label>
                           )}
-
                         </div>
 
                         {q.type === "choice" && (
@@ -606,6 +617,9 @@ export default function SurveyAdmin() {
                                       {expired ? "Süre doldu" : "Son gün: " + new Date(s.deadline).toLocaleString()}
                                     </Badge>
                                 )}
+                                {s.createdAt && (
+                                    <Badge color="slate">Oluşturuldu: {new Date(s.createdAt).toLocaleString()}</Badge>
+                                )}
                               </div>
                               {s.description && (
                                   <div className="text-sm text-slate-500 truncate">{s.description}</div>
@@ -654,14 +668,17 @@ export default function SurveyAdmin() {
                 <h3 className="text-lg font-semibold mb-2">
                   {selectedSurvey?.title || "Anket Sonuçları"}
                 </h3>
-                {selectedSurvey?.deadline && (
-                    <div className="mb-2">
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {selectedSurvey?.deadline && (
                       <Badge color={new Date(selectedSurvey.deadline) < new Date() ? "red" : "amber"}>
                         Son gün: {new Date(selectedSurvey.deadline).toLocaleString()}
                       </Badge>
-                    </div>
-                )}
-                {selectedSurvey?.anonymous && <div className="mb-2"><Badge color="blue">Anonim</Badge></div>}
+                  )}
+                  {selectedSurvey?.createdAt && (
+                      <Badge>Oluşturuldu: {new Date(selectedSurvey.createdAt).toLocaleString()}</Badge>
+                  )}
+                  {selectedSurvey?.anonymous && <Badge color="blue">Anonim</Badge>}
+                </div>
 
                 {resultsLoading && <p>Sonuçlar yükleniyor...</p>}
                 {resultsError && (

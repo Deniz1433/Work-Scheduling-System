@@ -2,44 +2,57 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 
+/* -------------------- API -------------------- */
 const api = axios.create({
-  baseURL: "",           // aynı origin/proxy ise boş bırak
-  withCredentials: true, // Keycloak/cookie için
+  baseURL: "",            // aynı origin/proxy
+  withCredentials: true,  // auth cookie/Keycloak
 });
 
-// Yardımcılar
-const isExpired = (dl) => !!dl && new Date(dl).getTime() < Date.now();
-const fmtDeadline = (dl) =>
-    !dl ? "" : new Date(dl).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+/* -------------------- Yardımcılar -------------------- */
+const nowMs = () => Date.now();
 
-const SurveyTake = () => {
-  const [surveys, setSurveys] = useState([]);     // tüm anketler
-  const [answers, setAnswers] = useState({});     // { [surveyId]: { [qId]: val } }
-  const [sending, setSending] = useState({});     // { [surveyId]: bool }
-  const [errors, setErrors]   = useState({});     // { [surveyId]: string|null }
-  const [infos, setInfos]     = useState({});     // { [surveyId]: string|null }
-  const [loading, setLoading] = useState(true);
+const isExpired = (deadline) =>
+    !!deadline && new Date(deadline).getTime() < nowMs();
 
+const isHiddenByHideAfter = (hideAfter) =>
+    !!hideAfter && new Date(hideAfter).getTime() < nowMs();
+
+const fmtDateTime = (dt) =>
+    !dt ? "" : new Date(dt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+
+/* -------------------- Bileşen -------------------- */
+export default function SurveyTake() {
+  const [surveys, setSurveys]   = useState([]);  // listelenen anketler
+  const [answers, setAnswers]   = useState({});  // { [surveyId]: { [qId]: string | string[] } }
+  const [sending, setSending]   = useState({});  // { [surveyId]: bool }
+  const [errors, setErrors]     = useState({});  // { [surveyId]: string|null }
+  const [infos, setInfos]       = useState({});  // { [surveyId]: string|null }
+  const [loading, setLoading]   = useState(true);
+
+  // Anketleri çek + hideAfter'a göre yerelde filtrele + cevap state'ini hazırla
   const load = async () => {
     setLoading(true);
     setErrors({});
     setInfos({});
     try {
-      const res = await api.get("/api/surveys");
-      const list = res.data || [];
-      setSurveys(list);
+      const { data } = await api.get("/api/surveys");
 
+      // HideAfter geçmiş olanlar kullanıcıya görünmesin (backend de süzüyor olabilir)
+      const visible = (data || []).filter(s => !isHiddenByHideAfter(s.hideAfter));
+
+      setSurveys(visible);
+
+      // myAnswers artık Map<Long, List<String>> — state ön dolumu
       const init = {};
-      list.forEach(s => {
+      visible.forEach(s => {
+        const mineByQ = s.alreadyAnswered && s.myAnswers ? s.myAnswers : {};
         const a = {};
         (s.questions || []).forEach(q => {
-          const mine = s.alreadyAnswered && s.myAnswers ? s.myAnswers[q.id] : undefined;
+          const mineArr = Array.isArray(mineByQ[q.id]) ? mineByQ[q.id] : [];
           if (q.type === "choice" && q.multiple) {
-            // Multi-choice → always array
-            a[q.id] = Array.isArray(mine) ? mine : [];
+            a[q.id] = [...mineArr];                 // çoklu → dizi
           } else {
-            // Text or single-choice → string (first item if backend sent a list)
-            a[q.id] = Array.isArray(mine) ? (mine[0] ?? "") : (mine ?? "");
+            a[q.id] = mineArr.length ? mineArr[0] : ""; // tekli/text → string
           }
         });
         init[s.id] = a;
@@ -52,13 +65,13 @@ const SurveyTake = () => {
     }
   };
 
-
   useEffect(() => { load(); }, []);
 
+  // Form uygun mu?
   const canSubmit = (s) => {
     if (!s?.questions?.length) return false;
     if (s.alreadyAnswered) return false;
-    if (isExpired(s.deadline)) return false;
+    if (isExpired(s.deadline)) return false; // deadline varsa ve geçtiyse gönderme
     const a = answers[s.id] || {};
     return s.questions.every(q => {
       const v = a[q.id];
@@ -69,7 +82,7 @@ const SurveyTake = () => {
     });
   };
 
-
+  // Cevap değişimi
   const handleChange = (surveyId, qId, value) => {
     setAnswers(prev => ({
       ...prev,
@@ -77,33 +90,38 @@ const SurveyTake = () => {
     }));
   };
 
+  // Gönder
   const submit = async (s) => {
-    // UI tarafında ekstra koruma
-    if (isExpired(s.deadline)) {
-      setInfos(prev => ({ ...prev, [s.id]: "Bu anketin süresi dolmuş, cevap gönderilemez." }));
-      return;
-    }
     if (s.alreadyAnswered) {
       setInfos(prev => ({ ...prev, [s.id]: "Bu anketi daha önce yanıtladınız." }));
+      return;
+    }
+    if (isExpired(s.deadline)) {
+      setInfos(prev => ({ ...prev, [s.id]: "Bu anketin süresi dolmuş, cevap gönderilemez." }));
       return;
     }
 
     setSending(prev => ({ ...prev, [s.id]: true }));
     setErrors(prev => ({ ...prev, [s.id]: null }));
     setInfos(prev  => ({ ...prev, [s.id]: null }));
+
     try {
+      // Backend beklenen: { answers: Map<Long, List<String>> }
       const normalized = {};
       (s.questions || []).forEach(q => {
         const v = (answers[s.id] || {})[q.id];
         if (q.type === "choice" && q.multiple) {
           normalized[q.id] = Array.isArray(v) ? v : [];
         } else {
-          normalized[q.id] = [typeof v === "string" ? v : ""];
+          const one = typeof v === "string" ? v : "";
+          normalized[q.id] = [one];
         }
       });
+
       await api.post(`/api/surveys/${s.id}/submit`, { answers: normalized });
+
       setInfos(prev => ({ ...prev, [s.id]: "Teşekkürler! Cevabınız kaydedildi." }));
-      // UI'da kilitle:
+      // UI'da kilitle
       setSurveys(prev => prev.map(it => it.id === s.id ? { ...it, alreadyAnswered: true } : it));
     } catch (e) {
       const status = e?.response?.status;
@@ -120,6 +138,7 @@ const SurveyTake = () => {
     }
   };
 
+  /* -------------------- UI -------------------- */
   if (loading) return <p>Anketler yükleniyor...</p>;
   if (!surveys.length) return <p>Görüntülenecek anket yok.</p>;
 
@@ -131,16 +150,25 @@ const SurveyTake = () => {
             </div>
         )}
 
-        {surveys.map((s) => {
+        {surveys.map(s => {
+          // Güvenlik: hideAfter geçtiyse hiç renderlama (yukarıda zaten filtreliyoruz)
+          if (isHiddenByHideAfter(s.hideAfter)) return null;
+
           const expired = isExpired(s.deadline);
           const disabled = expired || s.alreadyAnswered;
+
           return (
               <div key={s.id} className="relative border rounded-xl p-4 bg-white">
-                {/* Sağ üstte deadline ve durum rozetleri */}
-                <div className="absolute top-2 right-3 flex items-center gap-2">
+                {/* Sağ üst rozetler: createdAt, deadline, durum */}
+                <div className="absolute top-2 right-3 flex items-center gap-2 flex-wrap justify-end">
+                  {s.createdAt && (
+                      <span className="text-xs rounded-full px-2 py-1 border bg-slate-50 text-slate-700">
+                  Oluşturuldu: {fmtDateTime(s.createdAt)}
+                </span>
+                  )}
                   {s.deadline && (
                       <span className="text-xs rounded-full px-2 py-1 border bg-slate-50 text-slate-700">
-                  Son gün: {fmtDeadline(s.deadline)}
+                  Son gün: {fmtDateTime(s.deadline)}
                 </span>
                   )}
                   {expired && (
@@ -156,9 +184,11 @@ const SurveyTake = () => {
                 </div>
 
                 <h2 className="text-xl font-bold mb-1">{s.title}</h2>
-                {s.description && <p className="mb-4 text-slate-700">{s.description}</p>}
+                {s.description && (
+                    <p className="mb-4 text-slate-700">{s.description}</p>
+                )}
 
-                {/* Üst bilgilendirme kutuları */}
+                {/* Bilgilendirme kutuları */}
                 {expired && (
                     <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50 text-amber-800 p-2">
                       Bu anketin süresi doldu. Cevap gönderilemez.
@@ -169,9 +199,10 @@ const SurveyTake = () => {
                       Bu anketi daha önce yanıtladınız. Yanıtlarınız kilitli olarak gösteriliyor.
                     </div>
                 )}
-
                 {errors[s.id] && (
-                    <div className="mb-3 rounded-lg border border-red-300 bg-red-50 text-red-800 p-2">{errors[s.id]}</div>
+                    <div className="mb-3 rounded-lg border border-red-300 bg-red-50 text-red-800 p-2">
+                      {errors[s.id]}
+                    </div>
                 )}
                 {infos[s.id] && (
                     <div className="mb-3 rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-800 p-2">
@@ -179,11 +210,13 @@ const SurveyTake = () => {
                     </div>
                 )}
 
+                {/* Sorular */}
                 <div className="space-y-4">
                   {(s.questions || []).map((q, idx) => (
                       <div key={q.id} className="relative border rounded-lg p-3">
-                        {/* Soru başlığı */}
-                        <div className="mb-2 font-medium">{idx + 1}. {q.questionText}</div>
+                        <div className="mb-2 font-medium">
+                          {idx + 1}. {q.questionText}
+                        </div>
 
                         {q.type === "text" && (
                             <textarea
@@ -213,6 +246,7 @@ const SurveyTake = () => {
                               ))}
                             </div>
                         )}
+
                         {q.type === "choice" && q.multiple && (
                             <div className={`grid gap-2 ${disabled ? "opacity-80" : ""}`}>
                               {(q.options || []).map((opt, oIdx) => {
@@ -241,6 +275,7 @@ const SurveyTake = () => {
                   ))}
                 </div>
 
+                {/* Gönder butonu */}
                 <div className="pt-4">
                   <button
                       onClick={() => submit(s)}
@@ -251,7 +286,7 @@ const SurveyTake = () => {
                               : "bg-green-600 text-white hover:bg-green-700"
                       }`}
                   >
-                    {expired
+                    {isExpired(s.deadline)
                         ? "Süresi doldu"
                         : s.alreadyAnswered
                             ? "Zaten yanıtlanmış"
@@ -263,6 +298,4 @@ const SurveyTake = () => {
         })}
       </div>
   );
-};
-
-export default SurveyTake;
+}

@@ -688,3 +688,15 @@ databaseChangeLog:
             tableName: survey_question
             columns:
               - column: { name: survey_id }
+  - changeSet:
+        id: add-hide-after-to-survey
+        author: emir
+        changes:
+          - addColumn:
+              tableName: survey
+              columns:
+                - column:
+                    name: hide_after
+                    type: TIMESTAMP
+                    constraints:
+                      nullable: true

@@ -28,4 +28,7 @@ public class Survey {
 
     @OneToMany(mappedBy = "survey", cascade = CascadeType.ALL, orphanRemoval = true,fetch = FetchType.EAGER)
     private List<SurveyQuestion> questions;
+
+    @Column(name = "hide_after")
+    private LocalDateTime hideAfter;
 }
