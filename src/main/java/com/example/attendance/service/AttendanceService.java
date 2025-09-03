@@ -9,7 +9,6 @@ import com.example.attendance.repository.UserRepository;
 import com.example.attendance.dto.TeamAttendanceDto;
 import com.example.attendance.security.CustomAnnotationEvaluator;
 
-import org.springframework.cglib.core.Local;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,174 +34,6 @@ public class AttendanceService {
         this.holidayService = holidayService;
     }
 
-    
-    public List<TeamAttendanceDto> getTeamAttendance(String keycloakId) {
-        // 1. Kullanıcıyı keycloakId'ye göre bul
-        User currentUser = userRepo.findByKeycloakId(keycloakId).orElse(null);
-        if (currentUser == null) {
-            return new ArrayList<>();
-        }
-
-        // 2. Kullanıcının departman ID'sini al
-        Long departmentId = currentUser.getDepartment().getId();
-
-        // 3. Aynı departmandaki tüm kullanıcıları getir
-        List<User> departmentUsers = userRepo.findByDepartmentId(departmentId);
-
-        // 4. Gelecek haftanın başlangıç tarihini hesapla
-        LocalDate nextWeekStart = calculateNextWeekStart();
-
-        // 5. Her kullanıcı için attendance verilerini al ve DTO'ya dönüştür
-        return departmentUsers.stream()
-                .map(user -> {
-                    TeamAttendanceDto dto = new TeamAttendanceDto();
-                    dto.setId(user.getId()); // Long ID
-                    dto.setName(user.getFirstName());
-                    dto.setSurname(user.getLastName());
-                    dto.setDepartment(user.getDepartment().getName());
-                    dto.setDepartmentId(user.getDepartment().getId());
-
-
-                    Attendance attendance = repo.findByUserIdAndWeekStart(user.getId(), nextWeekStart);
-                    if (attendance != null) {
-                       
-                        List<Integer> attendanceIntegers = attendance.getDates().stream()
-                                .map(day -> day) 
-                                .collect(Collectors.toList());
-                        // Tatil günlerini kontrol et ve güncelle
-                        attendanceIntegers = updateAttendanceWithHolidays(attendanceIntegers, nextWeekStart);
-                        dto.setAttendance(attendanceIntegers);
-                        dto.setApproved(attendance.isApproved());
-                    } else {
-                        // Attendance kaydı yoksa varsayılan değerler
-                        List<Integer> defaultAttendance = List.of(0,0,0,0,0);
-                        // Tatil günlerini kontrol et ve güncelle
-                        defaultAttendance = updateAttendanceWithHolidays(defaultAttendance, nextWeekStart);
-                        dto.setAttendance(defaultAttendance);
-                        dto.setApproved(false);
-                    }
-
-                    dto.setEmployeeExcuse(null); // Şimdilik null, sonra excuse tablosundan alınabilir
-                    return dto;
-                })
-                .collect(Collectors.toList());
-    }
-
-    public List<TeamAttendanceDto> getTeamAttendanceWithFilters(
-            String keycloakId, 
-            String departmentId, 
-            String roleId, 
-            String searchTerm
-    ) {
-        System.out.println("🔍 getTeamAttendanceWithFilters called with:");
-        System.out.println("  - keycloakId: " + keycloakId);
-        System.out.println("  - departmentId: " + departmentId);
-        System.out.println("  - roleId: " + roleId);
-        System.out.println("  - searchTerm: " + searchTerm);
-        
-        // 1. Kullanıcıyı keycloakId'ye göre bul
-        User currentUser = userRepo.findByKeycloakId(keycloakId).orElse(null);
-        if (currentUser == null) {
-            System.out.println("❌ User not found for keycloakId: " + keycloakId);
-            return new ArrayList<>();
-        }
-        
-        System.out.println("✅ User found: " + currentUser.getFirstName() + " " + currentUser.getLastName());
-
-        // 2. Filtreleme için kullanıcı listesini al
-        List<User> users;
-        
-        // Çoklu departman filtresi
-        if (departmentId != null && !departmentId.isEmpty()) {
-            // Virgülle ayrılmış departman ID'lerini parse et
-            String[] departmentIds = departmentId.split(",");
-            if (departmentIds.length == 1) {
-                // Tek departman
-                users = userRepo.findByDepartmentId(Long.parseLong(departmentIds[0].trim()));
-                System.out.println("🔍 Found " + users.size() + " users in department " + departmentIds[0].trim());
-            } else {
-                // Çoklu departman - birleşim (union) mantığı
-                users = new ArrayList<>();
-                for (String deptId : departmentIds) {
-                    List<User> deptUsers = userRepo.findByDepartmentId(Long.parseLong(deptId.trim()));
-                    users.addAll(deptUsers);
-                    System.out.println("🔍 Found " + deptUsers.size() + " users in department " + deptId.trim());
-                }
-            }
-        } else {
-            // Tüm departmanlardaki kullanıcıları getir
-            users = userRepo.findAll();
-            System.out.println("🔍 Found " + users.size() + " total users (no department filter)");
-        }
-
-        // 3. Gelecek haftanın başlangıç tarihini hesapla
-        LocalDate nextWeekStart = calculateNextWeekStart();
-
-        // 4. Filtreleme ve DTO dönüşümü
-        List<TeamAttendanceDto> result = users.stream()
-                .filter(user -> {
-                    // Çoklu rol filtresi - birleşim mantığı
-                    if (roleId != null && !roleId.isEmpty()) {
-                        String[] roleIds = roleId.split(",");
-                        boolean hasMatchingRole = false;
-                        for (String rId : roleIds) {
-                            if (user.getRole().getId().toString().equals(rId.trim())) {
-                                hasMatchingRole = true;
-                                break;
-                            }
-                        }
-                        if (!hasMatchingRole) {
-                            return false;
-                        }
-                    }
-                    
-                    // Arama terimi filtresi (isim, soyisim, email)
-                    if (searchTerm != null && !searchTerm.isEmpty()) {
-                        String searchLower = searchTerm.toLowerCase();
-                        boolean matchesSearch = (user.getFirstName() != null && user.getFirstName().toLowerCase().contains(searchLower)) ||
-                                              (user.getLastName() != null && user.getLastName().toLowerCase().contains(searchLower)) ||
-                                              (user.getEmail() != null && user.getEmail().toLowerCase().contains(searchLower));
-                        if (!matchesSearch) {
-                            return false;
-                        }
-                    }
-                    
-                    return true;
-                })
-                .map(user -> {
-                    TeamAttendanceDto dto = new TeamAttendanceDto();
-                    dto.setId(user.getId()); // Long ID
-                    dto.setName(user.getFirstName());
-                    dto.setSurname(user.getLastName());
-                    dto.setDepartment(user.getDepartment().getName());
-                    dto.setDepartmentId(user.getDepartment().getId());
-
-                    Attendance attendance = repo.findByUserIdAndWeekStart(user.getId(), nextWeekStart);
-                    if (attendance != null) {
-                        List<Integer> attendanceIntegers = attendance.getDates().stream()
-                                .map(day -> day) 
-                                .collect(Collectors.toList());
-                        // Tatil günlerini kontrol et ve güncelle
-                        attendanceIntegers = updateAttendanceWithHolidays(attendanceIntegers, nextWeekStart);
-                        dto.setAttendance(attendanceIntegers);
-                        dto.setApproved(attendance.isApproved());
-                    } else {
-                        // Attendance kaydı yoksa varsayılan değerler
-                        List<Integer> defaultAttendance = List.of(0,0,0,0,0);
-                        // Tatil günlerini kontrol et ve güncelle
-                        defaultAttendance = updateAttendanceWithHolidays(defaultAttendance, nextWeekStart);
-                        dto.setAttendance(defaultAttendance);
-                        dto.setApproved(false);
-                    }
-
-                    dto.setEmployeeExcuse(null);
-                    return dto;
-                })
-                .collect(Collectors.toList());
-                
-        System.out.println("✅ Returning " + result.size() + " team members");
-        return result;
-    }
 
     public List<TeamAttendanceDto> getTeamAttendanceWithFiltersAndPermissions(
             String keycloakId,
@@ -240,7 +71,7 @@ public class AttendanceService {
         // 3. Yetki kontrolü yaparak hangi kullanıcıları görebileceğini belirle
         List<User> authorizedUsers = allUsers.stream()
                 .filter(user -> permissionEvaluator.canViewAttendance(authentication, user.getId()))
-                .collect(Collectors.toList());
+                .toList();
         
         System.out.println("🔍 Users after permission check: " + authorizedUsers.size());
 
@@ -278,22 +109,20 @@ public class AttendanceService {
                         String search = searchTerm.toLowerCase().trim();
                         String fullName = (user.getFirstName() + " " + user.getLastName()).toLowerCase();
                         String email = user.getEmail() != null ? user.getEmail().toLowerCase() : "";
-                        
-                        if (!fullName.contains(search) && !email.contains(search)) {
-                            return false;
-                        }
+
+                        return fullName.contains(search) || email.contains(search);
                     }
                     
                     return true;
                 })
-                .collect(Collectors.toList());
+                .toList();
 
         System.out.println("🔍 Users after filtering: " + filteredUsers.size());
 
         // 5. Hafta başlangıç tarihini hesapla (weekStart parametresi varsa onu kullan, yoksa gelecek hafta)
         final LocalDate targetWeekStart;
         if (weekStart != null && !weekStart.trim().isEmpty()) {
-            LocalDate parsedDate = null;
+            LocalDate parsedDate;
             try {
                 parsedDate = LocalDate.parse(weekStart);
                 System.out.println("🔍 Using provided weekStart: " + parsedDate);
@@ -367,7 +196,7 @@ public class AttendanceService {
      * Belirli bir tarihin tatil olup olmadığını kontrol eder
      */
     private boolean isHoliday(LocalDate date) {
-        return holidayService.getHolidaysBetweenDates(date, date).size() > 0;
+        return !holidayService.getHolidaysBetweenDates(date, date).isEmpty();
     }
 
     /**
@@ -453,13 +282,16 @@ public class AttendanceService {
         repo.save(attendance);
     }
 
-    public List<Excuse> getExcuse(Long editorId, Long userId) {
-        List<Excuse> excuses = excuseRepo.findByUserId(userId);
+    public List<Excuse> getExcuse(Long editorId) {
+        List<Excuse> excuses = excuseRepo.findByUserId(editorId);
         LocalDate weekStart = calculateNextWeekStart();
-        return excuses.stream().filter(e -> e.getExcuseDate().isAfter(weekStart)).collect(Collectors.toList());
+        return excuses.stream()
+                .filter(e -> e.getExcuseDate().isAfter(weekStart))
+                .collect(Collectors.toList());
     }
 
-    public void approveExcuse(Long id, String username) {
+
+    public void approveExcuse(Long id) {
         Excuse excuse = excuseRepo.findById(id).orElseThrow(() -> new RuntimeException("Excuse not found"));
         excuse.setIsApproved(true);
         excuseRepo.save(excuse);
@@ -496,9 +328,7 @@ public class AttendanceService {
 
         Attendance attendance = repo.findByUserIdAndWeekStart(user.getId(), weekStart);
         if (attendance != null) {
-            List<Integer> attendanceIntegers = attendance.getDates().stream()
-                    .map(day -> day) 
-                    .collect(Collectors.toList());
+            List<Integer> attendanceIntegers = new ArrayList<>(attendance.getDates());
             // Tatil günlerini kontrol et ve güncelle
             attendanceIntegers = updateAttendanceWithHolidays(attendanceIntegers, weekStart);
             dto.setAttendance(attendanceIntegers);

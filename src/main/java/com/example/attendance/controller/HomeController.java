@@ -1,6 +1,5 @@
 package com.example.attendance.controller;
 
-import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.GrantedAuthority;
@@ -17,7 +16,9 @@ import java.util.stream.Collectors;
 @RequestMapping("/api")
 public class HomeController {
 
-    private static final Logger log = LoggerFactory.getLogger(HomeController.class);
+    static {
+        LoggerFactory.getLogger(HomeController.class);
+    }
 
     /**
      * GET /api/user

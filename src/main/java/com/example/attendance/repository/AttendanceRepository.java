@@ -13,9 +13,4 @@ import org.springframework.stereotype.Repository;
 public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
     Attendance findByUserIdAndWeekStart(Long userId, LocalDate weekStart);
     List<Attendance> findByUserId(Long userId);
-   //UserId + weekStart ile attendance silme
-    void deleteByUserIdAndWeekStart(
-            Long userId,
-            LocalDate weekStart
-    );
 }

@@ -49,7 +49,7 @@ const EmployeeAttendanceRegistration = () => {
     }, [user]);
 
     // Hafta navigasyon state'i
-    const [currentWeekOffset, setCurrentWeekOffset] = useState(1); // Hafta offset'i (0 = bu hafta, 1 = gelecek hafta, -1 = geçen hafta)
+    const [currentWeekOffset] = useState(1); // Hafta offset'i (0 = bu hafta, 1 = gelecek hafta, -1 = geçen hafta)
 
     // Hafta günlerini hesapla (offset'e göre)
     const generateWeekDays = (weekOffset = 0) => {
@@ -105,10 +105,11 @@ const EmployeeAttendanceRegistration = () => {
                 const userIdResponse = await axios.get(`/api/userInfo/${user.keycloakId}`);
                 const userId = userIdResponse.data;
                 console.log('User ID:', userId);
-                
+
                 if (!userId) {
                     console.error('User ID not found for keycloakId:', user.keycloakId);
-                    throw new Error('Kullanıcı ID bulunamadı');
+                    setLoading(false);
+                    return;
                 }
 
                 // Then fetch attendance data
@@ -208,18 +209,6 @@ const EmployeeAttendanceRegistration = () => {
     }, [currentWeekOffset]);
 
     // Hafta navigasyon fonksiyonları
-    const goToPreviousWeek = () => {
-        setCurrentWeekOffset(prev => prev - 1);
-    };
-
-    const goToNextWeek = () => {
-        setCurrentWeekOffset(prev => prev + 1);
-    };
-
-    const goToCurrentWeek = () => {
-        setCurrentWeekOffset(0);
-    };
-
     const handleStatusChange = async (dayIndex, newStatus) => {
         // Tatil günü kontrolü
         if (weeklyStatus[dayIndex] === 5) {
@@ -301,7 +290,7 @@ const EmployeeAttendanceRegistration = () => {
                 }));
             } else {
                 // İptal edildi, status değişikliği yapma
-                return;
+
             }
         } else {
             // Normal durum değişikliği (İzinli/Mazeretli değil)
@@ -367,7 +356,7 @@ const EmployeeAttendanceRegistration = () => {
             console.log('Çalışma günü yok - minimum ofis günü kontrolü atlanıyor');
         }
 
-        let warningText = '';
+        let warningText;
         if (needsApprovalWarning) {
             warningText = 'Onaylı attendance kaydınız değiştirildi. Kaydetmek onayınızı kaldıracaktır. Devam etmek istiyor musunuz?';
         } else {
@@ -404,13 +393,13 @@ const EmployeeAttendanceRegistration = () => {
                     await Promise.all(excusePromises);
                 }
 
-                // Get user ID first
                 const userIdResponse = await axios.get(`/api/userInfo/${user.keycloakId}`);
                 const userId = userIdResponse.data;
-                
                 if (!userId) {
-                    throw new Error('Kullanıcı ID bulunamadı');
+                    await Swal.fire('Hata', 'Kullanıcı ID bulunamadı.', 'error');
+                    return;
                 }
+
 
                 // Sonra attendance'ı kaydet - isApproved false olacak
                 await axios.post('/api/attendance', { 
@@ -472,14 +461,13 @@ const EmployeeAttendanceRegistration = () => {
                         // State güncellemesi sonrası API çağrısı yap
                         setTimeout(async () => {
                             try {
-                                // Get user ID first
                                 const userIdResponse = await axios.get(`/api/userInfo/${user.keycloakId}`);
                                 const userId = userIdResponse.data;
-                                
                                 if (!userId) {
-                                    throw new Error('Kullanıcı ID bulunamadı');
+                                    console.error('Kullanıcı ID bulunamadı');
+                                    return;
                                 }
-                                
+
                                 await axios.post('/api/attendance', { 
                                     userId: userId, // Long ID
                                     weekStart: weekStart,
@@ -572,14 +560,14 @@ const EmployeeAttendanceRegistration = () => {
                             // State güncellemesi sonrası API çağrısı yap
                             setTimeout(async () => {
                                 try {
-                                    // Get user ID first
                                     const userIdResponse = await axios.get(`/api/userInfo/${user.keycloakId}`);
                                     const userId = userIdResponse.data;
-                                    
                                     if (!userId) {
-                                        throw new Error('Kullanıcı ID bulunamadı');
+                                        console.error('Kullanıcı ID bulunamadı');
+                                        return;
                                     }
-                                    
+
+
                                     await axios.post('/api/attendance', { 
                                         userId: userId, // Long ID
                                         weekStart: weekStart,

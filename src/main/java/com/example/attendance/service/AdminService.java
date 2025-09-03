@@ -12,10 +12,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.resource.RealmResource;
-import org.keycloak.admin.client.resource.UsersResource;
-import org.keycloak.representations.idm.CredentialRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -54,53 +51,6 @@ public class AdminService {
         return userRepository.findById(userId)
                 .map(this::toDto)
                 .orElse(null);
-    }
-
-    @Transactional
-    public UserRepresentation createKeycloakUser(UserDto userDto) {
-        try {
-            RealmResource realm = keycloakAdminClient.realm("attendance-realm");
-            UsersResource usersResource = realm.users();
-
-            UserRepresentation user = new UserRepresentation();
-            user.setEnabled(true);
-            user.setUsername(userDto.getUsername());
-            user.setEmail(userDto.getEmail());
-            user.setFirstName(userDto.getFirstName());
-            user.setLastName(userDto.getLastName());
-
-            CredentialRepresentation credential = new CredentialRepresentation();
-            credential.setType(CredentialRepresentation.PASSWORD);
-            credential.setValue(userDto.getPassword());
-            credential.setTemporary(false);
-            user.setCredentials(List.of(credential));
-
-            var response = usersResource.create(user);
-            if (response.getStatus() != 201) {
-                throw new RuntimeException("Failed to create user in Keycloak. Status: " + response.getStatus());
-            }
-
-            return user;
-        } catch (Exception e) {
-            log.error("Error creating Keycloak user: {}", e.getMessage(), e);
-            throw new RuntimeException("Keycloak user creation failed: " + e.getMessage());
-        }
-    }
-
-    @Transactional
-    public void createUser(UserDto userDto, String keycloakId) {
-        User user = new User();
-        user.setIsActive(true);
-        user.setKeycloakId(keycloakId);
-        user.setUsername(userDto.getUsername());
-        user.setEmail(userDto.getEmail());
-        user.setFirstName(userDto.getFirstName());
-        user.setLastName(userDto.getLastName());
-        user.setPassword(userDto.getPassword());
-        user.setDepartment(departmentRepository.findById(userDto.getDepartmentId()).orElse(null));
-        user.setRole(roleRepository.findById(userDto.getRoleId()).orElse(null));
-        userRepository.save(user);
-        log.info("User created in Postgres: {}", user.getUsername());
     }
 
     @Transactional

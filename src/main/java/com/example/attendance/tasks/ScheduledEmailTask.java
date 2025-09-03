@@ -37,7 +37,7 @@ public class ScheduledEmailTask {
         for (int i = 0; i < dates.size(); i++) {
             int status = dates.get(i);
             String statusStr = (status >= 0 && status < statusMap.length) ? statusMap[status] : "Bilinmeyen";
-            sb.append((i + 1) + ". gün: " + statusStr + "\n");
+            sb.append((i + 1)).append(". gün: ").append(statusStr).append("\n");
         }
         return sb.toString();
     }

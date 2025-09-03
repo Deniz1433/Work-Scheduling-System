@@ -73,7 +73,7 @@ public class AttendanceController {
     }
 
     // Edit another user's attendance (requires permissions)
-    @PreAuthorize("@CustomAnnotationEvaluator.hasAnyPermission(authentication, null, {'ADMIN_ALL', 'EDIT_CHILD_ATTENDANCE', 'EDIT_ALL_ATTENDANCE', 'EDIT_DEPARTMENT_ATTENDANCE'})")
+    @PreAuthorize("@CustomAnnotationEvaluator.hasAnyPermission(authentication, {'ADMIN_ALL', 'EDIT_CHILD_ATTENDANCE', 'EDIT_ALL_ATTENDANCE', 'EDIT_DEPARTMENT_ATTENDANCE'})")
     @PostMapping("/{id}")
     public ResponseEntity<?> submit(@PathVariable Long id, @RequestBody AttendanceRequest req, Principal principal) {
         logger.info("Controller received request - ID: {}, Principal: {}", id, principal.getName());
@@ -133,7 +133,7 @@ public class AttendanceController {
                 return ResponseEntity.status(403).body(Map.of("error", "You cannot approve your own attendance from the team view"));
             }
 
-            if (!permissionEvaluator.canApproveAttendance(authentication, userId)) {
+            if (permissionEvaluator.canApproveAttendance(authentication, userId)) {
                 return ResponseEntity.status(403).body(Map.of("error", "Insufficient permissions to approve this user's attendance"));
             }
 
@@ -162,11 +162,11 @@ public class AttendanceController {
                 return ResponseEntity.status(403).body(Map.of("error", "You cannot approve your own excuse from the team view"));
             }
 
-            if (!permissionEvaluator.canApproveAttendance(authentication, excuse.getUserId())) {
+            if (permissionEvaluator.canApproveAttendance(authentication, excuse.getUserId())) {
                 return ResponseEntity.status(403).body(Map.of("error", "Insufficient permissions to approve this user's excuse"));
             }
 
-            service.approveExcuse(id, currentUserId.toString());
+            service.approveExcuse(id);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             logger.error("Error in approveExcuse", e);
@@ -224,8 +224,8 @@ public class AttendanceController {
     @GetMapping("/excuse/{id}")
     public ResponseEntity<List<ExcuseDto>> getExcuse(Principal principal, @PathVariable Long id) {
         try {
-            Long userId = getUserIdFromPrincipal(principal);
-            List<Excuse> excuses = service.getExcuse(userId, id);
+            getUserIdFromPrincipal(principal);
+            List<Excuse> excuses = service.getExcuse(id);
             List<ExcuseDto> excuseDtos = excuses.stream()
                     .map(e -> new ExcuseDto(e.getId(), e.getUserId(), e.getExcuseDate().toString(), e.getExcuseType(), e.getDescription(), e.getIsApproved()))
                     .collect(Collectors.toList());
@@ -246,17 +246,17 @@ public class AttendanceController {
                 return ResponseEntity.notFound().build();
             }
 
-            boolean canViewAll = permissionEvaluator.hasAnyPermission(authentication, null, new String[]{"ADMIN_ALL", "VIEW_ALL_ATTENDANCE"});
-            boolean canViewChild = permissionEvaluator.hasAnyPermission(authentication, null, new String[]{"ADMIN_ALL", "VIEW_CHILD_ATTENDANCE"});
-            boolean canViewDepartment = permissionEvaluator.hasAnyPermission(authentication, null, new String[]{"ADMIN_ALL", "VIEW_DEPARTMENT_ATTENDANCE"});
+            boolean canViewAll = permissionEvaluator.hasAnyPermission(authentication, new String[]{"ADMIN_ALL", "VIEW_ALL_ATTENDANCE"});
+            boolean canViewChild = permissionEvaluator.hasAnyPermission(authentication, new String[]{"ADMIN_ALL", "VIEW_CHILD_ATTENDANCE"});
+            boolean canViewDepartment = permissionEvaluator.hasAnyPermission(authentication, new String[]{"ADMIN_ALL", "VIEW_DEPARTMENT_ATTENDANCE"});
 
-            boolean canViewAllUsers = permissionEvaluator.hasAnyPermission(authentication, null, new String[]{"ADMIN_ALL", "VIEW_ALL_USERS"});
-            boolean canViewAllDepartments = permissionEvaluator.hasAnyPermission(authentication, null, new String[]{"ADMIN_ALL", "VIEW_ALL_DEPARTMENTS"});
-            boolean canViewRoles = permissionEvaluator.hasAnyPermission(authentication, null, new String[]{"ADMIN_ALL", "VIEW_ROLES"});
-            boolean canViewHolidays = permissionEvaluator.hasAnyPermission(authentication, null, new String[]{"ADMIN_ALL", "VIEW_HOLIDAYS"});
-            boolean canViewDepartmentHierarchy = permissionEvaluator.hasAnyPermission(authentication, null, new String[]{"ADMIN_ALL", "VIEW_DEPARTMENT_HIERARCHY"});
-            boolean canViewSurveys = permissionEvaluator.hasAnyPermission(authentication, null, new String[]{"ADMIN_ALL", "VIEW_SURVEYS"});
-            boolean canManageSurveys = permissionEvaluator.hasAnyPermission(authentication, null, new String[]{"ADMIN_ALL", "MANAGE_SURVEYS"});
+            boolean canViewAllUsers = permissionEvaluator.hasAnyPermission(authentication, new String[]{"ADMIN_ALL", "VIEW_ALL_USERS"});
+            boolean canViewAllDepartments = permissionEvaluator.hasAnyPermission(authentication, new String[]{"ADMIN_ALL", "VIEW_ALL_DEPARTMENTS"});
+            boolean canViewRoles = permissionEvaluator.hasAnyPermission(authentication, new String[]{"ADMIN_ALL", "VIEW_ROLES"});
+            boolean canViewHolidays = permissionEvaluator.hasAnyPermission(authentication, new String[]{"ADMIN_ALL", "VIEW_HOLIDAYS"});
+            boolean canViewDepartmentHierarchy = permissionEvaluator.hasAnyPermission(authentication, new String[]{"ADMIN_ALL", "VIEW_DEPARTMENT_HIERARCHY"});
+            boolean canViewSurveys = permissionEvaluator.hasAnyPermission(authentication, new String[]{"ADMIN_ALL", "VIEW_SURVEYS"});
+            boolean canManageSurveys = permissionEvaluator.hasAnyPermission(authentication, new String[]{"ADMIN_ALL", "MANAGE_SURVEYS"});
 
             Map<String, Object> permissions = new HashMap<>();
             permissions.put("canViewAll", canViewAll);
@@ -289,9 +289,9 @@ public class AttendanceController {
                 return ResponseEntity.notFound().build();
             }
 
-            boolean canEditAll = permissionEvaluator.hasAnyPermission(authentication, null, new String[]{"ADMIN_ALL", "EDIT_ALL_ATTENDANCE"});
-            boolean canEditChild = permissionEvaluator.hasAnyPermission(authentication, null, new String[]{"ADMIN_ALL", "EDIT_CHILD_ATTENDANCE"});
-            boolean canEditDepartment = permissionEvaluator.hasAnyPermission(authentication, null, new String[]{"ADMIN_ALL", "EDIT_DEPARTMENT_ATTENDANCE"});
+            boolean canEditAll = permissionEvaluator.hasAnyPermission(authentication, new String[]{"ADMIN_ALL", "EDIT_ALL_ATTENDANCE"});
+            boolean canEditChild = permissionEvaluator.hasAnyPermission(authentication, new String[]{"ADMIN_ALL", "EDIT_CHILD_ATTENDANCE"});
+            boolean canEditDepartment = permissionEvaluator.hasAnyPermission(authentication, new String[]{"ADMIN_ALL", "EDIT_DEPARTMENT_ATTENDANCE"});
 
             Map<String, Boolean> editPermissions = Map.of(
                     "canEditAll", canEditAll,

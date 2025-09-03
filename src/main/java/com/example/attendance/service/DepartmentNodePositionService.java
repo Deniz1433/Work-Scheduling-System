@@ -26,8 +26,6 @@ public class DepartmentNodePositionService {
     public void saveAll(List<DepartmentNodePosition> positions) {
         // clear then insert
         repo.deleteAllInBatch();
-        for (var pos : positions) {
-            repo.save(pos);
-        }
+        repo.saveAll(positions);
     }
 }

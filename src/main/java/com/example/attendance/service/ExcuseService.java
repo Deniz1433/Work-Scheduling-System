@@ -40,26 +40,21 @@ public class ExcuseService {
     }
 
     @Transactional
-    public void deleteExcuse(Long userId, Long excuseId) {
+    public void deleteExcuse(Long excuseId) {
         Excuse e = repo.findById(excuseId).orElseThrow();
-        if(e != null){
-            repo.delete(e);
-        }
+        repo.delete(e);
     }
 
     @Transactional
     public void updateExcuse(Long userId, Long id ,ExcuseUpdateRequest req) {
         Excuse e = repo.findById(id).orElseThrow();
-        if(e != null){
-            if (!e.getUserId().equals(userId)) {
-                throw new AccessDeniedException("Not your excuse");
-            }
-            else{
-                e.setExcuseType(req.getExcuseType());
-                e.setDescription(req.getDescription());
-                e.setIsApproved(false);
-                repo.save(e);
-            }
+        if (!e.getUserId().equals(userId)) {
+            throw new AccessDeniedException("Not your excuse");
+        } else {
+            e.setExcuseType(req.getExcuseType());
+            e.setDescription(req.getDescription());
+            e.setIsApproved(false);
+            repo.save(e);
         }
     }
 }

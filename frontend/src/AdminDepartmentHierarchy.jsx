@@ -8,14 +8,14 @@ const snapPos = (p) => ({ x: snap(p.x), y: snap(p.y) });
 const AdminDepartmentHierarchy = () => {
     const cyRef = useRef(null);
     const containerRef = useRef(null);
-    const [isDirty, setIsDirty] = useState(false);
+    const [, setIsDirty] = useState(false);
     const [mode, setMode] = useState('move');
     const [departments, setDepartments] = useState([]);
     const [loadedData, setLoadedData] = useState({
         childrenMap: {},
         positionsMap: {}
     });
-    const [debugData, setDebugData] = useState({ loaded: {}, toSave: {} });
+    const [, setDebugData] = useState({ loaded: {}, toSave: {} });
 
     // Helper to get CSRF token from cookie
     const getCsrfTokenFromCookie = () => {
@@ -280,7 +280,7 @@ const AdminDepartmentHierarchy = () => {
             });
         const positions = cyRef.current
             .nodes()
-            .map(n => ({ department: n.id(), x: n.position('x'), y: n.position('y') }));;
+            .map(n => ({ department: n.id(), x: n.position('x'), y: n.position('y') }));
         const body = { relations, positions };
         setDebugData(prev => ({ ...prev, toSave: body }));
 
@@ -308,12 +308,6 @@ const AdminDepartmentHierarchy = () => {
                 alert('Save error—see console');
             });
     };
-
-    const goBack = () => {
-        if (isDirty && !window.confirm('You have unsaved changes. Leave anyway?')) return;
-        window.location.href = '/';
-    };
-
     return (
         <div className="flex h-full w-full m-0 font-sans">
             {/* Sidebar */}

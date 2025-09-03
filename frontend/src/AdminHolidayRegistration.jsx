@@ -4,7 +4,7 @@ import 'react-calendar/dist/Calendar.css';
 
 const HolidayRegistration = () => {
     const [holidays, setHolidays] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [holidayName, setHolidayName] = useState('');
     const [holidayStart, setHolidayStart] = useState('');
@@ -100,12 +100,7 @@ const HolidayRegistration = () => {
     });
 
     // Tüm tatil aralıklarını yyyy-mm-dd string olarak çıkar (UTC ile tam gün)
-    const toUTCDate = (str) => {
-        const [year, month, day] = str.split('-');
-        return new Date(Date.UTC(year, month - 1, day));
-    };
-    
-    // Tatil aralığını sadece yyyy-mm-dd string olarak karşılaştır
+// Tatil aralığını sadece yyyy-mm-dd string olarak karşılaştır
     const getDateStringsInRange = (start, end) => {
         const result = [];
         let current = start;

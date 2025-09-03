@@ -80,7 +80,7 @@ public class SurveyController {
 
     // Optional: Unique constraint violation -> 409 Conflict
     @ExceptionHandler(DataIntegrityViolationException.class)
-    public ResponseEntity<Void> handleIntegrityViolation(DataIntegrityViolationException ex) {
+    public ResponseEntity<Void> handleIntegrityViolation() {
         return ResponseEntity.status(409).build();
     }
 }

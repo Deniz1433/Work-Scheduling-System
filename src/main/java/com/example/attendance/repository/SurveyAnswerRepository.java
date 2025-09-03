@@ -9,11 +9,6 @@ import java.util.List;
 
 public interface SurveyAnswerRepository extends JpaRepository<SurveyAnswer, Long> {
 
-    boolean existsBySurveyIdAndUserId(Long surveyId, String userId);
-
-    // Bu survey için bu kullanıcının tüm cevapları (myAnswers'ı doldurmak için)
-    List<SurveyAnswer> findAllBySurveyIdAndUserId(Long surveyId, String userId);
-
     // Kullanıcının cevapladığı surveyId'leri tek seferde çek (N+1 önler)
     @Query("select distinct a.survey.id from SurveyAnswer a where a.userId = :userId")
     List<Long> findAnsweredSurveyIds(@Param("userId") String userId);
@@ -39,15 +34,4 @@ public interface SurveyAnswerRepository extends JpaRepository<SurveyAnswer, Long
     group by sa.questionId, sa.answer
 """)
     List<ChoiceAgg> countByQuestionAndAnswer(Long surveyId);
-    @Query("""
-  select a.userEmail
-  from SurveyAnswer a
-  where a.survey.id = :surveyId
-    and a.questionId = :questionId
-    and a.answer = :answer
-    and a.userEmail is not null
-""")
-    List<String> findEmailsBySurveyQuestionAndAnswer(@Param("surveyId") Long surveyId,
-                                                     @Param("questionId") Long questionId,
-                                                     @Param("answer") String answer);
 }

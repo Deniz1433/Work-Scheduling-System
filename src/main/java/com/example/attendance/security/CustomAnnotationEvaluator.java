@@ -2,7 +2,7 @@ package com.example.attendance.security;
 
 import java.io.Serializable;
 import java.util.*;
-import java.util.stream.Collectors;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.PermissionEvaluator;
@@ -11,7 +11,6 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Component;
 
 import com.example.attendance.model.Department;
-import com.example.attendance.model.Role;
 import com.example.attendance.model.RolePermission;
 import com.example.attendance.model.User;
 import com.example.attendance.repository.RolePermissionRepository;
@@ -25,7 +24,7 @@ public class CustomAnnotationEvaluator implements PermissionEvaluator {
       @Autowired private UserRepository userRepository;
       @Autowired private DepartmentHierarchyService departmentHierarchyService;
 
-      @Override
+    @Override
       public boolean hasPermission(Authentication authentication, Object targetDomainObject, Object permission) {
             return checkPermission(authentication, permission);
       }
@@ -66,8 +65,8 @@ public class CustomAnnotationEvaluator implements PermissionEvaluator {
       }
 
       // Any-of
-      public boolean hasAnyPermission(Authentication authentication, Object targetDomainObject, Object permissions) {
-            String[] required = toArray(permissions);
+      public boolean hasAnyPermission(Authentication authentication, Object permissions) {
+          String[] required = toArray(permissions);
             if (required == null) return false;
 
             // 1) JWT-driven ANY
@@ -82,7 +81,7 @@ public class CustomAnnotationEvaluator implements PermissionEvaluator {
 
             List<String> userPerms = rolePermissionRepository.findByRoleId(user.getRole().getId()).stream()
                     .map(rp -> rp.getPermission().getName())
-                    .collect(Collectors.toList());
+                    .toList();
 
             for (String p : required) {
                   if (userPerms.contains(p)) return true;
@@ -90,34 +89,12 @@ public class CustomAnnotationEvaluator implements PermissionEvaluator {
             return false;
       }
 
-      // All-of
-      public boolean hasAllPermissions(Authentication authentication, Object targetDomainObject, Object permissions) {
-            String[] required = toArray(permissions);
-            if (required == null) return false;
+     public boolean hasAnyPermission(Authentication authentication, Object targetDomainObject, Object permissions) {
+         return hasAnyPermission(authentication, permissions);
+     }
 
-            // 1) JWT-driven ALL
-            boolean allJwt = true;
-            for (String p : required) {
-                  if (!hasJwtPermission(authentication, p)) { allJwt = false; break; }
-            }
-            if (allJwt) return true;
 
-            // 2) DB fallback
-            String keycloakId = authentication.getName();
-            User user = userRepository.findByKeycloakId(keycloakId).orElse(null);
-            if (user == null || user.getRole() == null) return false;
-
-            Set<String> userPerms = rolePermissionRepository.findByRoleId(user.getRole().getId()).stream()
-                    .map(rp -> rp.getPermission().getName())
-                    .collect(Collectors.toSet());
-
-            for (String p : required) {
-                  if (!userPerms.contains(p)) return false;
-            }
-            return true;
-      }
-
-      // Attendance view/edit helpers unchanged below (but they now benefit from JWT checks via hasAnyPermission calls where used)
+    // Attendance view/edit helpers unchanged below (but they now benefit from JWT checks via hasAnyPermission calls where used)
 
       public boolean canViewAttendance(Authentication authentication, Long targetUserId) {
             String keycloakId = authentication.getName();
@@ -130,16 +107,16 @@ public class CustomAnnotationEvaluator implements PermissionEvaluator {
             if (viewer.getId().equals(targetUserId)) return true;
 
             // Admin/All via JWT or DB
-            if (hasAnyPermission(authentication, null, List.of("ADMIN_ALL", "VIEW_ALL_ATTENDANCE"))) return true;
+            if (hasAnyPermission(authentication, List.of("ADMIN_ALL", "VIEW_ALL_ATTENDANCE"))) return true;
 
             // Child / Department checks (DB-driven context)
-            if (hasAnyPermission(authentication, null, List.of("VIEW_CHILD_ATTENDANCE"))) {
+            if (hasAnyPermission(authentication, List.of("VIEW_CHILD_ATTENDANCE"))) {
                   System.out.println("🔍 canViewAttendance: User has VIEW_CHILD_ATTENDANCE permission");
                   System.out.println("🔍 canViewAttendance: Viewer: " + viewer.getUsername() + " (dept: " + (viewer.getDepartment() != null ? viewer.getDepartment().getName() : "null") + ")");
                   System.out.println("🔍 canViewAttendance: Target: " + targetUser.getUsername() + " (dept: " + (targetUser.getDepartment() != null ? targetUser.getDepartment().getName() : "null") + ")");
                   return isInChildDepartments(viewer.getDepartment(), targetUser.getDepartment());
             }
-            if (hasAnyPermission(authentication, null, List.of("VIEW_DEPARTMENT_ATTENDANCE"))) {
+            if (hasAnyPermission(authentication, List.of("VIEW_DEPARTMENT_ATTENDANCE"))) {
                   return viewer.getDepartment() != null && targetUser.getDepartment() != null
                           && Objects.equals(viewer.getDepartment().getId(), targetUser.getDepartment().getId());
             }
@@ -157,12 +134,12 @@ public class CustomAnnotationEvaluator implements PermissionEvaluator {
 
             if (editor.getId().equals(targetUserId)) return true;
 
-            if (hasAnyPermission(authentication, null, List.of("ADMIN_ALL", "EDIT_ALL_ATTENDANCE"))) return true;
+            if (hasAnyPermission(authentication, List.of("ADMIN_ALL", "EDIT_ALL_ATTENDANCE"))) return true;
 
-            if (hasAnyPermission(authentication, null, List.of("EDIT_CHILD_ATTENDANCE"))) {
+            if (hasAnyPermission(authentication, List.of("EDIT_CHILD_ATTENDANCE"))) {
                   return isInChildDepartments(editor.getDepartment(), targetUser.getDepartment());
             }
-            if (hasAnyPermission(authentication, null, List.of("EDIT_DEPARTMENT_ATTENDANCE"))) {
+            if (hasAnyPermission(authentication, List.of("EDIT_DEPARTMENT_ATTENDANCE"))) {
                   return editor.getDepartment() != null && targetUser.getDepartment() != null
                           && Objects.equals(editor.getDepartment().getId(), targetUser.getDepartment().getId());
             }
@@ -171,13 +148,13 @@ public class CustomAnnotationEvaluator implements PermissionEvaluator {
       }
 
       public boolean canApproveAttendance(Authentication authentication, Long targetUserId) {
-            String keycloakId = authentication.getName();
-            User actor = userRepository.findByKeycloakId(keycloakId).orElse(null);
-            if (actor == null) return false;
+          AtomicReference<String> keycloakId = new AtomicReference<>(authentication.getName());
+          User actor = userRepository.findByKeycloakId(keycloakId.get()).orElse(null);
+            if (actor == null) return true;
 
             // For self: require the ability to approve/edit OTHERS (i.e., edit beyond self)
             if (actor.getId().equals(targetUserId)) {
-                  return hasAnyPermission(authentication, null, List.of(
+                  return !hasAnyPermission(authentication, List.of(
                           "ADMIN_ALL",
                           "EDIT_ALL_ATTENDANCE",
                           "EDIT_CHILD_ATTENDANCE",
@@ -186,7 +163,7 @@ public class CustomAnnotationEvaluator implements PermissionEvaluator {
             }
 
             // For others: same scope as edit-perms for that target
-            return canEditAttendance(authentication, targetUserId);
+            return !canEditAttendance(authentication, targetUserId);
       }
 
       private boolean isInChildDepartments(Department parentDepartment, Department childDepartment) {

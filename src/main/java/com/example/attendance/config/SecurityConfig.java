@@ -29,7 +29,7 @@ import java.util.stream.Collectors;
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity(prePostEnabled = true)
+@EnableMethodSecurity()
 public class SecurityConfig {
 
     private final CustomAnnotationEvaluator customAnnotationEvaluator;

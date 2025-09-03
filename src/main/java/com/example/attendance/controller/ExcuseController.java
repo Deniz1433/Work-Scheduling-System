@@ -14,7 +14,6 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.oauth2.core.user.OAuth2User;
@@ -89,7 +88,7 @@ public class ExcuseController {
             }
             
             // Kendi excuse'ını sil
-            service.deleteExcuse(currentUserId, id);
+            service.deleteExcuse(id);
             return ResponseEntity.noContent().build();
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body(Map.of("error", "Error deleting excuse: " + e.getMessage()));
@@ -115,7 +114,7 @@ public class ExcuseController {
             }
             
             // Yetki varsa silme işlemini gerçekleştir
-            service.deleteExcuse(excuse.getUserId(), id);
+            service.deleteExcuse(id);
             return ResponseEntity.noContent().build();
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body(Map.of("error", "Error deleting excuse: " + e.getMessage()));

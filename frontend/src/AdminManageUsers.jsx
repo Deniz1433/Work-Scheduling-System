@@ -5,13 +5,11 @@ import DataGrid, {
     Paging,
     FilterRow,
     HeaderFilter,
-    Toolbar,
-    Item as ToolbarItem,
+
 } from 'devextreme-react/data-grid';
-import SelectBox from 'devextreme-react/select-box';
 import Button from 'devextreme-react/button';
 import Popup from 'devextreme-react/popup';
-import Form, { SimpleItem, GroupItem } from 'devextreme-react/form';
+import Form, { SimpleItem } from 'devextreme-react/form';
 import Swal from 'sweetalert2';
 
 const attendanceMap = {
@@ -37,7 +35,7 @@ const AdminManageUsers = () => {
     const [departments, setDepartments] = useState([]);
     const [popupVisible, setPopupVisible] = useState(false);
     const [selectedUser, setSelectedUser] = useState(null);
-    const [attendanceRecords, setAttendanceRecords] = useState([]);
+    const [, setAttendanceRecords] = useState([]);
     const [editingAttendanceData, setEditingAttendanceData] = useState([]);
     const [newUser, setNewUser] = useState({
         firstName: '',
@@ -130,7 +128,7 @@ const AdminManageUsers = () => {
         } catch (error) {
             console.error("Update Error:", error);
             Swal.fire('Hata', 'Kullanıcı güncellenemedi', 'error');
-            throw error;
+
         }
     };
 
@@ -166,13 +164,15 @@ const AdminManageUsers = () => {
             const resultText = await res.text();
 
             if (!res.ok) {
+                let msg = resultText;
                 try {
                     const parsed = JSON.parse(resultText);
-                    throw new Error(parsed.error || "Kullanıcı oluşturulamadı.");
-                } catch (e) {
-                    throw new Error(resultText);
-                }
+                    msg = parsed.error || "Kullanıcı oluşturulamadı.";
+                } catch (_) {}
+                Swal.fire('Hata', msg, 'error');
+                return;
             }
+
 
             const createdUser = JSON.parse(resultText);
 
@@ -201,11 +201,13 @@ const AdminManageUsers = () => {
 
                     if (!selfRes.ok) {
                         const err = await selfRes.text();
-                        throw new Error("Attendance eklenemedi (kendi adına): " + err);
+                        Swal.fire('Hata', "Attendance eklenemedi (kendi adına): " + err, 'error');
+                        return;
                     }
                 } else {
                     const err = await attendanceRes.text();
-                    throw new Error("Attendance eklenemedi (admin olarak): " + err);
+                    Swal.fire('Hata', "Attendance eklenemedi (admin olarak): " + err, 'error');
+                    return;
                 }
             }
 
@@ -246,8 +248,9 @@ const AdminManageUsers = () => {
                 Swal.fire('Başarılı', 'Attendance kayıtları güncellendi', 'success');
                 setPopupVisible(false);
             } else {
-                throw new Error('Güncelleme başarısız');
+                Swal.fire('Hata', 'Güncelleme başarısız', 'error');
             }
+
         } catch (error) {
             console.error('Attendance güncelleme hatası:', error);
             Swal.fire('Hata', 'Attendance kayıtları güncellenirken hata oluştu', 'error');

@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, {useEffect, useState} from 'react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import Select from 'react-select';
 import Swal from 'sweetalert2';
+
 const EmployeeTeamAttendance = ({ user }) => {
 
   const [teamState, setTeamState] = useState([]);
@@ -10,7 +11,7 @@ const EmployeeTeamAttendance = ({ user }) => {
   const [error, setError] = useState(null);
 
   // Filtreleme state'leri
-  const [departments, setDepartments] = useState([]);
+  const [, setDepartments] = useState([]);
   const [roles, setRoles] = useState([]);
   const [selectedDepartments, setSelectedDepartments] = useState([]);
   const [selectedRoles, setSelectedRoles] = useState([]);
@@ -31,9 +32,8 @@ const EmployeeTeamAttendance = ({ user }) => {
   const [userPermissions, setUserPermissions] = useState(null);
   const [editPermissions, setEditPermissions] = useState(null);
   const [memberEditPermissions, setMemberEditPermissions] = useState({});
-  const [memberApprovePermissions, setMemberApprovePermissions] = useState({});
   const [filteredDepartments, setFilteredDepartments] = useState([]);
-  const [filteredRoles, setFilteredRoles] = useState([]);
+  const [, setFilteredRoles] = useState([]);
 
   // Kullanıcı yetkilerini yükle
   const fetchUserPermissions = async () => {
@@ -251,7 +251,7 @@ const EmployeeTeamAttendance = ({ user }) => {
     try {
       // Excel için veri hazırlama
       const excelData = teamState.map((member, index) => {
-        const row = {
+        return {
           'Sıra': index + 1,
           'Ad': member.name,
           'Soyad': member.surname,
@@ -263,7 +263,6 @@ const EmployeeTeamAttendance = ({ user }) => {
           'Cuma': getAttendanceLabel(member.attendance[4]),
           'Onay Durumu': (member.approved || member.isApproved) ? 'Onaylandı' : 'Onaylanmadı'
         };
-        return row;
       });
 
              // Hafta bilgisi
@@ -545,7 +544,7 @@ const EmployeeTeamAttendance = ({ user }) => {
           icon: 'error'
         });
       }
-      return;
+
     }
   };
 

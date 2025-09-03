@@ -25,7 +25,7 @@ public class KeycloakStartupUserSync implements ApplicationRunner {
                 adminService.syncUsersFromKeycloak();
                 return;
             }
-            sleep(2000);
+            sleep();
         }
     }
 
@@ -39,7 +39,7 @@ public class KeycloakStartupUserSync implements ApplicationRunner {
         }
     }
 
-    private void sleep(long ms) {
-        try { Thread.sleep(ms); } catch (InterruptedException ignored) {}
+    private void sleep() {
+        try { Thread.sleep(2000); } catch (InterruptedException ignored) {}
     }
 }

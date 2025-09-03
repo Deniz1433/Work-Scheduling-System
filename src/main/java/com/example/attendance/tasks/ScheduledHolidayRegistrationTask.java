@@ -139,7 +139,7 @@ public class ScheduledHolidayRegistrationTask {
             
             if (isHoliday) {
                 // Tatil günü ise attendance'ı 5 (Resmi Tatil) olarak işaretle
-                updateAttendanceDay(attendance, dayIndex, 5);
+                updateAttendanceDay(attendance, dayIndex);
                 System.out.println("🎉 Marked " + currentDate + " as holiday for user " + userId);
             }
         }
@@ -148,22 +148,22 @@ public class ScheduledHolidayRegistrationTask {
         attendanceService.saveAttendance(attendance);
     }
     
-    private void updateAttendanceDay(Attendance attendance, int dayIndex, int status) {
+    private void updateAttendanceDay(Attendance attendance, int dayIndex) {
         switch (dayIndex) {
             case 0: // Pazartesi
-                attendance.setMonday(status);
+                attendance.setMonday(5);
                 break;
             case 1: // Salı
-                attendance.setTuesday(status);
+                attendance.setTuesday(5);
                 break;
             case 2: // Çarşamba
-                attendance.setWednesday(status);
+                attendance.setWednesday(5);
                 break;
             case 3: // Perşembe
-                attendance.setThursday(status);
+                attendance.setThursday(5);
                 break;
             case 4: // Cuma
-                attendance.setFriday(status);
+                attendance.setFriday(5);
                 break;
         }
     }

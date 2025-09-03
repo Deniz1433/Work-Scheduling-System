@@ -25,19 +25,6 @@ public class DepartmentHierarchyService {
         return repo.findAll();
     }
 
-    @Transactional
-    public void addRelation(Department parent, Department child) {
-        if (parent.equals(child)) {
-            throw new IllegalArgumentException("Cannot link department to itself");
-        }
-        repo.save(new DepartmentHierarchy(parent, child));
-    }
-
-    @Transactional
-    public void removeRelation(Department parent, Department child) {
-        repo.deleteByParentDepartmentAndChildDepartment(parent, child);
-    }
-
     /**
      * Replace *all* relations with the provided list.
      * First clears the table in batch, then inserts the new ones.
@@ -79,22 +66,5 @@ public class DepartmentHierarchyService {
         return found;
     }
 
-    /** All ancestors (reverse graph) */
-    public Set<Department> findAllAncestors(Department dep) {
-        Set<Department> found = new LinkedHashSet<>();
-        LinkedList<Department> stack = new LinkedList<>();
-        stack.push(dep);
-        while (!stack.isEmpty()) {
-            Department cur = stack.pop();
-            repo.findByChildDepartment(cur)
-                    .stream()
-                    .map(DepartmentHierarchy::getParentDepartment)
-                    .forEach(parent -> {
-                        if (found.add(parent)) stack.push(parent);
-                    });
-        }
-        return found;
-    }
 
-    
 }
