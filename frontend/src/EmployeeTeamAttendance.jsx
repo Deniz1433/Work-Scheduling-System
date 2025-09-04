@@ -513,10 +513,10 @@ const EmployeeTeamAttendance = ({ user }) => {
         });
         return;
       }
-      
+
       const response = await axios.post(`/api/attendance/${memberId}/${weekStart}/approve`);
       console.log(response);
-      
+
 
       if (employeeExcuses.length > 0) {
         for (const excuse of employeeExcuses) {
@@ -567,7 +567,7 @@ const EmployeeTeamAttendance = ({ user }) => {
     try {
       setEditingMember(member);
       setTempAttendance([...member.attendance]);
-      const excuseInfo = await fetch(`/api/attendance/excuse/${memberId}`);
+      const excuseInfo = await fetch(`/api/excuse/user/${memberId}`);
       const excuseData = await excuseInfo.json();
       setEmployeeExcuses(excuseData);
       console.log(excuseData);
@@ -943,11 +943,15 @@ const EmployeeTeamAttendance = ({ user }) => {
                 </label>
                 <div className="bg-gray-50 border rounded-lg p-3">
                   {employeeExcuses.length > 0 && employeeExcuses.map((excuse) => (
-                    <div key={excuse.id}>
-                      <p className="text-gray-800 text-sm">{excuse.excuseDate}</p>
-                      <p className="text-gray-800 text-sm">{excuse.description}</p>
-                    </div>
+                      <div key={excuse.id} className="border-b last:border-b-0 py-2">
+                        <p className="text-gray-800 text-sm">{excuse.excuseDate}</p>
+                        <p className="text-gray-800 text-sm">{excuse.description}</p>
+                        <span className="inline-block text-xs mt-1 px-2 py-0.5 rounded bg-gray-200">
+                          {excuse.excuseType === 0 ? "Yıllık İzin" : "Mazeretli İzin"}
+                        </span>
+                      </div>
                   ))}
+
                   {employeeExcuses.length === 0 && (
                     <p className="text-gray-500 text-sm italic">Mazeret Yok</p>
                   )}

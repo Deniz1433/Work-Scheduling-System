@@ -1,5 +1,6 @@
 package com.example.attendance.controller;
 
+import com.example.attendance.dto.ExcuseDto;
 import com.example.attendance.dto.ExcusesRequest;
 import com.example.attendance.dto.ExcuseUpdateRequest;
 import com.example.attendance.model.Excuse;
@@ -130,5 +131,21 @@ public class ExcuseController {
         Long userId = getUserIdFromAuthentication(authentication);
         service.updateExcuse(userId, id, req);
         return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<List<ExcuseDto>> listByUserId(@PathVariable Long userId) {
+        List<Excuse> excuses = service.listUserExcuses(userId); // returns ALL types
+        List<ExcuseDto> dtos = excuses.stream()
+                .map(e -> new ExcuseDto(
+                        e.getId(),
+                        e.getUserId(),
+                        e.getExcuseDate().toString(),
+                        e.getExcuseType(),
+                        e.getDescription(),
+                        e.getIsApproved()
+                ))
+                .collect(java.util.stream.Collectors.toList());
+        return ResponseEntity.ok(dtos);
     }
 }
