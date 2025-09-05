@@ -19,9 +19,6 @@ const toLocalLdt = (v) => {
 };
 /* -------------- Yardımcı Fonksiyonlar -------------- */
 const emptyQuestion = () => ({ questionText: "", type: "text", options: [], multiple: false });
-
-const toIso = (v) => (v ? `${v}:00` : null);
-
 // Küçük rozet
 const Badge = ({ children, color = "slate" }) => {
   const map = {
@@ -658,9 +655,9 @@ export default function SurveyAdmin() {
 
         {/* RESULTS MODAL */}
         {resultsOpen && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-              <div className="w-full max-w-3xl bg-white rounded-2xl shadow-xl p-6 relative">
-                <button
+            <div className="fixed inset-0 z-50 bg-black/40 p-4 overflow-y-auto">
+              <div className="mx-auto my-8 w-full max-w-3xl bg-white rounded-2xl shadow-xl p-6 relative max-h-[85vh] overflow-y-auto">
+              <button
                     onClick={() => { setResultsOpen(false); setResultsData(null); setSelectedSurvey(null); }}
                     className="absolute top-3 right-3 text-slate-500 hover:text-slate-800"
                     aria-label="Kapat"
@@ -764,9 +761,9 @@ export default function SurveyAdmin() {
 
         {/* VOTERS (Drill-down) MODAL */}
         {voterOpen && (
-            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
-              <div className="w-full max-w-lg bg-white rounded-2xl shadow-xl p-6 relative">
-                <button
+            <div className="fixed inset-0 z-[60] bg-black/40 p-4 overflow-y-auto">
+              <div className="mx-auto my-8 w-full max-w-lg bg-white rounded-2xl shadow-xl p-6 relative max-h-[85vh] overflow-y-auto">
+              <button
                     onClick={() => { setVoterOpen(false); setVoterList([]); setVoterError(null); }}
                     className="absolute top-3 right-3 text-slate-500 hover:text-slate-800"
                     aria-label="Kapat"
