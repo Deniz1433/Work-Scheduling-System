@@ -606,49 +606,103 @@ const EmployeeTeamAttendance = ({ user }) => {
 
   // Modal'daki değişiklikleri kaydetme
   const handleSaveChanges = async () => {
-    if (isEditLoading) return; // Eğer zaten loading durumundaysa, işlemi engelle
-    
+    if (isEditLoading) return;
+
     setIsEditLoading(true);
     try {
-      console.log('Sending request with data:', {
+      const localYMD = (d) => {
+        const dt = new Date(d);
+        const y = dt.getFullYear();
+        const m = String(dt.getMonth() + 1).padStart(2, '0');
+        const da = String(dt.getDate()).padStart(2, '0');
+        return `${y}-${m}-${da}`; // LOCAL date, no UTC conversion
+      };
+
+      const payload = {
         userId: editingMember.id.toString(),
-        weekStart: weekDays[0].toISOString().split('T')[0],
+        weekStart: localYMD(weekDays[0]),
         dates: tempAttendance,
         explanation: editReason
-      });
+      };
+      console.log('Sending request with data:', payload);
 
-      // Birleştirilmiş endpoint - attendance güncelleme ve e-posta gönderme
-      const response = await axios.post(`/api/attendance/${editingMember.id}`, {
-        userId: editingMember.id.toString(),
-        weekStart: weekDays[0].toISOString().split('T')[0],
-        dates: tempAttendance,
-        explanation: editReason
-      });
+      // 1) Attendance update + email
+      const response = await axios.post(`/api/attendance/${editingMember.id}`, payload);
 
-      // Excuse silme işlemi (eğer gerekirse)
-      if(employeeExcuses.length > 0){
-        for(let i = 0; i < 5; i++){
-          if((editingMember.attendance[i] === 3 || editingMember.attendance[i] === 4) && (tempAttendance[i] === 1 || tempAttendance[i] === 2)){
-            console.log('Deleting excuse:', employeeExcuses[i]);
-            const responseExcuseDelete = await axios.delete(`/api/excuse/${employeeExcuses[i].id}`);
-            console.log('Excuse delete response:', responseExcuseDelete);
+      // 2) Delete excuses ONLY for days that changed from excused(3/4) -> non-excused(1/2)
+      try {
+        if (Array.isArray(employeeExcuses) && employeeExcuses.length > 0) {
+          // Build direct map by the string date exactly as backend returns (YYYY-MM-DD)
+          const excusesByExactDate = new Map(
+              employeeExcuses.map(e => [e.excuseDate, e]) // assume 'YYYY-MM-DD'
+          );
+
+          const plusDays = (dateStr, delta) => {
+            const [y, m, d] = dateStr.split('-').map(Number);
+            const dt = new Date(y, m - 1, d);
+            dt.setDate(dt.getDate() + delta);
+            return localYMD(dt);
+          };
+
+          const deletions = [];
+          const daysToCheck = Math.min(
+              weekDays.length,
+              tempAttendance.length,
+              editingMember.attendance.length
+          );
+
+          for (let i = 0; i < daysToCheck; i++) {
+            const wasExcused = editingMember.attendance[i] === 3 || editingMember.attendance[i] === 4;
+            const nowNotExcused = tempAttendance[i] === 1 || tempAttendance[i] === 2;
+
+            if (!wasExcused || !nowNotExcused) continue;
+
+            const dayKey = localYMD(weekDays[i]);
+
+            // Try exact match first
+            let excuse = excusesByExactDate.get(dayKey);
+
+            // Fallbacks to handle any server/client TZ drift if needed
+            if (!excuse) excuse = excusesByExactDate.get(plusDays(dayKey, +1));
+            if (!excuse) excuse = excusesByExactDate.get(plusDays(dayKey, -1));
+
+            // Final fallback: linear search by tolerant matching
+            if (!excuse) {
+              excuse = employeeExcuses.find(e =>
+                  e.excuseDate === dayKey ||
+                  e.excuseDate === plusDays(dayKey, +1) ||
+                  e.excuseDate === plusDays(dayKey, -1)
+              );
+            }
+
+            if (excuse && excuse.id != null) {
+              console.log('Deleting excuse for', dayKey, 'id:', excuse.id, 'type:', excuse.excuseType);
+              deletions.push(axios.delete(`/api/excuse/${excuse.id}`));
+            } else {
+              console.warn('No matching excuse found for', dayKey, '— skipping delete.');
+            }
+          }
+
+          if (deletions.length > 0) {
+            await Promise.all(deletions);
           }
         }
+      } catch (delErr) {
+        console.error('Excuse delete step failed:', delErr);
+        // Optional: show a non-blocking toast; do not fail the whole save
       }
 
       console.log('API Response:', response);
-      console.log('Response data:', response.data);
-      console.log('Response status:', response.status);
 
-      // Başarılı düzenleme sonrası verileri yeniden çek
+      // 3) Refresh UI
       await fetchTeamData();
 
+      // 4) Reset modal state
       setIsEditModalOpen(false);
       setEditingMember(null);
       setTempAttendance([]);
       setEditReason('');
 
-      // Başarı mesajı
       Swal.fire({
         title: 'Başarılı',
         text: 'Değişiklikler kaydedildi ve e-posta gönderildi!',
@@ -668,6 +722,8 @@ const EmployeeTeamAttendance = ({ user }) => {
       setIsEditLoading(false);
     }
   };
+
+
 
   // Modal'ı iptal etme
   const handleCancelEdit = () => {
