@@ -121,30 +121,37 @@ public class AttendanceController {
     }
 
     @PostMapping("/{userId}/{weekStart}/approve")
-    public ResponseEntity<?> approve(@PathVariable Long userId, @PathVariable String weekStart, Principal principal) {
+    public ResponseEntity<?> approve(
+            @PathVariable Long userId,
+            @PathVariable String weekStart,
+            Principal principal) {
+
         logger.info("Attendance approval request by user: {}", principal.getName());
 
         try {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
-            // Prevent self-approval from team view
             Long currentUserId = getUserIdFromPrincipal(principal);
-            if (currentUserId.equals(userId)) {
-                return ResponseEntity.status(403).body(Map.of("error", "You cannot approve your own attendance from the team view"));
-            }
+            boolean isSelf = currentUserId.equals(userId);
 
-            if (permissionEvaluator.canApproveAttendance(authentication, userId)) {
+            // Require permission; allow self if they have it
+            if (!permissionEvaluator.canApproveAttendance(authentication, userId)
+                    && !permissionEvaluator.canEditAttendance(authentication, userId)) {
                 return ResponseEntity.status(403).body(Map.of("error", "Insufficient permissions to approve this user's attendance"));
             }
+
+            // (Optional) If you still want to disallow self for non-admins, the above check already handles it.
 
             service.approve(userId, LocalDate.parse(weekStart));
             logger.info("Attendance approved successfully!");
             return ResponseEntity.ok().build();
+
         } catch (Exception e) {
             logger.error("Error in approve", e);
-            return ResponseEntity.internalServerError().body("Error processing approval: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(Map.of("error", "Error processing approval: " + e.getMessage()));
         }
     }
+
 
     @PostMapping("/excuse/{id}/approve")
     public ResponseEntity<?> approveExcuse(@PathVariable Long id, Principal principal) {
@@ -156,23 +163,27 @@ public class AttendanceController {
 
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
-            // Prevent self-approval of excuses from team view
             Long currentUserId = getUserIdFromPrincipal(principal);
-            if (currentUserId.equals(excuse.getUserId())) {
-                return ResponseEntity.status(403).body(Map.of("error", "You cannot approve your own excuse from the team view"));
-            }
+            boolean isSelf = currentUserId.equals(excuse.getUserId());
 
-            if (permissionEvaluator.canApproveAttendance(authentication, excuse.getUserId())) {
+            // Allow approving own excuse if the user has approval/edit permission
+            boolean hasApprovalPermission =
+                    permissionEvaluator.canApproveAttendance(authentication, excuse.getUserId())
+                            || permissionEvaluator.canEditAttendance(authentication, excuse.getUserId());
+
+            if (!hasApprovalPermission) {
                 return ResponseEntity.status(403).body(Map.of("error", "Insufficient permissions to approve this user's excuse"));
             }
 
             service.approveExcuse(id);
             return ResponseEntity.ok().build();
+
         } catch (Exception e) {
             logger.error("Error in approveExcuse", e);
-            return ResponseEntity.internalServerError().body("Error processing excuse approval: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(Map.of("error", "Error processing excuse approval: " + e.getMessage()));
         }
     }
+
 
     // Public endpoint
     @GetMapping("/{weekStart}")
