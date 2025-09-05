@@ -131,9 +131,6 @@ public class AttendanceController {
         try {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
-            Long currentUserId = getUserIdFromPrincipal(principal);
-            boolean isSelf = currentUserId.equals(userId);
-
             // Require permission; allow self if they have it
             if (!permissionEvaluator.canApproveAttendance(authentication, userId)
                     && !permissionEvaluator.canEditAttendance(authentication, userId)) {
@@ -154,7 +151,7 @@ public class AttendanceController {
 
 
     @PostMapping("/excuse/{id}/approve")
-    public ResponseEntity<?> approveExcuse(@PathVariable Long id, Principal principal) {
+    public ResponseEntity<?> approveExcuse(@PathVariable Long id) {
         try {
             Excuse excuse = service.getExcuseById(id);
             if (excuse == null) {
@@ -162,9 +159,6 @@ public class AttendanceController {
             }
 
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-
-            Long currentUserId = getUserIdFromPrincipal(principal);
-            boolean isSelf = currentUserId.equals(excuse.getUserId());
 
             // Allow approving own excuse if the user has approval/edit permission
             boolean hasApprovalPermission =
