@@ -36,6 +36,7 @@ const sortSurveys = (arr) => {
     return bcr - acr;
   });
 };
+
 /* basit ikonlar */
 const ChevronDown = ({ className = "w-5 h-5" }) => (
     <svg className={className} viewBox="0 0 20 20" fill="currentColor">
@@ -48,6 +49,51 @@ const ChevronUp = ({ className = "w-5 h-5" }) => (
     </svg>
 );
 
+/* -------------------- Yeni: Durum Bileşenleri -------------------- */
+function LoadingState() {
+  return (
+      <div className="max-w-3xl mx-auto p-6 space-y-4">
+        {[0, 1, 2].map((i) => (
+            <div key={i} className="border rounded-xl bg-white p-4">
+              <div className="animate-pulse space-y-3">
+                <div className="h-5 w-1/3 bg-slate-200 rounded" />
+                <div className="h-4 w-2/3 bg-slate-200 rounded" />
+                <div className="h-24 w-full bg-slate-100 rounded" />
+                <div className="flex justify-end">
+                  <div className="h-9 w-28 bg-slate-200 rounded-lg" />
+                </div>
+              </div>
+            </div>
+        ))}
+      </div>
+  );
+}
+
+function EmptyState() {
+  return (
+      <div className="max-w-3xl mx-auto p-6">
+        <div className="border rounded-2xl bg-white p-10 text-center shadow-sm">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-slate-100">
+            {/* clipboard-check icon */}
+            <svg
+                viewBox="0 0 24 24"
+                className="h-7 w-7 text-slate-600"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+            >
+              <path d="M9 5h6a2 2 0 012 2v1h1.5a1.5 1.5 0 011.5 1.5V19a2 2 0 01-2 2H6a2 2 0 01-2-2V9.5A1.5 1.5 0 015.5 8H7V7a2 2 0 012-2z" />
+              <path d="M9 7h6" />
+              <path d="M9 14l2 2 4-4" />
+            </svg>
+          </div>
+          <h2 className="text-lg font-semibold">Şu anda görüntülenecek bir anket yok.</h2>
+        </div>
+      </div>
+  );
+}
+
+
 /* -------------------- Bileşen -------------------- */
 export default function SurveyTake() {
   const [surveys, setSurveys] = useState([]);
@@ -59,10 +105,6 @@ export default function SurveyTake() {
 
   // hangi kart(lar) açık?  true/false map
   const [expanded, setExpanded] = useState({}); // { [surveyId]: boolean }
-
-  const toggle = (id) =>
-      setExpanded((p) => ({ ...p, [id]: !p[id] }));
-
   const openOneOnly = (id) =>
       setExpanded((p) => {
         const next = {};
@@ -77,7 +119,7 @@ export default function SurveyTake() {
     setInfos({});
     try {
       const { data } = await api.get("/api/surveys");
-      const visible = (data || []).filter(s => !isHiddenByHideAfter(s.hideAfter));
+      const visible = (data || []).filter((s) => !isHiddenByHideAfter(s.hideAfter));
       setSurveys(sortSurveys(visible));
 
       const initAns = {};
@@ -150,8 +192,8 @@ export default function SurveyTake() {
 
       await api.post(`/api/surveys/${s.id}/submit`, { answers: normalized });
       setInfos((p) => ({ ...p, [s.id]: "Teşekkürler! Cevabınız kaydedildi." }));
-      setSurveys(prev => prev.map(it => it.id === s.id ? { ...it, alreadyAnswered: true } : it));
-          } catch (e) {
+      setSurveys((prev) => prev.map((it) => (it.id === s.id ? { ...it, alreadyAnswered: true } : it)));
+    } catch (e) {
       const status = e?.response?.status;
       if (status === 409) {
         setInfos((p) => ({ ...p, [s.id]: "Bu anketi zaten yanıtladınız." }));
@@ -167,13 +209,15 @@ export default function SurveyTake() {
   };
 
   /* -------------------- UI -------------------- */
-  if (loading) return <p>Anketler yükleniyor...</p>;
-  if (!surveys.length) return <p>Görüntülenecek anket yok.</p>;
+  if (loading) return <LoadingState />;
+  if (!surveys.length) return <EmptyState />;
 
   return (
       <div className="max-w-3xl mx-auto p-6 space-y-4">
         {infos._global && (
-            <div className="rounded-lg border border-amber-300 bg-amber-50 text-amber-800 p-3">{infos._global}</div>
+            <div className="rounded-lg border border-amber-300 bg-amber-50 text-amber-800 p-3">
+              {infos._global}
+            </div>
         )}
 
         {surveys.map((s) => {
@@ -184,16 +228,15 @@ export default function SurveyTake() {
 
           return (
               <div key={s.id} className="border rounded-xl bg-white overflow-hidden">
-                {/* Header (kapalıyken sadece burası görünür) */}
+                {/* Header */}
                 <button
                     type="button"
-                    onClick={() => openOneOnly(s.id)} // tek açılır istiyorsan; hepsi bağımsız açılsın istersen toggle(s.id) yap
+                    onClick={() => openOneOnly(s.id)}
                     className={`w-full flex items-center gap-3 justify-between px-4 py-3 text-left
-                          ${isOpen ? "bg-slate-50" : "bg-white"} hover:bg-slate-50`}
+                ${isOpen ? "bg-slate-50" : "bg-white"} hover:bg-slate-50`}
                 >
                   <div className="flex-1 min-w-0">
                     <div className="font-semibold truncate">{s.title}</div>
-                    {/* küçük açıklama satırı istersen: */}
                     {s.description && <div className="text-slate-600 text-sm line-clamp-1">{s.description}</div>}
                   </div>
 
@@ -217,7 +260,7 @@ export default function SurveyTake() {
                   </div>
                 </button>
 
-                {/* Body (sorular) */}
+                {/* Body */}
                 {isOpen && (
                     <div className="px-4 pb-4 pt-2 border-t">
                       {expired && (
