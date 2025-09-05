@@ -501,52 +501,71 @@ const EmployeeTeamAttendance = ({ user }) => {
   };
 
   // Onaylama fonksiyonu
+  // Approve button
   const handleApprove = async (memberId) => {
     try {
-      // Yetki kontrolü yap
+      // Authz check you already have:
       const member = teamState.find(m => m.id === memberId);
       if (!member || !canEditMember(member)) {
         Swal.fire({
-          title: 'Yetki Hatası',
-          text: 'Bu kullanıcının attendance bilgisini onaylama yetkiniz yok.',
+          title: 'Permission Error',
+          text: 'You do not have permission to approve this user’s attendance.',
           icon: 'error'
         });
         return;
       }
 
-      const response = await axios.post(`/api/attendance/${memberId}/${weekStart}/approve`);
-      console.log(response);
+      // 1) Always fetch the user's excuses fresh here
+      const excuseRes = await fetch(`/api/excuse/user/${memberId}`);
+      const allExcuses = await excuseRes.json(); // [{ id, userId, excuseDate, excuseType, description, isApproved }, ...]
 
+      // 2) Filter to THIS WEEK and only those not yet approved
+      const start = new Date(`${weekStart}T00:00:00`);        // weekStart is your YYYY-MM-DD
+      const end = new Date(start);
+      end.setDate(start.getDate() + 6);
 
-      if (employeeExcuses.length > 0) {
-        for (const excuse of employeeExcuses) {
-          if (excuse.approved === false || excuse.isApproved === false) {
-            const responseExcuseApprove = await axios.post(`/api/attendance/excuse/${excuse.id}/approve`);
-            console.log(responseExcuseApprove);
-          }
-        }
+      const inWeek = (isoDateStr) => {
+        const d = new Date(`${isoDateStr}T00:00:00`);
+        return d >= start && d <= end;
+      };
+
+      const pendingThisWeek = allExcuses.filter(ex =>
+          inWeek(ex.excuseDate) && !(ex.isApproved === true || ex.approved === true) // handle both shapes
+      );
+
+      // 3) Approve attendance
+      await axios.post(`/api/attendance/${memberId}/${weekStart}/approve`);
+
+      // 4) Approve all pending excuses for the same week (in parallel)
+      if (pendingThisWeek.length > 0) {
+        await Promise.all(
+            pendingThisWeek.map(ex =>
+                axios.post(`/api/attendance/excuse/${ex.id}/approve`)
+            )
+        );
       }
-      // Başarılı onaylama sonrası verileri yeniden çek
+
+      // 5) Refresh UI
       await fetchTeamData();
 
     } catch (error) {
       console.error('API Error:', error);
       if (error.response?.status === 403) {
         Swal.fire({
-          title: 'Yetki Hatası',
-          text: 'Bu kullanıcının attendance bilgisini onaylama yetkiniz yok.',
+          title: 'Permission Error',
+          text: 'You do not have permission to approve this user’s attendance/excuses.',
           icon: 'error'
         });
       } else {
         Swal.fire({
-          title: 'Hata',
-          text: 'Onaylama işlemi sırasında hata oluştu: ' + (error.response?.data?.message || error.message),
+          title: 'Error',
+          text: 'There was an error while approving: ' + (error.response?.data?.message || error.message),
           icon: 'error'
         });
       }
-
     }
   };
+
 
   // Düzenleme fonksiyonu - Modal açma
   const handleEdit = async (memberId) => {
