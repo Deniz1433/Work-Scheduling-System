@@ -151,7 +151,7 @@ export default function SurveyAdmin() {
   // Create form state
   const [title, setTitle]             = useState("");
   const [description, setDescription] = useState("");
-  const [anonymous, setAnonymous]     = useState(false);// datetime-local (zorunlu)
+  const [anonymous, setAnonymous]     = useState(false);
   const [questions, setQuestions]     = useState([emptyQuestion()]);
   const [deadline, setDeadline]       = useState("");
   const [hideAfter, setHideAfter]     = useState("");
@@ -205,7 +205,11 @@ export default function SurveyAdmin() {
 
   const validate = () => {
     if (!title.trim()) return "Anket başlığı zorunludur.";
-    if (!deadline) return "Son tarih zorunludur.";
+    if (deadline && hideAfter) {
+      const d1 = new Date(deadline);
+      const d2 = new Date(hideAfter);
+      if(d2<d1) return "Kaybolma tarihi, son tarihten önce olamaz.";
+    }
     if (questions.length === 0) return "En az bir soru ekleyin.";
     for (let i = 0; i < questions.length; i++) {
       const q = questions[i];
